@@ -77,7 +77,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "20.1.25";
+const char* VERSION = "21.5.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -97,6 +97,8 @@ const char* LIGHT_CONFIG_FILE = "/light_config.json";
 // czujniki temperatury
 #define TEMP_AIR_PIN 15        // temperatutra powietrza (DS18B20)
 #define TEMP_CONTROLLER_PIN 4  // temperatura sterownika (DS18B20)
+// kadencja
+#define CADENCE_SENSOR_PIN 27
 
 // Stałe czasowe
 const unsigned long DEBOUNCE_DELAY = 25;
@@ -283,7 +285,6 @@ uint8_t displayBrightness = 16;  // Wartość od 0 do 255 (jasność wyświetlac
 
 // Zmienne pomiarowe
 float speed_kmh;
-int cadence_rpm;
 float temp_air;
 float temp_controller;
 float temp_motor;
@@ -299,7 +300,12 @@ int power_avg_w;
 int power_max_w;
 float speed_avg_kmh;
 float speed_max_kmh;
+// kadencja
+int cadence_rpm;
 int cadence_avg_rpm;
+int cadence_max_rpm = 0;
+volatile uint32_t cadence_pulse_count = 0;
+volatile unsigned long last_cadence_pulse_time = 0;
 
 // Zmienne dla czujników ciśnienia kół
 float pressure_bar;           // przednie koło
@@ -463,6 +469,16 @@ class TemperatureSensor {
             return isValidTemperature(temp) ? temp : INVALID_TEMP;
         }
 };
+
+void IRAM_ATTR cadence_ISR() {
+    static unsigned long last_isr_time = 0;
+    unsigned long now = millis();
+    if (now - last_isr_time > 20) { // filtr drgań styków ~20ms
+        cadence_pulse_count++;
+        last_cadence_pulse_time = now;
+        last_isr_time = now;
+    }
+}
 
 /********************************************************************
  * DEKLARACJE I IMPLEMENTACJE FUNKCJI
@@ -1091,6 +1107,11 @@ void drawMainDisplay() {
                         sprintf(valueStr, "%4d", cadence_avg_rpm);
                         unitStr = "RPM";
                         descText = ">Kadencja AVG";
+                        break;
+                    case CADENCE_SUB_COUNT: 
+                        sprintf(valueStr, "%4d", cadence_max_rpm);
+                        unitStr = "RPM";
+                        descText = ">Kadencja MAX";
                         break;
                 }
                 break;
@@ -2662,6 +2683,10 @@ void setup() {
     digitalWrite(FrontPin, LOW);
     digitalWrite(RearPin, LOW);
 
+    // kadencja
+    pinMode(CADENCE_SENSOR_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(CADENCE_SENSOR_PIN), cadence_ISR, FALLING);
+
     // Ładowarka USB
     pinMode(UsbPin, OUTPUT);
     digitalWrite(UsbPin, LOW);
@@ -2821,9 +2846,33 @@ void loop() {
         handleTemperature();
         updateBmsData();
 
+        static uint32_t last_cadence_pulse_count = 0;
+        static unsigned long last_cadence_update_time = 0;
+        static uint32_t cadence_sum = 0;
+        static uint32_t cadence_samples = 0;
+
+        if (currentTime - last_cadence_update_time >= 1000) { // co sekundę
+            uint32_t pulses = cadence_pulse_count - last_cadence_pulse_count;
+            last_cadence_pulse_count = cadence_pulse_count;
+            cadence_rpm = pulses * 60; // 1 impuls = 1 obrót korby na minutę
+
+            // Liczenie średniej
+            cadence_sum += cadence_rpm;
+            cadence_samples++;
+            if (cadence_samples > 0) {
+                cadence_avg_rpm = cadence_sum / cadence_samples;
+            }
+
+            // Liczenie maksymalnej kadencji
+            if (cadence_rpm > cadence_max_rpm) {
+                cadence_max_rpm = cadence_rpm;
+            }
+
+            last_cadence_update_time = currentTime;
+        }
+
         if (currentTime - lastUpdate >= updateInterval) {
             speed_kmh = (speed_kmh >= 35.0) ? 0.0 : speed_kmh + 0.1;
-            cadence_rpm = random(60, 90);
             temp_motor = 30.0 + random(20);
             range_km = 50.0 - (random(20) / 10.0);
             // Aktualizacja dystansu            
@@ -2856,9 +2905,6 @@ void loop() {
             if (speed_kmh > speed_max_kmh) {
                 speed_max_kmh = speed_kmh;
             }
-
-            // Aktualizacja kadencji
-            cadence_rpm = random(60, 90);
 
             // Aktualizacja średniej kadencji (przykładowa implementacja)
             static int cadence_sum = 0;
