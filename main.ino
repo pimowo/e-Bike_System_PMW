@@ -302,11 +302,14 @@ int power_max_w;
 float speed_avg_kmh;
 float speed_max_kmh;
 // kadencja
-int cadence_rpm;
-int cadence_avg_rpm;
-int cadence_max_rpm = 0;
 volatile uint32_t cadence_pulse_count = 0;
 volatile unsigned long last_cadence_pulse_time = 0;
+int cadence_rpm = 0;
+int cadence_avg_rpm = 0;
+int cadence_max_rpm = 0;
+uint32_t cadence_sum = 0;
+uint32_t cadence_samples = 0;
+unsigned long cadence_last_calc = 0;
 
 // Zmienne dla czujników ciśnienia kół
 float pressure_bar;           // przednie koło
@@ -472,13 +475,8 @@ class TemperatureSensor {
 };
 
 void IRAM_ATTR cadence_ISR() {
-    static unsigned long last_isr_time = 0;
-    unsigned long now = millis();
-    if (now - last_isr_time > 20) { // filtr drgań styków ~20ms
-        cadence_pulse_count++;
-        last_cadence_pulse_time = now;
-        last_isr_time = now;
-    }
+    cadence_pulse_count++;
+    last_cadence_pulse_time = millis();
 }
 
 /********************************************************************
@@ -2689,6 +2687,14 @@ void setup() {
     pinMode(CADENCE_SENSOR_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(CADENCE_SENSOR_PIN), cadence_ISR, FALLING);
 
+    // zeruj licznik kadencji przy starcie
+    cadence_rpm = 0;
+    cadence_avg_rpm = 0;
+    cadence_max_rpm = 0;
+    cadence_sum = 0;
+    cadence_samples = 0;
+    cadence_last_calc = 0;
+
     // Ładowarka USB
     pinMode(UsbPin, OUTPUT);
     digitalWrite(UsbPin, LOW);
@@ -2849,29 +2855,39 @@ void loop() {
         handleTemperature();
         updateBmsData();
 
-        static uint32_t last_cadence_pulse_count = 0;
-        static unsigned long last_cadence_update_time = 0;
-        static uint32_t cadence_sum = 0;
-        static uint32_t cadence_samples = 0;
+        // Ustaw interwał, np. co 100 ms
+        unsigned long now = millis();
+        static uint32_t last_pulse_count = 0;
+        static unsigned long last_check = 0;
+        const unsigned long cadence_interval = 100; // 100 ms
 
-        if (currentTime - last_cadence_update_time >= 1000) { // co sekundę
-            uint32_t pulses = cadence_pulse_count - last_cadence_pulse_count;
-            last_cadence_pulse_count = cadence_pulse_count;
-            cadence_rpm = pulses * 60; // 1 impuls = 1 obrót korby na minutę
+        if (now - last_check >= cadence_interval) {
+            uint32_t pulses = cadence_pulse_count - last_pulse_count;
+            last_pulse_count = cadence_pulse_count;
 
-            // Liczenie średniej
-            cadence_sum += cadence_rpm;
-            cadence_samples++;
-            if (cadence_samples > 0) {
+            // Jeśli był impuls od ostatniego sprawdzenia, licz RPM na podstawie czasu od poprzedniego impulsu
+            if (pulses > 0) {
+                // Czas od poprzedniego impulsu (ms)
+                unsigned long time_per_rev = now - cadence_last_calc;
+                cadence_last_calc = now;
+
+                if (time_per_rev > 0) {
+                    cadence_rpm = 60000 / time_per_rev; // 1 obrót = 1 impuls
+                } else {
+                    cadence_rpm = 0;
+                }
+                // Aktualizuj średnią i max tylko przy pedałowaniu!
+                cadence_sum += cadence_rpm;
+                cadence_samples++;
+                if (cadence_rpm > cadence_max_rpm) cadence_max_rpm = cadence_rpm;
                 cadence_avg_rpm = cadence_sum / cadence_samples;
+            } else {
+                // Jeśli długo nie było impulsu, wyzeruj RPM
+                if (now - last_cadence_pulse_time > 2000) { // np. 2s bez impulsu = nie pedałuje
+                    cadence_rpm = 0;
+                }
             }
-
-            // Liczenie maksymalnej kadencji
-            if (cadence_rpm > cadence_max_rpm) {
-                cadence_max_rpm = cadence_rpm;
-            }
-
-            last_cadence_update_time = currentTime;
+            last_check = now;
         }
 
         if (currentTime - lastUpdate >= updateInterval) {
