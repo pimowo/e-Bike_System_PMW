@@ -1,0 +1,408 @@
+:root {
+    --primary-color: #2196F3;
+    --secondary-color: #1976D2;
+    --background-color: #1a1a1a;
+    --card-background: #2a2a2a;
+    --text-color: #ffffff;
+    --border-color: #3d3d3d;
+    --header-background: #2d2d2d;
+    --danger-color: #F44336;
+    --success-color: #4CAF50;
+    --unit-color: #999999;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    background-color: var(--header-background);
+    color: var(--text-color);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+header h1 {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.dashboard {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.card {
+    background-color: var(--card-background);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    text-align: center;
+    border: 1px solid var(--border-color);
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.card h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: var(--primary-color);
+    font-size: 1.5rem;
+    font-weight: 500;
+}
+
+.card h3 {
+    text-align: left;
+    margin: 20px 0 10px 0;
+    color: var(--primary-color);
+}
+
+/* Wspólne style dla wszystkich wierszy */
+.rtc-row,
+.light-row,
+.display-row,
+.setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 15px 0;
+    padding: 0 10px;
+    width: 100%;
+}
+
+/* Wspólne style dla etykiet */
+.rtc-row label,
+.light-row label,
+.display-row label,
+.setting-row label {
+    flex: 0 0 auto;
+    min-width: 250px;
+    color: var(--text-color);
+    font-size: 1.1rem;
+    text-align: left;
+    padding-right: 15px;
+}
+
+/* Wspólne style dla inputów i selectów */
+.rtc-row input,
+.light-row input,
+.display-row input,
+.setting-row input,
+.rtc-row select,
+.light-row select,
+.display-row select,
+.setting-row select {
+    width: 150px;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 1rem;
+    margin-left: auto;
+}
+
+/* Kontener z jednostką */
+.input-with-unit {
+    display: flex;
+    align-items: center;
+    width: 150px;
+    margin-left: auto;
+}
+
+.input-with-unit input {
+    width: 100px;
+    margin-right: 5px;
+}
+
+.unit {
+    color: var(--text-color);
+    margin-left: 5px;
+    min-width: 30px;
+}
+
+/* Toggle Switch - nowy styl dla selecta */
+.toggle-switch {
+    margin-left: auto;
+    width: 150px;
+}
+
+.toggle-switch select {
+    width: 100%;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.toggle-switch select:hover {
+    border-color: var(--primary-color);
+}
+
+.toggle-switch select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+}
+
+/* Grupy parametrów sterownika */
+.settings-group {
+    margin: 15px 0;
+    padding: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    width: 100%;
+}
+
+/* Przycisk zapisz */
+.btn-save {
+    background-color: var(--success-color);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 20px auto 0;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: background-color 0.3s ease;
+    display: block;
+    width: 100%;
+}
+
+.btn-save:hover {
+    background-color: #388e3c;
+}
+
+/* Stopka */
+footer {
+    background-color: var(--header-background);
+    color: var(--text-color);
+    padding: 20px;
+    border-radius: 8px;
+    margin-top: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    text-align: center;
+}
+
+footer a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+footer a:hover {
+    color: var(--secondary-color);
+}
+
+/* Media Queries */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
+    .rtc-row,
+    .light-row,
+    .display-row,
+    .setting-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .rtc-row label,
+    .light-row label,
+    .display-row label,
+    .setting-row label {
+        margin-bottom: 5px;
+        padding-right: 0;
+    }
+    
+    .rtc-row input,
+    .light-row input,
+    .display-row input,
+    .setting-row input,
+    .rtc-row select,
+    .light-row select,
+    .display-row select,
+    .setting-row select,
+    .input-with-unit {
+        width: 100%;
+        margin-left: 0;
+    }
+    
+    .toggle-switch {
+        width: 100%;
+        margin-left: 0;
+    }
+    
+    .card {
+        padding: 15px;
+    }
+}
+
+/* Style dla ikonki info */
+.info-icon {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    padding: 0 5px;
+    font-size: 1.2rem;
+    transition: color 0.3s ease;
+    line-height: 1;
+    vertical-align: middle;
+    display: inline-flex;
+    align-items: center;
+}
+
+.info-icon:hover {
+    color: var(--secondary-color);
+}
+
+/* Style dla modala */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: var(--card-background);
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    color: var(--danger-color); /* Zmiana na czerwony */
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0 5px;
+    transition: color 0.3s ease; /* Płynna zmiana koloru przy hover */
+}
+
+.close-modal:hover {
+    color: #d32f2f; /* Ciemniejszy odcień czerwonego przy najechaniu */
+}
+
+.modal-body {
+    color: var(--text-color);
+    line-height: 1.6;
+    white-space: pre-line;
+}
+
+.modal-footer {
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    color: var(--unit-color);
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+    .modal-content {
+        margin: 10% auto;
+        width: 95%;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+}
+
+.no-time-icon::-webkit-calendar-picker-indicator,
+.no-calendar-icon::-webkit-calendar-picker-indicator {
+    display: none;
+}
+
+.no-time-icon::-webkit-inner-spin-button,
+.no-calendar-icon::-webkit-inner-spin-button {
+    display: none;
+}
+
+#kt-lcd-params, #s866-lcd-params {
+    display: none; /* domyślnie ukryte */
+}
+
+#kt-lcd-params.active, #s866-lcd-params.active {
+    display: block;
+}
+
+.settings-group {
+    margin: 10px 0;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+}
+
+.card-header h2 {
+    flex-grow: 1;
+    text-align: center;
+    margin: 0 10px;
+}
+
+.info-icon, .collapse-btn {
+    background: none;
+    border: none;
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.info-icon:hover, .collapse-btn:hover {
+    opacity: 0.8;
+}
+
+.collapse-btn.rotated {
+    transform: rotate(180deg);
+}
