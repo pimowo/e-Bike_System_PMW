@@ -74,7 +74,7 @@
  * DEFINICJE I STAŁE GLOBALNE
  ********************************************************************/
 
-#define DEBUG
+//#define DEBUG
 
 // Wersja oprogramowania
 const char* VERSION = "21.5.25";
@@ -1717,7 +1717,7 @@ void goToSleep() {
 
     // Zapisz licznik całkowity
     //odometer.shutdown();
-    odometer.save();
+    //odometer.save();
 
     // Konfiguracja wybudzania przez przycisk SET
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_12, 0);  // GPIO12 (BTN_SET) stan niski
@@ -2711,7 +2711,7 @@ void setup() {
 
     // Inicjalizacja licznika
     //odometer.initialize();
-    odometer.begin();
+    //odometer.begin();
     #ifdef DEBUG
     Serial.println("Stan licznika po inicjalizacji:");
     Serial.print("Zainicjalizowany: ");
