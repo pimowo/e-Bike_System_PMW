@@ -219,6 +219,7 @@ enum SpeedSubScreen {
 enum CadenceSubScreen {
     CADENCE_RPM,       // Aktualna kadencja
     CADENCE_AVG_RPM,   // Średnia kadencja
+    CADENCE_MAX_RPM,   // Maksymalna kadencja
     CADENCE_SUB_COUNT  
 };
 
