@@ -1716,7 +1716,8 @@ void goToSleep() {
     display.setPowerSave(1);  // Wprowadź OLED w tryb oszczędzania energii
 
     // Zapisz licznik całkowity
-    odometer.shutdown();
+    //odometer.shutdown();
+    odometer.save();
 
     // Konfiguracja wybudzania przez przycisk SET
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_12, 0);  // GPIO12 (BTN_SET) stan niski
@@ -2709,7 +2710,8 @@ void setup() {
     }
 
     // Inicjalizacja licznika
-    odometer.initialize();
+    //odometer.initialize();
+    odometer.begin();
     #ifdef DEBUG
     Serial.println("Stan licznika po inicjalizacji:");
     Serial.print("Zainicjalizowany: ");
