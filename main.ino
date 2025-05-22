@@ -318,8 +318,8 @@ const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
 #define CADENCE_HYSTERESIS 2
 enum CadenceArrow { ARROW_NONE, ARROW_UP, ARROW_DOWN };
 CadenceArrow cadence_arrow_state = ARROW_NONE;
-enum CadenceArrowState { ARROW_NONE, ARROW_UP, ARROW_DOWN };
-CadenceArrowState cadence_arrow_state = ARROW_NONE;
+//enum CadenceArrowState { ARROW_NONE, ARROW_UP, ARROW_DOWN };
+//CadenceArrowState cadence_arrow_state = ARROW_NONE;
 unsigned long lastCadenceArrowUpdate = 0;
 const unsigned long ARROW_PERSIST_TIME = 1500; // ms
 
@@ -927,7 +927,7 @@ void drawHorizontalLine() {
 // rysowanie linii pionowej
 void drawVerticalLine() {
     display.drawVLine(25, 16, 28);
-    display.drawVLine(64, 16, 28);
+    display.drawVLine(66, 16, 28);
 }
 
 // rysowanie górnego paska
@@ -1096,6 +1096,35 @@ void drawCircleIcon() {
 void drawDownArrow() {
     // Strzałka w dół: od lewej 50, od góry 35 (grot na 58,43)
     display.drawTriangle(53, 35, 58, 43, 63, 35);
+}
+
+// --- Logika kadencji ---
+void updateCadenceLogic() {
+    bool arrowActive = false;
+    switch (cadence_arrow_state) {
+        case ARROW_NONE:
+            if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN) {
+                cadence_arrow_state = ARROW_UP;
+                arrowActive = true;
+            } else if (cadence_rpm > CADENCE_OPTIMAL_MAX) {
+                cadence_arrow_state = ARROW_DOWN;
+                arrowActive = true;
+            }
+            break;
+        case ARROW_UP:
+            if (cadence_rpm >= CADENCE_OPTIMAL_MIN + CADENCE_HYSTERESIS)
+                cadence_arrow_state = ARROW_NONE;
+            else
+                arrowActive = true;
+            break;
+        case ARROW_DOWN:
+            if (cadence_rpm <= CADENCE_OPTIMAL_MAX - CADENCE_HYSTERESIS)
+                cadence_arrow_state = ARROW_NONE;
+            else
+                arrowActive = true;
+            break;
+    }
+    if (arrowActive) lastCadenceArrowUpdate = millis();
 }
 
 // Implementacja głównego ekranu
@@ -1367,7 +1396,7 @@ void drawCadenceArrowsAndCircle() {
     // Strzałka w górę
     if (upVisible) drawUpArrow();
     // Kółko zawsze
-    drawCircleIcon();
+    //drawCircleIcon();
     // Strzałka w dół
     if (downVisible) drawDownArrow();
 }
@@ -2966,35 +2995,6 @@ void loop() {
             // NIE zerujemy sumatorów ani max!
             last_avg_max_update = now;
             //}
-        }
-
-        // --- Logika kadencji ---
-        void updateCadenceLogic() {
-            bool arrowActive = false;
-            switch (cadence_arrow_state) {
-                case ARROW_NONE:
-                    if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN) {
-                        cadence_arrow_state = ARROW_UP;
-                        arrowActive = true;
-                    } else if (cadence_rpm > CADENCE_OPTIMAL_MAX) {
-                        cadence_arrow_state = ARROW_DOWN;
-                        arrowActive = true;
-                    }
-                    break;
-                case ARROW_UP:
-                    if (cadence_rpm >= CADENCE_OPTIMAL_MIN + CADENCE_HYSTERESIS)
-                        cadence_arrow_state = ARROW_NONE;
-                    else
-                        arrowActive = true;
-                    break;
-                case ARROW_DOWN:
-                    if (cadence_rpm <= CADENCE_OPTIMAL_MAX - CADENCE_HYSTERESIS)
-                        cadence_arrow_state = ARROW_NONE;
-                    else
-                        arrowActive = true;
-                    break;
-            }
-            if (arrowActive) lastCadenceArrowUpdate = millis();
         }
 
         drawCadenceArrowsAndCircle();
