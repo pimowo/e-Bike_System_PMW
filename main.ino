@@ -1079,12 +1079,22 @@ void drawValueAndUnit(const char* valueStr, const char* unitStr) {
 }
 
 // wyświetlanie strzałek kadencji
+// Strzałka w górę: od lewej 55, od góry 30
 void drawUpArrow() {
-    display.drawTriangle(55, 35, 64, 50, 68, 58);
+    // Wierzchołek środkowy (grot) na (64, 30), podstawa na (59, 38) i (69, 38)
+    display.drawTriangle(59, 38, 64, 30, 69, 38);
 }
 
+// strzałka w dół - od lewej 55, od góry 50
 void drawDownArrow() {
-    display.drawTriangle(55, 50, 64, 80, 68, 72);
+    // Wierzchołek środkowy (grot) na (64, 58), podstawa na (59, 50) i (69, 50)
+    display.drawTriangle(59, 50, 64, 58, 69, 50);
+}
+
+// ikona hamulca
+// środek od lewej 64, od góry 40 (promień 6)
+void drawCircleIcon() {
+    display.drawCircle(64, 40, 6); // x=64, y=40, r=6
 }
 
 // Implementacja głównego ekranu
