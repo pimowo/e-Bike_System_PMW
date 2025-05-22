@@ -1080,11 +1080,11 @@ void drawValueAndUnit(const char* valueStr, const char* unitStr) {
 
 // wyświetlanie strzałek kadencji
 void drawUpArrow() {
-    display.drawTriangle(60, 58, 64, 50, 68, 58);
+    display.drawTriangle(55, 35, 64, 50, 68, 58);
 }
 
 void drawDownArrow() {
-    display.drawTriangle(60, 72, 64, 80, 68, 72);
+    display.drawTriangle(55, 50, 64, 80, 68, 72);
 }
 
 // Implementacja głównego ekranu
@@ -2879,6 +2879,15 @@ void loop() {
         handleTemperature();
         updateBmsData();
 
+        // Strzałki kadencji ZAWSZE na ekranie głównym
+        if (cadence_arrow_state == ARROW_UP) {
+            drawUpArrow();
+        } else if (cadence_arrow_state == ARROW_DOWN) {
+            drawDownArrow();
+        }
+
+        display.sendBuffer();
+
         unsigned long now = millis();
         static unsigned long last_rpm_calc = 0;
         const unsigned long rpm_calc_interval = 100; // co 100ms
@@ -2972,12 +2981,5 @@ void loop() {
                 speed_max_kmh = speed_kmh;
             }
         }
-
-        if (cadence_arrow_state == ARROW_UP) {
-            drawUpArrow();
-        } else if (cadence_arrow_state == ARROW_DOWN) {
-            drawDownArrow();
-        }
-
     }
 }
