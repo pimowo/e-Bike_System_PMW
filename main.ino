@@ -1090,17 +1090,20 @@ void drawValueAndUnit(const char* valueStr, const char* unitStr) {
 // --- Funkcje rysujące ---
 void drawUpArrow() {
     // Strzałka w górę: od lewej 50, od góry 15 (grot na 58,15)
-    display.drawTriangle(53, 23, 58, 15, 63, 23);
+    //display.drawTriangle(53, 23, 58, 15, 63, 23);
+    display.drawTriangle(56, 23, 61, 15, 66, 23);
 }
 
 void drawCircleIcon() {
     // Kółko: środek od lewej 58, od góry 25 (promień 6)
-    display.drawCircle(58, 25, 6);
+    //display.drawCircle(58, 25, 6);
+    display.drawCircle(61, 25, 6);
 }
 
 void drawDownArrow() {
     // Strzałka w dół: od lewej 50, od góry 35 (grot na 58,43)
-    display.drawTriangle(53, 35, 58, 43, 63, 35);
+    //display.drawTriangle(53, 35, 58, 43, 63, 35);
+    display.drawTriangle(56, 35, 61, 43, 66, 35);
 }
 
 // logika kadencji
