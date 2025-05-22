@@ -310,9 +310,14 @@ int cadence_max_rpm = 0;
 uint32_t cadence_sum = 0;
 uint32_t cadence_samples = 0;
 unsigned long cadence_last_calc = 0;
+// bufor do wygładzania aktualnej kadencji
 #define CADENCE_SMOOTHING 5
 int cadence_buffer[CADENCE_SMOOTHING] = {0};
 int cadence_buffer_pos = 0;
+int cadence_rpm_smoothed = 0;
+
+int cadence_avg_rpm_display = 0;
+int cadence_max_rpm_display = 0;
 unsigned long last_avg_max_update = 0;
 const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5 sekund
 
