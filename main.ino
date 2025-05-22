@@ -323,6 +323,10 @@ const unsigned long ARROW_PERSIST_TIME = 1500; // ms
 unsigned long lastCadenceTime = 0;
 const unsigned long cadenceArrowTimeout = 1000; // czas wyświetlania strzałek w milisekundach (1 sekunda)
 bool cadenceArrowsOn = false;
+// Zmienne dla strzałek kadencji
+unsigned long ostatniCzasKadencji = 0;
+const unsigned long czasWyswietlaniaStrzalek = 1000; // czas w milisekundach (1 sekunda)
+bool strzalkiAktywne = false;
 
 // Zmienne dla czujników ciśnienia kół
 float pressure_bar;           // przednie koło
