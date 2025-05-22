@@ -1103,33 +1103,34 @@ void drawDownArrow() {
     display.drawTriangle(53, 35, 58, 43, 63, 35);
 }
 
-// --- Logika kadencji ---
+// logika kadencji
 void updateCadenceLogic() {
-    bool arrowActive = false;
+    unsigned long now = millis();
+    bool cadenceActive = (now - cadence_last_pulse_time < 2000);
+    
+    if (!cadenceActive) {
+        // Jeśli kadencja nie jest aktywna, nie pokazujemy żadnych strzałek
+        cadence_arrow_state = ARROW_NONE;
+        return;
+    }
+    
+    // Aktualizuj stan strzałek tylko gdy kadencja jest aktywna
     switch (cadence_arrow_state) {
         case ARROW_NONE:
-            if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN) {
+            if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN)
                 cadence_arrow_state = ARROW_UP;
-                arrowActive = true;
-            } else if (cadence_rpm > CADENCE_OPTIMAL_MAX) {
+            else if (cadence_rpm > CADENCE_OPTIMAL_MAX)
                 cadence_arrow_state = ARROW_DOWN;
-                arrowActive = true;
-            }
             break;
         case ARROW_UP:
             if (cadence_rpm >= CADENCE_OPTIMAL_MIN + CADENCE_HYSTERESIS)
                 cadence_arrow_state = ARROW_NONE;
-            else
-                arrowActive = true;
             break;
         case ARROW_DOWN:
             if (cadence_rpm <= CADENCE_OPTIMAL_MAX - CADENCE_HYSTERESIS)
                 cadence_arrow_state = ARROW_NONE;
-            else
-                arrowActive = true;
             break;
     }
-    if (arrowActive) lastCadenceArrowUpdate = millis();
 }
 
 // Implementacja głównego ekranu
@@ -1386,24 +1387,27 @@ void drawMainDisplay() {
     display.drawStr(0, 62, descText);
 }
 
+// rysowanie strzałek
 // --- Rysowanie strzałek i kółka ---
-// Wywołuj w drawMainDisplay() lub w głównym loop PRZED display.sendBuffer()
 void drawCadenceArrowsAndCircle() {
     unsigned long now = millis();
-    bool upVisible = (cadence_arrow_state == ARROW_UP) ||
-                     ((cadence_arrow_state == ARROW_NONE) &&
-                      (now - lastCadenceArrowUpdate < ARROW_PERSIST_TIME) &&
-                      (lastCadenceArrowUpdate > 0));
-    bool downVisible = (cadence_arrow_state == ARROW_DOWN) ||
-                       ((cadence_arrow_state == ARROW_NONE) &&
-                        (now - lastCadenceArrowUpdate < ARROW_PERSIST_TIME) &&
-                        (lastCadenceArrowUpdate > 0));
-    // Strzałka w górę
-    if (upVisible) drawUpArrow();
-    // Kółko zawsze
-    //drawCircleIcon();
-    // Strzałka w dół
-    if (downVisible) drawDownArrow();
+    
+    // Sprawdź, czy wykryto obrót pedałów w ostatnim czasie
+    // Jeśli tak, uznaj kadencję za aktywną (w ciągu ostatnich 2 sekund)
+    bool cadenceActive = (now - cadence_last_pulse_time < 2000);
+    
+    // Strzałka w górę - pokaż gdy potrzebna wyższa kadencja i kadencja jest aktywna
+    if (cadenceActive && (cadence_arrow_state == ARROW_UP)) {
+        drawUpArrow();
+    }
+    
+    // Kółko (opcjonalne)
+    // drawCircleIcon();
+    
+    // Strzałka w dół - pokaż gdy potrzebna niższa kadencja i kadencja jest aktywna
+    if (cadenceActive && (cadence_arrow_state == ARROW_DOWN)) {
+        drawDownArrow();
+    }
 }
 
 // wyświetlanie wycentrowanego tekstu
@@ -3002,6 +3006,7 @@ void loop() {
             //}
         }
 
+        updateCadenceLogic();
         drawCadenceArrowsAndCircle();
         display.sendBuffer();
 
