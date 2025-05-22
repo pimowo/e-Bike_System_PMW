@@ -318,10 +318,11 @@ const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
 #define CADENCE_HYSTERESIS 2
 enum CadenceArrow { ARROW_NONE, ARROW_UP, ARROW_DOWN };
 CadenceArrow cadence_arrow_state = ARROW_NONE;
-//enum CadenceArrowState { ARROW_NONE, ARROW_UP, ARROW_DOWN };
-//CadenceArrowState cadence_arrow_state = ARROW_NONE;
 unsigned long lastCadenceArrowUpdate = 0;
 const unsigned long ARROW_PERSIST_TIME = 1500; // ms
+unsigned long lastCadenceTime = 0;
+const unsigned long cadenceArrowTimeout = 1000; // czas wyświetlania strzałek w milisekundach (1 sekunda)
+bool cadenceArrowsOn = false;
 
 // Zmienne dla czujników ciśnienia kół
 float pressure_bar;           // przednie koło
