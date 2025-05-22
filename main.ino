@@ -302,6 +302,8 @@ int power_max_w;
 float speed_avg_kmh;
 float speed_max_kmh;
 // kadencja
+volatile unsigned long cadence_last_pulse_time = 0;
+volatile unsigned long cadence_prev_pulse_time = 0;
 volatile uint32_t cadence_pulse_count = 0;
 volatile unsigned long last_cadence_pulse_time = 0;
 int cadence_rpm = 0;
@@ -485,8 +487,8 @@ class TemperatureSensor {
 };
 
 void IRAM_ATTR cadence_ISR() {
-    cadence_pulse_count++;
-    last_cadence_pulse_time = millis();
+    cadence_prev_pulse_time = cadence_last_pulse_time;
+    cadence_last_pulse_time = millis();
 }
 
 /********************************************************************
@@ -2703,7 +2705,6 @@ void setup() {
     cadence_max_rpm = 0;
     cadence_sum = 0;
     cadence_samples = 0;
-    cadence_last_calc = 0;
 
     // Ładowarka USB
     pinMode(UsbPin, OUTPUT);
@@ -2865,60 +2866,35 @@ void loop() {
         handleTemperature();
         updateBmsData();
 
-        // Ustaw interwał, np. co 100 ms
         unsigned long now = millis();
-        static uint32_t last_pulse_count = 0;
-        static unsigned long last_check = 0;
-        const unsigned long cadence_interval = 100; // 100 ms
+        static unsigned long last_rpm_calc = 0;
+        const unsigned long rpm_calc_interval = 100;
 
-        // Dodaj do bufora nowy odczyt
-        cadence_buffer[cadence_buffer_pos] = cadence_rpm;
-        cadence_buffer_pos = (cadence_buffer_pos + 1) % CADENCE_SMOOTHING;
-
-        // Licz średnią z bufora
-        int sum = 0;
-        for (int i = 0; i < CADENCE_SMOOTHING; i++) sum += cadence_buffer[i];
-        int smoothed_rpm = sum / CADENCE_SMOOTHING;
-
-        if (now - last_avg_max_update >= AVG_MAX_UPDATE_INTERVAL) {
-            if (cadence_samples > 0) {
-                cadence_avg_rpm_display = cadence_sum / cadence_samples;
+        if (now - last_rpm_calc >= rpm_calc_interval) {
+            unsigned long pulse_dt = cadence_last_pulse_time - cadence_prev_pulse_time;
+            if ((now - cadence_last_pulse_time) < 2000 && pulse_dt > 0) {
+                cadence_rpm = 60000UL / pulse_dt;
+            } else {
+                cadence_rpm = 0;
             }
-            cadence_max_rpm_display = cadence_max_rpm;
-            last_avg_max_update = now;
-            // Wyzeruj akumulatory dla kolejnych 5 sek.
-            cadence_sum = 0;
-            cadence_samples = 0;
-            cadence_max_rpm = 0;
+            // Uśrednianie i max można aktualizować co np. 5 sekund
+            cadence_sum += cadence_rpm;
+            cadence_samples++;
+            if (cadence_rpm > cadence_max_rpm) cadence_max_rpm = cadence_rpm;
+            last_rpm_calc = now;
         }
 
-        if (now - last_check >= cadence_interval) {
-            uint32_t pulses = cadence_pulse_count - last_pulse_count;
-            last_pulse_count = cadence_pulse_count;
-
-            // Jeśli był impuls od ostatniego sprawdzenia, licz RPM na podstawie czasu od poprzedniego impulsu
-            if (pulses > 0) {
-                // Czas od poprzedniego impulsu (ms)
-                unsigned long time_per_rev = now - cadence_last_calc;
-                cadence_last_calc = now;
-
-                if (time_per_rev > 0) {
-                    cadence_rpm = 60000 / time_per_rev; // 1 obrót = 1 impuls
-                } else {
-                    cadence_rpm = 0;
-                }
-                // Aktualizuj średnią i max tylko przy pedałowaniu!
-                cadence_sum += cadence_rpm;
-                cadence_samples++;
-                if (cadence_rpm > cadence_max_rpm) cadence_max_rpm = cadence_rpm;
+        // --- Co 5 sekund (np. w osobnym liczniku w loop) ---
+        static unsigned long last_avg_update = 0;
+        if (now - last_avg_update >= 5000) {
+            if (cadence_samples > 0) {
                 cadence_avg_rpm = cadence_sum / cadence_samples;
-            } else {
-                // Jeśli długo nie było impulsu, wyzeruj RPM
-                if (now - last_cadence_pulse_time > 2000) { // np. 2s bez impulsu = nie pedałuje
-                    cadence_rpm = 0;
-                }
             }
-            last_check = now;
+            last_avg_update = now;
+            cadence_sum = 0;
+            cadence_samples = 0;
+            cadence_max_rpm = 0; // jeśli chcesz max per 5s
+            // jeśli chcesz max z całej jazdy – nie zeruj!
         }
 
         if (currentTime - lastUpdate >= updateInterval) {
