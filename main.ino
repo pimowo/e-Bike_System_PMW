@@ -302,26 +302,16 @@ int power_max_w;
 float speed_avg_kmh;
 float speed_max_kmh;
 // kadencja
+#define CADENCE_SAMPLES_WINDOW 4
+volatile unsigned long cadence_pulse_times[CADENCE_SAMPLES_WINDOW] = {0};
 volatile unsigned long cadence_last_pulse_time = 0;
-volatile unsigned long cadence_prev_pulse_time = 0;
-volatile uint32_t cadence_pulse_count = 0;
-volatile unsigned long last_cadence_pulse_time = 0;
 int cadence_rpm = 0;
 int cadence_avg_rpm = 0;
 int cadence_max_rpm = 0;
 uint32_t cadence_sum = 0;
 uint32_t cadence_samples = 0;
-unsigned long cadence_last_calc = 0;
-// bufor do wygładzania aktualnej kadencji
-#define CADENCE_SMOOTHING 5
-int cadence_buffer[CADENCE_SMOOTHING] = {0};
-int cadence_buffer_pos = 0;
-int cadence_rpm_smoothed = 0;
-
-int cadence_avg_rpm_display = 0;
-int cadence_max_rpm_display = 0;
 unsigned long last_avg_max_update = 0;
-const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5 sekund
+const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
 
 // Zmienne dla czujników ciśnienia kół
 float pressure_bar;           // przednie koło
@@ -494,7 +484,6 @@ void IRAM_ATTR cadence_ISR() {
         }
         cadence_pulse_times[0] = now;
         cadence_last_pulse_time = now;
-        cadence_pulse_count++;
     }
 }
 
@@ -1117,17 +1106,17 @@ void drawMainDisplay() {
             case CADENCE_SCREEN:
                 switch (currentSubScreen) {
                     case CADENCE_RPM:
-                        sprintf(valueStr, "%4d", cadence_rpm_smoothed);
+                        sprintf(valueStr, "%4d", cadence_rpm);
                         unitStr = "RPM";
                         descText = ">Kadencja";
                         break;
                     case CADENCE_AVG_RPM:
-                        sprintf(valueStr, "%4d", cadence_avg_rpm_display);
+                        sprintf(valueStr, "%4d", cadence_avg_rpm);
                         unitStr = "RPM";
                         descText = ">Kadencja AVG";
                         break;
                     case CADENCE_MAX_RPM: 
-                        sprintf(valueStr, "%4d", cadence_max_rpm_display);
+                        sprintf(valueStr, "%4d", cadence_max_rpm);
                         unitStr = "RPM";
                         descText = ">Kadencja MAX";
                         break;
@@ -2893,20 +2882,29 @@ void loop() {
                 rpm = 60000.0 / avg_period;
             }
             cadence_rpm = rpm;
+
+            // Liczenie średniej/maksymalnej kadencji
+            cadence_sum += cadence_rpm;
+            cadence_samples++;
+            if (cadence_rpm > cadence_max_rpm) cadence_max_rpm = cadence_rpm;
+
             last_rpm_calc = now;
         }
 
-        // --- Co 5 sekund (np. w osobnym liczniku w loop) ---
-        static unsigned long last_avg_update = 0;
-        if (now - last_avg_update >= 5000) {
-            if (cadence_samples > 0) {
+        // Co 5s aktualizuj wyświetlaną średnią i max, oraz zeruj sumatory
+        if (now - last_avg_max_update >= AVG_MAX_UPDATE_INTERVAL) {
+            if (cadence_samples > 0)
                 cadence_avg_rpm = cadence_sum / cadence_samples;
-            }
-            last_avg_update = now;
+            else
+                cadence_avg_rpm = 0;
+
+            // Jeśli chcesz max z ostatnich 5s:
+            // cadence_max_rpm_display = cadence_max_rpm; cadence_max_rpm = 0;
+            // Jeśli chcesz max z całości jazdy – nie zeruj
+
             cadence_sum = 0;
             cadence_samples = 0;
-            //cadence_max_rpm = 0; // jeśli chcesz max per 5s
-            // jeśli chcesz max z całej jazdy – nie zeruj!
+            last_avg_max_update = now;
         }
 
         if (currentTime - lastUpdate >= updateInterval) {
