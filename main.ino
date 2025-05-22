@@ -1403,33 +1403,29 @@ void drawMainDisplay() {
 }
 
 // rysowanie strzałek
-// --- Rysowanie strzałek i kółka ---
 void drawCadenceArrowsAndCircle() {
     unsigned long now = millis();
     
-    // Kluczowa zmiana: buforowanie czasu ostatniego wykrycia kadencji
-    // i utrzymywanie strzałek przez dłuższy czas
-    static unsigned long arrowShowTime = 0;
+    // Statyczna zmienna przechowująca czas ostatniego wykrycia kadencji
+    static unsigned long lastCadenceDetection = 0;
     
-    // Sprawdź, czy wykryto obrót pedałów w ostatnim czasie
-    bool cadenceActive = (now - cadence_last_pulse_time < 2000);
-    
-    // Gdy wykryta nowa kadencja, aktualizuj czas wyświetlania strzałek
-    if (cadenceActive) {
-        arrowShowTime = now;  // Odświeżaj czas za każdym razem, gdy kadencja jest aktywna
+    // Jeśli wykryto kadencję, aktualizuj czas
+    if (now - cadence_last_pulse_time < 500) { // Kadencja wykryta w ostatnich 500ms
+        lastCadenceDetection = now;
     }
     
-    // Pokazuj strzałki przez 2 sekundy od ostatniej wykrytej kadencji
-    bool shouldShowArrows = (now - arrowShowTime < 2000);
+    // Wyświetlaj strzałki przez 2 sekundy od ostatniego wykrycia kadencji
+    bool showArrows = (now - lastCadenceDetection < 2000);
     
-    if (shouldShowArrows) {
-        // Strzałka w górę - pokaż gdy potrzebna wyższa kadencja
-        if (cadence_arrow_state == ARROW_UP) {
+    // Tylko jeśli powinniśmy pokazywać strzałki
+    if (showArrows) {
+        // Strzałka w górę - pokazuj stabilnie gdy RPM jest poniżej optymalnego
+        if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN) {
             drawUpArrow();
         }
         
-        // Strzałka w dół - pokaż gdy potrzebna niższa kadencja
-        if (cadence_arrow_state == ARROW_DOWN) {
+        // Strzałka w dół - pokazuj stabilnie gdy RPM jest powyżej optymalnego
+        else if (cadence_rpm > CADENCE_OPTIMAL_MAX) {
             drawDownArrow();
         }
     }
@@ -2969,7 +2965,7 @@ void loop() {
         drawAssistLevel();
         drawMainDisplay();
         drawLightStatus();
-        display.sendBuffer();
+        //display.sendBuffer();
         handleTemperature();
         updateBmsData();
 
