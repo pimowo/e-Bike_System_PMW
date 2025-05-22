@@ -1079,12 +1079,12 @@ void drawValueAndUnit(const char* valueStr, const char* unitStr) {
 }
 
 // wyświetlanie strzałek kadencji
-void drawUpArrow(int x, int y) {
-    display.drawTriangle(x, y+8, x+4, y, x+8, y+8);
+void drawUpArrow() {
+    display.drawTriangle(60, 58, 64, 50, 68, 58);
 }
 
-void drawDownArrow(int x, int y) {
-    display.drawTriangle(x, y, x+4, y+8, x+8, y);
+void drawDownArrow() {
+    display.drawTriangle(60, 72, 64, 80, 68, 72);
 }
 
 // Implementacja głównego ekranu
@@ -1120,21 +1120,10 @@ void drawMainDisplay() {
 
             case CADENCE_SCREEN:
                 switch (currentSubScreen) {
-                    // case CADENCE_RPM:
-                    //     sprintf(valueStr, "%4d", cadence_rpm);
-                    //     unitStr = "RPM";
-                    //     descText = ">Kadencja";
-                    //     break;
                     case CADENCE_RPM:
                         sprintf(valueStr, "%4d", cadence_rpm);
                         unitStr = "RPM";
                         descText = ">Kadencja";
-                        // Strzałka przy kadencji (np. x=105, y=20 - dostosuj wg potrzeb)
-                        if (cadence_arrow_state == ARROW_UP) {
-                            drawUpArrow(105, 20);
-                        } else if (cadence_arrow_state == ARROW_DOWN) {
-                            drawDownArrow(105, 20);
-                        }
                         break;
 
                     case CADENCE_AVG_RPM:
@@ -1280,24 +1269,11 @@ void drawMainDisplay() {
                 descText = " Predkosc";
                 break;
           
-            // case CADENCE_SCREEN:
-            //     sprintf(valueStr, "%4d", cadence_rpm);
-            //     unitStr = "RPM";
-            //     descText = " Kadencja";
-            //     break;
-
             case CADENCE_SCREEN:
-            //case CADENCE_RPM:
                 sprintf(valueStr, "%4d", cadence_rpm);
                 unitStr = "RPM";
-                descText = "Kadencja";
-                // Strzałka przy kadencji (np. x=105, y=20 - dostosuj wg potrzeb)
-                if (cadence_arrow_state == ARROW_UP) {
-                    drawUpArrow(105, 55);
-                } else if (cadence_arrow_state == ARROW_DOWN) {
-                    drawDownArrow(105, 55);
-                }
-                break;    
+                descText = " Kadencja";
+                break;  
 
             case TEMP_SCREEN:
                 if (currentTemp != TEMP_ERROR && currentTemp != DEVICE_DISCONNECTED_C) {
@@ -2956,14 +2932,9 @@ void loop() {
                 cadence_avg_rpm = cadence_sum / cadence_samples;
             else
                 cadence_avg_rpm = 0;
-
-            // Jeśli chcesz max z ostatnich 5s:
-            // cadence_max_rpm_display = cadence_max_rpm; cadence_max_rpm = 0;
-            // Jeśli chcesz max z całości jazdy – nie zeruj
-
-            cadence_sum = 0;
-            cadence_samples = 0;
+            // NIE zerujemy sumatorów ani max!
             last_avg_max_update = now;
+            //}
         }
 
         if (currentTime - lastUpdate >= updateInterval) {
@@ -3001,5 +2972,12 @@ void loop() {
                 speed_max_kmh = speed_kmh;
             }
         }
+
+        if (cadence_arrow_state == ARROW_UP) {
+            drawUpArrow();
+        } else if (cadence_arrow_state == ARROW_DOWN) {
+            drawDownArrow();
+        }
+
     }
 }
