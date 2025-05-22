@@ -1106,6 +1106,9 @@ void drawDownArrow() {
 // logika kadencji
 void updateCadenceLogic() {
     unsigned long now = millis();
+    static unsigned long lastStateChange = 0;
+    const unsigned long MIN_STATE_DURATION = 500; // Minimalny czas (ms) utrzymania tego samego stanu
+    
     bool cadenceActive = (now - cadence_last_pulse_time < 2000);
     
     if (!cadenceActive) {
@@ -1114,7 +1117,14 @@ void updateCadenceLogic() {
         return;
     }
     
-    // Aktualizuj stan strzałek tylko gdy kadencja jest aktywna
+    // Sprawdź czy minimalny czas utrzymania stanu upłynął
+    if (now - lastStateChange < MIN_STATE_DURATION) {
+        return; // Zbyt wcześnie na zmianę stanu
+    }
+    
+    // Aktualizuj stan strzałek tylko gdy kadencja jest aktywna i minął minimalny czas
+    CadenceArrow oldState = cadence_arrow_state;
+    
     switch (cadence_arrow_state) {
         case ARROW_NONE:
             if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN)
@@ -1130,6 +1140,11 @@ void updateCadenceLogic() {
             if (cadence_rpm <= CADENCE_OPTIMAL_MAX - CADENCE_HYSTERESIS)
                 cadence_arrow_state = ARROW_NONE;
             break;
+    }
+    
+    // Jeśli zmieniliśmy stan, zapisz czas zmiany
+    if (cadence_arrow_state != oldState) {
+        lastStateChange = now;
     }
 }
 
@@ -1392,21 +1407,31 @@ void drawMainDisplay() {
 void drawCadenceArrowsAndCircle() {
     unsigned long now = millis();
     
+    // Kluczowa zmiana: buforowanie czasu ostatniego wykrycia kadencji
+    // i utrzymywanie strzałek przez dłuższy czas
+    static unsigned long arrowShowTime = 0;
+    
     // Sprawdź, czy wykryto obrót pedałów w ostatnim czasie
-    // Jeśli tak, uznaj kadencję za aktywną (w ciągu ostatnich 2 sekund)
     bool cadenceActive = (now - cadence_last_pulse_time < 2000);
     
-    // Strzałka w górę - pokaż gdy potrzebna wyższa kadencja i kadencja jest aktywna
-    if (cadenceActive && (cadence_arrow_state == ARROW_UP)) {
-        drawUpArrow();
+    // Gdy wykryta nowa kadencja, aktualizuj czas wyświetlania strzałek
+    if (cadenceActive) {
+        arrowShowTime = now;  // Odświeżaj czas za każdym razem, gdy kadencja jest aktywna
     }
     
-    // Kółko (opcjonalne)
-    // drawCircleIcon();
+    // Pokazuj strzałki przez 2 sekundy od ostatniej wykrytej kadencji
+    bool shouldShowArrows = (now - arrowShowTime < 2000);
     
-    // Strzałka w dół - pokaż gdy potrzebna niższa kadencja i kadencja jest aktywna
-    if (cadenceActive && (cadence_arrow_state == ARROW_DOWN)) {
-        drawDownArrow();
+    if (shouldShowArrows) {
+        // Strzałka w górę - pokaż gdy potrzebna wyższa kadencja
+        if (cadence_arrow_state == ARROW_UP) {
+            drawUpArrow();
+        }
+        
+        // Strzałka w dół - pokaż gdy potrzebna niższa kadencja
+        if (cadence_arrow_state == ARROW_DOWN) {
+            drawDownArrow();
+        }
     }
 }
 
