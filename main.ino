@@ -487,8 +487,15 @@ class TemperatureSensor {
 };
 
 void IRAM_ATTR cadence_ISR() {
-    cadence_prev_pulse_time = cadence_last_pulse_time;
-    cadence_last_pulse_time = millis();
+    unsigned long now = millis();
+    if (now - cadence_last_pulse_time > 200) { // minimalny odstęp: 200ms = max 300 RPM
+        for (int i = CADENCE_SAMPLES_WINDOW - 1; i > 0; i--) {
+            cadence_pulse_times[i] = cadence_pulse_times[i - 1];
+        }
+        cadence_pulse_times[0] = now;
+        cadence_last_pulse_time = now;
+        cadence_pulse_count++;
+    }
 }
 
 /********************************************************************
@@ -2868,19 +2875,24 @@ void loop() {
 
         unsigned long now = millis();
         static unsigned long last_rpm_calc = 0;
-        const unsigned long rpm_calc_interval = 100;
+        const unsigned long rpm_calc_interval = 100; // co 100ms
 
         if (now - last_rpm_calc >= rpm_calc_interval) {
-            unsigned long pulse_dt = cadence_last_pulse_time - cadence_prev_pulse_time;
-            if ((now - cadence_last_pulse_time) < 2000 && pulse_dt > 0) {
-                cadence_rpm = 60000UL / pulse_dt;
-            } else {
-                cadence_rpm = 0;
+            unsigned long dt_sum = 0;
+            int valid_intervals = 0;
+            for (int i = 0; i < CADENCE_SAMPLES_WINDOW - 1; i++) {
+                unsigned long dt = cadence_pulse_times[i] - cadence_pulse_times[i + 1];
+                if (dt > 0 && cadence_pulse_times[i + 1] != 0) {
+                    dt_sum += dt;
+                    valid_intervals++;
+                }
             }
-            // Uśrednianie i max można aktualizować co np. 5 sekund
-            cadence_sum += cadence_rpm;
-            cadence_samples++;
-            if (cadence_rpm > cadence_max_rpm) cadence_max_rpm = cadence_rpm;
+            int rpm = 0;
+            if (valid_intervals > 0 && (now - cadence_pulse_times[0]) < 2000) {
+                float avg_period = (float)dt_sum / valid_intervals;
+                rpm = 60000.0 / avg_period;
+            }
+            cadence_rpm = rpm;
             last_rpm_calc = now;
         }
 
@@ -2893,7 +2905,7 @@ void loop() {
             last_avg_update = now;
             cadence_sum = 0;
             cadence_samples = 0;
-            cadence_max_rpm = 0; // jeśli chcesz max per 5s
+            //cadence_max_rpm = 0; // jeśli chcesz max per 5s
             // jeśli chcesz max z całej jazdy – nie zeruj!
         }
 
