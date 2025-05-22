@@ -312,6 +312,12 @@ uint32_t cadence_sum = 0;
 uint32_t cadence_samples = 0;
 unsigned long last_avg_max_update = 0;
 const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
+// strzałki kadencji
+#define CADENCE_OPTIMAL_MIN 75
+#define CADENCE_OPTIMAL_MAX 95
+#define CADENCE_HYSTERESIS 2
+enum CadenceArrow { ARROW_NONE, ARROW_UP, ARROW_DOWN };
+CadenceArrow cadence_arrow_state = ARROW_NONE;
 
 // Zmienne dla czujników ciśnienia kół
 float pressure_bar;           // przednie koło
@@ -1072,6 +1078,15 @@ void drawValueAndUnit(const char* valueStr, const char* unitStr) {
     display.drawStr(xPosUnit, 62, unitStr);
 }
 
+// wyświetlanie strzałek kadencji
+void drawUpArrow(int x, int y) {
+    display.drawTriangle(x, y+8, x+4, y, x+8, y+8);
+}
+
+void drawDownArrow(int x, int y) {
+    display.drawTriangle(x, y, x+4, y+8, x+8, y);
+}
+
 // Implementacja głównego ekranu
 void drawMainDisplay() {
     display.setFont(czcionka_mala);
@@ -1105,16 +1120,29 @@ void drawMainDisplay() {
 
             case CADENCE_SCREEN:
                 switch (currentSubScreen) {
+                    // case CADENCE_RPM:
+                    //     sprintf(valueStr, "%4d", cadence_rpm);
+                    //     unitStr = "RPM";
+                    //     descText = ">Kadencja";
+                    //     break;
                     case CADENCE_RPM:
                         sprintf(valueStr, "%4d", cadence_rpm);
                         unitStr = "RPM";
                         descText = ">Kadencja";
+                        // Strzałka przy kadencji (np. x=105, y=20 - dostosuj wg potrzeb)
+                        if (cadence_arrow_state == ARROW_UP) {
+                            drawUpArrow(105, 20);
+                        } else if (cadence_arrow_state == ARROW_DOWN) {
+                            drawDownArrow(105, 20);
+                        }
                         break;
+
                     case CADENCE_AVG_RPM:
                         sprintf(valueStr, "%4d", cadence_avg_rpm);
                         unitStr = "RPM";
                         descText = ">Kadencja AVG";
                         break;
+
                     case CADENCE_MAX_RPM: 
                         sprintf(valueStr, "%4d", cadence_max_rpm);
                         unitStr = "RPM";
@@ -1252,11 +1280,24 @@ void drawMainDisplay() {
                 descText = " Predkosc";
                 break;
           
+            // case CADENCE_SCREEN:
+            //     sprintf(valueStr, "%4d", cadence_rpm);
+            //     unitStr = "RPM";
+            //     descText = " Kadencja";
+            //     break;
+
             case CADENCE_SCREEN:
+            //case CADENCE_RPM:
                 sprintf(valueStr, "%4d", cadence_rpm);
                 unitStr = "RPM";
-                descText = " Kadencja";
-                break;
+                descText = "Kadencja";
+                // Strzałka przy kadencji (np. x=105, y=20 - dostosuj wg potrzeb)
+                if (cadence_arrow_state == ARROW_UP) {
+                    drawUpArrow(105, 55);
+                } else if (cadence_arrow_state == ARROW_DOWN) {
+                    drawDownArrow(105, 55);
+                }
+                break;    
 
             case TEMP_SCREEN:
                 if (currentTemp != TEMP_ERROR && currentTemp != DEVICE_DISCONNECTED_C) {
@@ -2882,6 +2923,24 @@ void loop() {
                 rpm = 60000.0 / avg_period;
             }
             cadence_rpm = rpm;
+
+            // Histereza dla strzałki kadencji
+            switch (cadence_arrow_state) {
+                case ARROW_NONE:
+                    if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN)
+                        cadence_arrow_state = ARROW_UP;
+                    else if (cadence_rpm > CADENCE_OPTIMAL_MAX)
+                        cadence_arrow_state = ARROW_DOWN;
+                    break;
+                case ARROW_UP:
+                    if (cadence_rpm >= CADENCE_OPTIMAL_MIN + CADENCE_HYSTERESIS)
+                        cadence_arrow_state = ARROW_NONE;
+                    break;
+                case ARROW_DOWN:
+                    if (cadence_rpm <= CADENCE_OPTIMAL_MAX - CADENCE_HYSTERESIS)
+                        cadence_arrow_state = ARROW_NONE;
+                    break;
+            }
 
             // Liczenie średniej/maksymalnej kadencji
             cadence_sum += cadence_rpm;
