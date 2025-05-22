@@ -310,6 +310,11 @@ int cadence_max_rpm = 0;
 uint32_t cadence_sum = 0;
 uint32_t cadence_samples = 0;
 unsigned long cadence_last_calc = 0;
+#define CADENCE_SMOOTHING 5
+int cadence_buffer[CADENCE_SMOOTHING] = {0};
+int cadence_buffer_pos = 0;
+unsigned long last_avg_max_update = 0;
+const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5 sekund
 
 // Zmienne dla czujników ciśnienia kół
 float pressure_bar;           // przednie koło
@@ -1098,17 +1103,17 @@ void drawMainDisplay() {
             case CADENCE_SCREEN:
                 switch (currentSubScreen) {
                     case CADENCE_RPM:
-                        sprintf(valueStr, "%4d", cadence_rpm);
+                        sprintf(valueStr, "%4d", cadence_rpm_smoothed);
                         unitStr = "RPM";
                         descText = ">Kadencja";
                         break;
                     case CADENCE_AVG_RPM:
-                        sprintf(valueStr, "%4d", cadence_avg_rpm);
+                        sprintf(valueStr, "%4d", cadence_avg_rpm_display);
                         unitStr = "RPM";
                         descText = ">Kadencja AVG";
                         break;
-                    case CADENCE_SUB_COUNT: 
-                        sprintf(valueStr, "%4d", cadence_max_rpm);
+                    case CADENCE_MAX_RPM: 
+                        sprintf(valueStr, "%4d", cadence_max_rpm_display);
                         unitStr = "RPM";
                         descText = ">Kadencja MAX";
                         break;
@@ -2861,6 +2866,27 @@ void loop() {
         static unsigned long last_check = 0;
         const unsigned long cadence_interval = 100; // 100 ms
 
+        // Dodaj do bufora nowy odczyt
+        cadence_buffer[cadence_buffer_pos] = cadence_rpm;
+        cadence_buffer_pos = (cadence_buffer_pos + 1) % CADENCE_SMOOTHING;
+
+        // Licz średnią z bufora
+        int sum = 0;
+        for (int i = 0; i < CADENCE_SMOOTHING; i++) sum += cadence_buffer[i];
+        int smoothed_rpm = sum / CADENCE_SMOOTHING;
+
+        if (now - last_avg_max_update >= AVG_MAX_UPDATE_INTERVAL) {
+            if (cadence_samples > 0) {
+                cadence_avg_rpm_display = cadence_sum / cadence_samples;
+            }
+            cadence_max_rpm_display = cadence_max_rpm;
+            last_avg_max_update = now;
+            // Wyzeruj akumulatory dla kolejnych 5 sek.
+            cadence_sum = 0;
+            cadence_samples = 0;
+            cadence_max_rpm = 0;
+        }
+
         if (now - last_check >= cadence_interval) {
             uint32_t pulses = cadence_pulse_count - last_pulse_count;
             last_pulse_count = cadence_pulse_count;
@@ -2924,13 +2950,6 @@ void loop() {
             if (speed_kmh > speed_max_kmh) {
                 speed_max_kmh = speed_kmh;
             }
-
-            // Aktualizacja średniej kadencji (przykładowa implementacja)
-            static int cadence_sum = 0;
-            static int cadence_count = 0;
-            cadence_sum += cadence_rpm;
-            cadence_count++;
-            cadence_avg_rpm = cadence_sum / cadence_count;
         }
     }
 }
