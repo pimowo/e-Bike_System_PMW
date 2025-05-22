@@ -318,6 +318,10 @@ const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
 #define CADENCE_HYSTERESIS 2
 enum CadenceArrow { ARROW_NONE, ARROW_UP, ARROW_DOWN };
 CadenceArrow cadence_arrow_state = ARROW_NONE;
+enum CadenceArrowState { ARROW_NONE, ARROW_UP, ARROW_DOWN };
+CadenceArrowState cadence_arrow_state = ARROW_NONE;
+unsigned long lastCadenceArrowUpdate = 0;
+const unsigned long ARROW_PERSIST_TIME = 1500; // ms
 
 // Zmienne dla czujników ciśnienia kół
 float pressure_bar;           // przednie koło
@@ -1078,23 +1082,20 @@ void drawValueAndUnit(const char* valueStr, const char* unitStr) {
     display.drawStr(xPosUnit, 62, unitStr);
 }
 
-// wyświetlanie strzałek kadencji
-// Strzałka w górę: od lewej 55, od góry 30
+// --- Funkcje rysujące ---
 void drawUpArrow() {
-    // Wierzchołek środkowy (grot) na (64, 30), podstawa na (59, 38) i (69, 38)
-    display.drawTriangle(59, 38, 64, 30, 69, 38);
+    // Strzałka w górę: od lewej 50, od góry 15 (grot na 58,15)
+    display.drawTriangle(53, 23, 58, 15, 63, 23);
 }
 
-// strzałka w dół - od lewej 55, od góry 50
-void drawDownArrow() {
-    // Wierzchołek środkowy (grot) na (64, 58), podstawa na (59, 50) i (69, 50)
-    display.drawTriangle(59, 50, 64, 58, 69, 50);
-}
-
-// ikona hamulca
-// środek od lewej 64, od góry 40 (promień 6)
 void drawCircleIcon() {
-    display.drawCircle(64, 40, 6); // x=64, y=40, r=6
+    // Kółko: środek od lewej 58, od góry 25 (promień 6)
+    display.drawCircle(58, 25, 6);
+}
+
+void drawDownArrow() {
+    // Strzałka w dół: od lewej 50, od góry 35 (grot na 58,43)
+    display.drawTriangle(53, 35, 58, 43, 63, 35);
 }
 
 // Implementacja głównego ekranu
@@ -1349,6 +1350,26 @@ void drawMainDisplay() {
 
     display.setFont(czcionka_mala);
     display.drawStr(0, 62, descText);
+}
+
+// --- Rysowanie strzałek i kółka ---
+// Wywołuj w drawMainDisplay() lub w głównym loop PRZED display.sendBuffer()
+void drawCadenceArrowsAndCircle() {
+    unsigned long now = millis();
+    bool upVisible = (cadence_arrow_state == ARROW_UP) ||
+                     ((cadence_arrow_state == ARROW_NONE) &&
+                      (now - lastCadenceArrowUpdate < ARROW_PERSIST_TIME) &&
+                      (lastCadenceArrowUpdate > 0));
+    bool downVisible = (cadence_arrow_state == ARROW_DOWN) ||
+                       ((cadence_arrow_state == ARROW_NONE) &&
+                        (now - lastCadenceArrowUpdate < ARROW_PERSIST_TIME) &&
+                        (lastCadenceArrowUpdate > 0));
+    // Strzałka w górę
+    if (upVisible) drawUpArrow();
+    // Kółko zawsze
+    drawCircleIcon();
+    // Strzałka w dół
+    if (downVisible) drawDownArrow();
 }
 
 // wyświetlanie wycentrowanego tekstu
@@ -2889,15 +2910,6 @@ void loop() {
         handleTemperature();
         updateBmsData();
 
-        // Strzałki kadencji ZAWSZE na ekranie głównym
-        if (cadence_arrow_state == ARROW_UP) {
-            drawUpArrow();
-        } else if (cadence_arrow_state == ARROW_DOWN) {
-            drawDownArrow();
-        }
-
-        display.sendBuffer();
-
         unsigned long now = millis();
         static unsigned long last_rpm_calc = 0;
         const unsigned long rpm_calc_interval = 100; // co 100ms
@@ -2955,6 +2967,38 @@ void loop() {
             last_avg_max_update = now;
             //}
         }
+
+        // --- Logika kadencji ---
+        void updateCadenceLogic() {
+            bool arrowActive = false;
+            switch (cadence_arrow_state) {
+                case ARROW_NONE:
+                    if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN) {
+                        cadence_arrow_state = ARROW_UP;
+                        arrowActive = true;
+                    } else if (cadence_rpm > CADENCE_OPTIMAL_MAX) {
+                        cadence_arrow_state = ARROW_DOWN;
+                        arrowActive = true;
+                    }
+                    break;
+                case ARROW_UP:
+                    if (cadence_rpm >= CADENCE_OPTIMAL_MIN + CADENCE_HYSTERESIS)
+                        cadence_arrow_state = ARROW_NONE;
+                    else
+                        arrowActive = true;
+                    break;
+                case ARROW_DOWN:
+                    if (cadence_rpm <= CADENCE_OPTIMAL_MAX - CADENCE_HYSTERESIS)
+                        cadence_arrow_state = ARROW_NONE;
+                    else
+                        arrowActive = true;
+                    break;
+            }
+            if (arrowActive) lastCadenceArrowUpdate = millis();
+        }
+
+        drawCadenceArrowsAndCircle();
+        display.sendBuffer();
 
         if (currentTime - lastUpdate >= updateInterval) {
             speed_kmh = (speed_kmh >= 35.0) ? 0.0 : speed_kmh + 0.1;
