@@ -183,14 +183,14 @@ struct BmsData {
 };
 
 struct TpmsData {
-    float pressure;           // Ciśnienie w bar
-    float temperature;        // Temperatura w °C
-    int batteryPercent;       // Poziom baterii w %
-    bool alarm;               // Status alarmu
-    uint8_t sensorNumber;     // Numer czujnika (1-4)
-    uint64_t address;         // Unikalny adres czujnika
-    bool isActive;            // Czy czujnik jest aktywny
+    float pressure;       // Ciśnienie w bar
+    float temperature;    // Temperatura w °C
+    int batteryPercent;   // Poziom baterii w %
+    bool alarm;           // Status alarmu
+    uint8_t sensorNumber; // Numer czujnika (1-4)
+    bool isActive;        // Czy czujnik jest aktywny
     unsigned long lastUpdate; // Czas ostatniego odczytu
+    char address[20];     // Adres czujnika jako string
 };
 
 // Klasa obsługująca licznik kilometrów
@@ -446,8 +446,8 @@ TpmsData rearTpms;
 bool tpmsScanning = false;
 unsigned long lastTpmsScanTime = 0;
 const unsigned long TPMS_SCAN_INTERVAL = 5000; // 5 sekund
-const String FRONT_TPMS_ADDRESS = "XX:XX:XX:XX:XX:XX"; // Adres przedniej opony
-const String REAR_TPMS_ADDRESS = "YY:YY:YY:YY:YY:YY";  // Adres tylnej opony
+const char* FRONT_TPMS_ADDRESS = "XX:XX:XX:XX:XX:XX"; // Adres przedniej opony
+const char* REAR_TPMS_ADDRESS = "YY:YY:YY:YY:YY:YY";  // Adres tylnej opony
 
 // Zmienne dla czujnika temperatury
 float currentTemp = DEVICE_DISCONNECTED_C;
@@ -496,6 +496,7 @@ DallasTemperature sensorsController(&oneWireController);
 
 // Obiekty BLE
 BLEClient* bleClient;
+BLEClient* tpmsClient = nullptr;
 BLEAddress bmsMacAddress("a5:c2:37:05:8b:86");
 BLERemoteService* bleService;
 BLERemoteCharacteristic* bleCharacteristicTx;
@@ -675,9 +676,9 @@ void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic,
 
 // Dodaj po callbacku dla BMS
 class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
-    void onResult(BLEAdvertisedDevice* advertisedDevice) {
-        if (advertisedDevice->haveManufacturerData()) {
-            std::string manufacturerData = advertisedDevice->getManufacturerData();
+    void onResult(BLEAdvertisedDevice advertisedDevice) {
+        if (advertisedDevice.haveManufacturerData()) {
+            std::string manufacturerData = advertisedDevice.getManufacturerData();
             
             // Sprawdź czy dane mają właściwy format (przynajmniej 18 bajtów)
             if (manufacturerData.length() >= 18) {
@@ -690,11 +691,11 @@ class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
                     uint8_t sensorNumber = manufacturerData[2];
                     
                     // Adres czujnika (bajty 5-7)
-                    std::string sensorAddressStr = "";
+                    char sensorAddressStr[20] = "";
                     for (int i = 5; i <= 7; i++) {
                         char hexStr[3];
                         sprintf(hexStr, "%02X", (uint8_t)manufacturerData[i]);
-                        sensorAddressStr += hexStr;
+                        strcat(sensorAddressStr, hexStr);
                     }
                     
                     // Obliczamy ciśnienie (bajty 8-11)
@@ -720,12 +721,12 @@ class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
                     bool alarmActive = ((uint8_t)manufacturerData[17] != 0);
                     
                     // Utwórz pełny adres czujnika łącząc prefiks (bajty 3-4) i adres (bajty 5-7)
-                    std::string fullAddress = "";
+                    char fullAddress[20] = "";
                     for (int i = 3; i <= 7; i++) {
                         char hexStr[3];
                         sprintf(hexStr, "%02X", (uint8_t)manufacturerData[i]);
-                        fullAddress += hexStr;
-                        if (i < 7) fullAddress += ":";
+                        strcat(fullAddress, hexStr);
+                        if (i < 7) strcat(fullAddress, ":");
                     }
                     
                     // Aktualizuj dane
@@ -834,12 +835,47 @@ void connectToBms() {
     }
 }
 
+void saveTpmsAddresses() {
+    if (!LittleFS.begin(false)) {
+        #ifdef DEBUG
+        Serial.println("Błąd montowania LittleFS przy zapisie adresów TPMS");
+        #endif
+        return;
+    }
+    
+    StaticJsonDocument<256> doc;
+    
+    // Zapisz adresy czujników
+    if (frontTpms.isActive && frontTpms.address[0] != '\0') {
+        doc["front_tpms"] = frontTpms.address;
+    }
+    
+    if (rearTpms.isActive && rearTpms.address[0] != '\0') {
+        doc["rear_tpms"] = rearTpms.address;
+    }
+    
+    File file = LittleFS.open("/tpms_config.json", "w");
+    if (!file) {
+        #ifdef DEBUG
+        Serial.println("Nie można otworzyć pliku konfiguracji TPMS do zapisu");
+        #endif
+        return;
+    }
+    
+    serializeJson(doc, file);
+    file.close();
+    
+    #ifdef DEBUG
+    Serial.println("Zapisano konfigurację TPMS");
+    #endif
+}
+
 // Dodaj do sekcji funkcji
-void updateTpmsData(std::string address, uint8_t sensorNumber, float pressure, float temperature, 
+void updateTpmsData(const char* address, uint8_t sensorNumber, float pressure, float temperature, 
                   uint8_t batteryPercent, bool alarm) {
     #ifdef DEBUG
     Serial.print("Odebrano dane TPMS: ");
-    Serial.print("Adres="); Serial.print(address.c_str());
+    Serial.print("Adres="); Serial.print(address);
     Serial.print(" Czujnik="); Serial.print(sensorNumber);
     Serial.print(" Ciśnienie="); Serial.print(pressure);
     Serial.print(" Temperatura="); Serial.print(temperature);
@@ -847,20 +883,25 @@ void updateTpmsData(std::string address, uint8_t sensorNumber, float pressure, f
     Serial.print(" Alarm="); Serial.println(alarm ? "TAK" : "NIE");
     #endif
     
-    // Sprawdź, czy to przedni czy tylny czujnik
+    // Sprawdź, czy to przedni czy tylny czujnik na podstawie numeru czujnika lub adresu
     bool isFrontSensor = false;
     bool isRearSensor = false;
     
-    if (address.find(FRONT_TPMS_ADDRESS) != std::string::npos || 
-        (frontTpms.isActive == false && rearTpms.isActive == true)) {
+    // Sprawdź numer czujnika (0x80 = 1, 0x81 = 2, itd.)
+    if (sensorNumber == 0x80) {
         isFrontSensor = true;
-    } else if (address.find(REAR_TPMS_ADDRESS) != std::string::npos || 
-               (frontTpms.isActive == true && rearTpms.isActive == false)) {
+    } else if (sensorNumber == 0x81) {
         isRearSensor = true;
     } else {
-        // Jeśli nie znamy jeszcze żadnego czujnika, przyjmij pierwszy jako przedni
+        // Jeśli nie mamy jeszcze żadnego aktywnego czujnika
         if (!frontTpms.isActive && !rearTpms.isActive) {
+            // Pierwszy wykryty czujnik to przedni
             isFrontSensor = true;
+        }
+        // Jeśli mamy aktywny przedni ale nie tylny
+        else if (frontTpms.isActive && !rearTpms.isActive) {
+            // To nowy czujnik jest tylny
+            isRearSensor = true;
         }
     }
     
@@ -909,7 +950,7 @@ void startTpmsScan() {
     #endif
     
     BLEScan* pBLEScan = BLEDevice::getScan();
-    pBLEScan->setAdvertisedDeviceCallbacks(new TpmsAdvertisedDeviceCallbacks(), true);
+    pBLEScan->setAdvertisedDeviceCallbacks(new TpmsAdvertisedDeviceCallbacks());
     pBLEScan->setActiveScan(true);
     pBLEScan->setInterval(100);   // Interwał w ms
     pBLEScan->setWindow(99);      // Mniej niż interwał
@@ -928,6 +969,14 @@ void stopTpmsScan() {
     #ifdef DEBUG
     Serial.println("Zatrzymano skanowanie TPMS");
     #endif
+}
+
+void loadTpmsAddresses() {
+    #ifdef DEBUG
+    Serial.println("Funkcja loadTpmsAddresses() jeszcze nie jest zaimplementowana");
+    #endif
+    // Na razie pusta implementacja
+    // Docelowo będzie wczytywać adresy czujników z pliku konfiguracyjnego
 }
 
 void checkTpmsTimeout() {
@@ -3169,12 +3218,14 @@ void setup() {
         }
         
         if (bluetoothConfig.tpmsEnabled) {
-            // Inicjalizacja zmiennych TPMS
-            frontTpms = {0};
-            rearTpms = {0};
+            // Inicjalizacja struktur TPMS z zerowymi wartościami
+            memset(&frontTpms, 0, sizeof(frontTpms));
+            memset(&rearTpms, 0, sizeof(rearTpms));
+            frontTpms.isActive = false;
+            rearTpms.isActive = false;
             
-            // Rozpocznij skanowanie TPMS
             loadTpmsAddresses();
+            // Rozpocznij skanowanie TPMS
             startTpmsScan();
         }
     }
