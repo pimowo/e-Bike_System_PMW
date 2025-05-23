@@ -899,6 +899,17 @@
 								</div>
 							</div>
 
+							<!-- Adres MAC BMS (prawdopodobnie już istnieje, ale dodaję dla kompletności) -->
+							<div class="setting-row" id="bms-mac-row" style="display:none;">
+								<label>
+									Adres MAC BMS
+									<button class="info-icon" data-info="bms-mac-info">ℹ</button>
+								</label>
+								<div>
+									<input type="text" id="bms-mac" placeholder="XX:XX:XX:XX:XX:XX">
+								</div>
+							</div>
+
 							<!-- TPMS -->
 							<div class="setting-row">
 								<label>
@@ -913,6 +924,31 @@
 								</div>
 							</div>
 
+							<!-- Pola MAC adresów TPMS - będą pokazywane/ukrywane przez JavaScript -->
+							<div id="tpms-fields" style="display:none;">
+								<!-- Przedni czujnik TPMS -->
+								<div class="setting-row">
+									<label>
+										Przedni czujnik TPMS (MAC)
+										<button class="info-icon" data-info="front-tpms-mac-info">ℹ</button>
+									</label>
+									<div>
+										<input type="text" id="front-tpms-mac" placeholder="XX:XX:XX:XX:XX:XX">
+									</div>
+								</div>
+								
+								<!-- Tylny czujnik TPMS -->
+								<div class="setting-row">
+									<label>
+										Tylny czujnik TPMS (MAC)
+										<button class="info-icon" data-info="rear-tpms-mac-info">ℹ</button>
+									</label>
+									<div>
+										<input type="text" id="rear-tpms-mac" placeholder="XX:XX:XX:XX:XX:XX">
+									</div>
+								</div>
+							</div>
+
 							<button class="btn-save" onclick="saveBluetoothConfig()">Zapisz</button>
 							
 						</div>
@@ -920,7 +956,7 @@
 
 					<!-- Stopka z informacją o wersji systemu -->
 					<footer>
-						<span>Project by PMW e-Bike System ver. <span id="system-version">...</span></span>		
+						<span>Project by PMW e-Bike System wer. <span id="system-version">...</span></span>		
 					</footer>
 
 				</section>
