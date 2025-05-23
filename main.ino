@@ -69,7 +69,7 @@
  * DEFINICJE I STAŁE GLOBALNE
  ********************************************************************/
 
-//#define DEBUG
+#define DEBUG
 
 // Wersja oprogramowania
 const char* VERSION = "23.5.25";
@@ -105,10 +105,6 @@ const unsigned long SET_LONG_PRESS = 2000;
 const unsigned long TEMP_REQUEST_INTERVAL = 1000;
 const unsigned long DS18B20_CONVERSION_DELAY_MS = 750;
 
-// Stałe wyświetlacza
-// #define PRESSURE_LEFT_MARGIN 70
-// #define PRESSURE_TOP_LINE 62
-// #define PRESSURE_BOTTOM_LINE 62
 #define TEMP_ERROR -999.0
 
 /********************************************************************
@@ -184,6 +180,17 @@ struct BmsData {
     float temperatures[4];    // Temperatury [°C]
     bool charging;            // Status ładowania
     bool discharging;         // Status rozładowania
+};
+
+struct TpmsData {
+    float pressure;           // Ciśnienie w bar
+    float temperature;        // Temperatura w °C
+    int batteryPercent;       // Poziom baterii w %
+    bool alarm;               // Status alarmu
+    uint8_t sensorNumber;     // Numer czujnika (1-4)
+    uint64_t address;         // Unikalny adres czujnika
+    bool isActive;            // Czy czujnik jest aktywny
+    unsigned long lastUpdate; // Czas ostatniego odczytu
 };
 
 // Klasa obsługująca licznik kilometrów
@@ -434,6 +441,14 @@ float pressure_rear_voltage;  // napięcie tylnego czujnika
 float pressure_temp;          // temperatura przedniego czujnika
 float pressure_rear_temp;     // temperatura tylnego czujnika
 
+TpmsData frontTpms;
+TpmsData rearTpms;
+bool tpmsScanning = false;
+unsigned long lastTpmsScanTime = 0;
+const unsigned long TPMS_SCAN_INTERVAL = 5000; // 5 sekund
+const String FRONT_TPMS_ADDRESS = "XX:XX:XX:XX:XX:XX"; // Adres przedniej opony
+const String REAR_TPMS_ADDRESS = "YY:YY:YY:YY:YY:YY";  // Adres tylnej opony
+
 // Zmienne dla czujnika temperatury
 float currentTemp = DEVICE_DISCONNECTED_C;
 bool conversionRequested = false;
@@ -658,6 +673,69 @@ void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic,
     }
 }
 
+// Dodaj po callbacku dla BMS
+class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
+    void onResult(BLEAdvertisedDevice* advertisedDevice) {
+        if (advertisedDevice->haveManufacturerData()) {
+            std::string manufacturerData = advertisedDevice->getManufacturerData();
+            
+            // Sprawdź czy dane mają właściwy format (przynajmniej 18 bajtów)
+            if (manufacturerData.length() >= 18) {
+                // Sprawdź czy pierwsze dwa bajty to 0001 (ID producenta)
+                uint8_t id1 = manufacturerData[0];
+                uint8_t id2 = manufacturerData[1];
+                
+                if (id1 == 0x00 && id2 == 0x01) {
+                    // Czytamy numer czujnika z trzeciego bajtu
+                    uint8_t sensorNumber = manufacturerData[2];
+                    
+                    // Adres czujnika (bajty 5-7)
+                    std::string sensorAddressStr = "";
+                    for (int i = 5; i <= 7; i++) {
+                        char hexStr[3];
+                        sprintf(hexStr, "%02X", (uint8_t)manufacturerData[i]);
+                        sensorAddressStr += hexStr;
+                    }
+                    
+                    // Obliczamy ciśnienie (bajty 8-11)
+                    uint32_t pressureValue = 
+                        (uint8_t)manufacturerData[8] | 
+                        ((uint8_t)manufacturerData[9] << 8) | 
+                        ((uint8_t)manufacturerData[10] << 16) | 
+                        ((uint8_t)manufacturerData[11] << 24);
+                    float pressureBar = pressureValue / 100000.0; // Konwersja na bar
+                    
+                    // Obliczamy temperaturę (bajty 12-15)
+                    uint32_t tempValue = 
+                        (uint8_t)manufacturerData[12] | 
+                        ((uint8_t)manufacturerData[13] << 8) | 
+                        ((uint8_t)manufacturerData[14] << 16) | 
+                        ((uint8_t)manufacturerData[15] << 24);
+                    float temperatureC = tempValue / 100.0; // Konwersja na stopnie Celsjusza
+                    
+                    // Poziom baterii (bajt 16)
+                    uint8_t batteryPercentage = (uint8_t)manufacturerData[16];
+                    
+                    // Status alarmu (bajt 17)
+                    bool alarmActive = ((uint8_t)manufacturerData[17] != 0);
+                    
+                    // Utwórz pełny adres czujnika łącząc prefiks (bajty 3-4) i adres (bajty 5-7)
+                    std::string fullAddress = "";
+                    for (int i = 3; i <= 7; i++) {
+                        char hexStr[3];
+                        sprintf(hexStr, "%02X", (uint8_t)manufacturerData[i]);
+                        fullAddress += hexStr;
+                        if (i < 7) fullAddress += ":";
+                    }
+                    
+                    // Aktualizuj dane
+                    updateTpmsData(fullAddress, sensorNumber, pressureBar, temperatureC, batteryPercentage, alarmActive);
+                }
+            }
+        }
+    }
+};
+
 // wysyłanie zapytania do BMS
 void requestBmsData(const uint8_t* command, size_t length) {
     if (bleClient && bleClient->isConnected() && bleCharacteristicTx) {
@@ -753,6 +831,122 @@ void connectToBms() {
           Serial.println("Nie udało się połączyć z BMS");
           #endif
         }
+    }
+}
+
+// Dodaj do sekcji funkcji
+void updateTpmsData(std::string address, uint8_t sensorNumber, float pressure, float temperature, 
+                  uint8_t batteryPercent, bool alarm) {
+    #ifdef DEBUG
+    Serial.print("Odebrano dane TPMS: ");
+    Serial.print("Adres="); Serial.print(address.c_str());
+    Serial.print(" Czujnik="); Serial.print(sensorNumber);
+    Serial.print(" Ciśnienie="); Serial.print(pressure);
+    Serial.print(" Temperatura="); Serial.print(temperature);
+    Serial.print(" Bateria="); Serial.print(batteryPercent);
+    Serial.print(" Alarm="); Serial.println(alarm ? "TAK" : "NIE");
+    #endif
+    
+    // Sprawdź, czy to przedni czy tylny czujnik
+    bool isFrontSensor = false;
+    bool isRearSensor = false;
+    
+    if (address.find(FRONT_TPMS_ADDRESS) != std::string::npos || 
+        (frontTpms.isActive == false && rearTpms.isActive == true)) {
+        isFrontSensor = true;
+    } else if (address.find(REAR_TPMS_ADDRESS) != std::string::npos || 
+               (frontTpms.isActive == true && rearTpms.isActive == false)) {
+        isRearSensor = true;
+    } else {
+        // Jeśli nie znamy jeszcze żadnego czujnika, przyjmij pierwszy jako przedni
+        if (!frontTpms.isActive && !rearTpms.isActive) {
+            isFrontSensor = true;
+        }
+    }
+    
+    if (isFrontSensor) {
+        frontTpms.pressure = pressure;
+        frontTpms.temperature = temperature;
+        frontTpms.batteryPercent = batteryPercent;
+        frontTpms.alarm = alarm;
+        frontTpms.sensorNumber = sensorNumber;
+        frontTpms.lastUpdate = millis();
+        frontTpms.isActive = true;
+
+        // Aktualizacja zmiennych globalnych używanych przez interfejs
+        pressure_bar = pressure;
+        pressure_temp = temperature;
+        pressure_voltage = batteryPercent / 100.0; // Konwersja % na napięcie 0-1
+        
+        #ifdef DEBUG
+        Serial.println("Zaktualizowano przedni czujnik");
+        #endif
+    } else if (isRearSensor) {
+        rearTpms.pressure = pressure;
+        rearTpms.temperature = temperature;
+        rearTpms.batteryPercent = batteryPercent;
+        rearTpms.alarm = alarm;
+        rearTpms.sensorNumber = sensorNumber;
+        rearTpms.lastUpdate = millis();
+        rearTpms.isActive = true;
+        
+        // Aktualizacja zmiennych globalnych używanych przez interfejs
+        pressure_rear_bar = pressure;
+        pressure_rear_temp = temperature;
+        pressure_rear_voltage = batteryPercent / 100.0; // Konwersja % na napięcie 0-1
+        
+        #ifdef DEBUG
+        Serial.println("Zaktualizowano tylny czujnik");
+        #endif
+    }
+}
+
+void startTpmsScan() {
+    if (tpmsScanning) return;
+    
+    #ifdef DEBUG
+    Serial.println("Rozpoczynam skanowanie TPMS...");
+    #endif
+    
+    BLEScan* pBLEScan = BLEDevice::getScan();
+    pBLEScan->setAdvertisedDeviceCallbacks(new TpmsAdvertisedDeviceCallbacks(), true);
+    pBLEScan->setActiveScan(true);
+    pBLEScan->setInterval(100);   // Interwał w ms
+    pBLEScan->setWindow(99);      // Mniej niż interwał
+    pBLEScan->start(5, false);    // Skanuj przez 5 sekund, bez zatrzymywania
+    tpmsScanning = true;
+    lastTpmsScanTime = millis();
+}
+
+void stopTpmsScan() {
+    if (!tpmsScanning) return;
+    
+    BLEScan* pBLEScan = BLEDevice::getScan();
+    pBLEScan->stop();
+    tpmsScanning = false;
+    
+    #ifdef DEBUG
+    Serial.println("Zatrzymano skanowanie TPMS");
+    #endif
+}
+
+void checkTpmsTimeout() {
+    unsigned long currentTime = millis();
+    const unsigned long TPMS_TIMEOUT = 30000; // 30 sekund
+    
+    // Sprawdź, czy czujniki nie wysłały danych przez dłuższy czas
+    if (frontTpms.isActive && (currentTime - frontTpms.lastUpdate > TPMS_TIMEOUT)) {
+        #ifdef DEBUG
+        Serial.println("Przedni czujnik nie odpowiada - oznaczam jako nieaktywny");
+        #endif
+        frontTpms.isActive = false;
+    }
+    
+    if (rearTpms.isActive && (currentTime - rearTpms.lastUpdate > TPMS_TIMEOUT)) {
+        #ifdef DEBUG
+        Serial.println("Tylny czujnik nie odpowiada - oznaczam jako nieaktywny");
+        #endif
+        rearTpms.isActive = false;
     }
 }
 
@@ -1400,7 +1594,15 @@ void drawMainDisplay() {
                 char combinedStr[16];
                 switch (currentSubScreen) {
                     case PRESSURE_BAR:
-                        sprintf(combinedStr, "%.2f|%.2f", pressure_bar, pressure_rear_bar);
+                        if (frontTpms.isActive && rearTpms.isActive) {
+                            sprintf(combinedStr, "%.2f|%.2f", pressure_bar, pressure_rear_bar);
+                        } else if (frontTpms.isActive) {
+                            sprintf(combinedStr, "%.2f|---", pressure_bar);
+                        } else if (rearTpms.isActive) {
+                            sprintf(combinedStr, "---|%.2f", pressure_rear_bar);
+                        } else {
+                            strcpy(combinedStr, "---|---");
+                        }
                         strcpy(valueStr, combinedStr);
                         unitStr = "bar";
                         descText = ">Cis";
@@ -2960,9 +3162,20 @@ void setup() {
     // Inicjalizacja BLE
     if (bluetoothConfig.bmsEnabled || bluetoothConfig.tpmsEnabled) {
         BLEDevice::init("e-Bike System PMW");
-        bleClient = BLEDevice::createClient();
+        
         if (bluetoothConfig.bmsEnabled) {
+            bleClient = BLEDevice::createClient();
             connectToBms();
+        }
+        
+        if (bluetoothConfig.tpmsEnabled) {
+            // Inicjalizacja zmiennych TPMS
+            frontTpms = {0};
+            rearTpms = {0};
+            
+            // Rozpocznij skanowanie TPMS
+            loadTpmsAddresses();
+            startTpmsScan();
         }
     }
 
@@ -3075,7 +3288,6 @@ void loop() {
     unsigned long lastAutoSaveTime = 0;
     const unsigned long AUTO_SAVE_INTERVAL = 60000; // Co minutę
 
-    // W funkcji loop() dodać:
     if (currentTime - lastAutoSaveTime >= AUTO_SAVE_INTERVAL) {
         // Zapisz dane odometru i inne ważne dane
         lastAutoSaveTime = currentTime;
@@ -3157,6 +3369,22 @@ void loop() {
         drawCadenceArrowsAndCircle();
         display.sendBuffer();
 
+        unsigned long currentTime = millis();
+        if (bluetoothConfig.tpmsEnabled) {
+            if (tpmsScanning && (currentTime - lastTpmsScanTime > 5000)) {
+                // Zakończ poprzednie skanowanie
+                stopTpmsScan();
+            }
+            
+            if (!tpmsScanning && (currentTime - lastTpmsScanTime > TPMS_SCAN_INTERVAL)) {
+                // Rozpocznij nowe skanowanie
+                startTpmsScan();
+            }
+            
+            // Sprawdź, czy czujniki działają
+            checkTpmsTimeout();
+        }
+
         if (currentTime - lastUpdate >= updateInterval) {
             speed_kmh = (speed_kmh >= 35.0) ? 0.0 : speed_kmh + 0.1;
             temp_motor = 30.0 + random(20);
@@ -3168,17 +3396,11 @@ void loop() {
             power_max_w = power_w * 1.2;
             battery_current = random(50, 150) / 10.0;
             battery_capacity_wh = battery_voltage * battery_capacity_ah;
-            pressure_bar = 2.0 + (random(20) / 10.0);
-            pressure_voltage = 0.5 + (random(20) / 100.0);
-            pressure_temp = 20.0 + (random(100) / 10.0);
             battery_capacity_wh = 14.5 - (random(20) / 10.0);
             battery_capacity_percent = (battery_capacity_percent <= 0) ? 100 : battery_capacity_percent - 1;
             battery_voltage = (battery_voltage <= 42.0) ? 50.0 : battery_voltage - 0.1;
             assistMode = (assistMode + 1) % 5;
             lastUpdate = currentTime;
-            pressure_rear_bar = 2.0 + (random(20) / 10.0);
-            pressure_rear_voltage = 0.5 + (random(20) / 100.0);
-            pressure_rear_temp = 20.0 + (random(100) / 10.0);
             static float speed_sum = 0;
             static int speed_count = 0;
             speed_sum += speed_kmh;
