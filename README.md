@@ -45,7 +45,7 @@ System oferuje intuicyjny interfejs webowy dostępny przez przeglądarkę, któr
 - Podgląd wszystkich parametrów systemu w czasie rzeczywistym
 - Konfigurację ustawień systemu
 - Ustawianie zegara RTC
-- Sterowanie oświetleniem i portem USB
+- Sterowanie oświetleniem i portem USB (ładowarką telefonu)
 - Kalibrację czujników
 
 ## 💻 Użytkowanie
@@ -70,6 +70,7 @@ System oferuje intuicyjny interfejs webowy dostępny przez przeglądarkę, któr
     d) BTN
     - Użyj przycisków `BTN_UP` + `BTN_DOWN` do uruchomienia trybu konfiguracji
     - Użyj przycisków `BTN_UP` + `BTN_SET` do przełączenia trybu legalnego
+    - Użyj przycisków `BTN_DOWN` + `BTN_SET` do kasowania liczników
       
 4. **⚙️ Konfiguracja przez interfejs webowy**:
     - Połącz się z siecią WiFi utworzoną przez urządzenie
