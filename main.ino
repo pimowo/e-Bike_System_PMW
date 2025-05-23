@@ -67,9 +67,6 @@
 #include <Preferences.h>      // Biblioteka do stałej pamięci ESP32
 #include <nvs_flash.h>
 
-// --- Biblioteki własne ---
-#include "Odometer.h"         // Własna biblioteka do obsługi licznika kilometrów
-
 /********************************************************************
  * DEFINICJE I STAŁE GLOBALNE
  ********************************************************************/
@@ -77,7 +74,7 @@
 //#define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "21.5.25";
+const char* VERSION = "23.5.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -191,18 +188,128 @@ struct BmsData {
     bool discharging;         // Status rozładowania
 };
 
+// Klasa obsługująca licznik kilometrów
+class OdometerManager {
+private:
+    const char* filename = "/odometer.json";
+    float currentTotal = 0;
+
+    void saveToFile() {
+        #ifdef DEBUG
+        Serial.println("Zapisywanie licznika do pliku...");
+        #endif
+
+        File file = LittleFS.open(filename, "w");
+        if (!file) {
+            #ifdef DEBUG
+            Serial.println("Błąd otwarcia pliku licznika do zapisu");
+            #endif
+            return;
+        }
+
+        StaticJsonDocument<128> doc;
+        doc["total"] = currentTotal;
+        
+        if (serializeJson(doc, file) == 0) {
+            #ifdef DEBUG
+            Serial.println("Błąd zapisu do pliku licznika");
+            #endif
+        } else {
+            #ifdef DEBUG
+            Serial.printf("Zapisano licznik: %.2f\n", currentTotal);
+            #endif
+        }
+        
+        file.close();
+    }
+
+    void loadFromFile() {
+        #ifdef DEBUG
+        Serial.println("Wczytywanie licznika z pliku...");
+        #endif
+
+        File file = LittleFS.open(filename, "r");
+        if (!file) {
+            #ifdef DEBUG
+            Serial.println("Brak pliku licznika - tworzę nowy");
+            #endif
+            currentTotal = 0;
+            saveToFile();
+            return;
+        }
+
+        StaticJsonDocument<128> doc;
+        DeserializationError error = deserializeJson(doc, file);
+        
+        if (!error) {
+            currentTotal = doc["total"] | 0.0f;
+            #ifdef DEBUG
+            Serial.printf("Wczytano licznik: %.2f\n", currentTotal);
+            #endif
+        } else {
+            #ifdef DEBUG
+            Serial.println("Błąd odczytu pliku licznika");
+            #endif
+            currentTotal = 0;
+        }
+        
+        file.close();
+    }
+
+public:
+    OdometerManager() {
+        loadFromFile();
+    }
+
+    float getRawTotal() const {
+        return currentTotal;
+    }
+
+    bool setInitialValue(float value) {
+        if (value < 0) {
+            #ifdef DEBUG
+            Serial.println("Błędna wartość początkowa (ujemna)");
+            #endif
+            return false;
+        }
+        
+        #ifdef DEBUG
+        Serial.printf("Ustawianie początkowej wartości licznika: %.2f\n", value);
+        #endif
+
+        currentTotal = value;
+        saveToFile();
+        return true;
+    }
+
+    void updateTotal(float newValue) {
+        if (newValue > currentTotal) {
+            #ifdef DEBUG
+            Serial.printf("Aktualizacja licznika z %.2f na %.2f\n", currentTotal, newValue);
+            #endif
+
+            currentTotal = newValue;
+            saveToFile();
+        }
+    }
+
+    bool isValid() const {
+        return true; // Zawsze zwraca true, bo nie ma już inicjalizacji Preferences
+    }
+};
+
 /********************************************************************
  * TYPY WYLICZENIOWE
  ********************************************************************/
 
 // Ekrany główne
 enum MainScreen {
-    SPEED_SCREEN,      // Ekran prędkości
-    CADENCE_SCREEN,    // Ekran kadencji
-    TEMP_SCREEN,       // Ekran temperatur
     RANGE_SCREEN,      // Ekran zasięgu
-    BATTERY_SCREEN,    // Ekran baterii
+    CADENCE_SCREEN,    // Ekran kadencji
+    SPEED_SCREEN,      // Ekran prędkości
     POWER_SCREEN,      // Ekran mocy
+    BATTERY_SCREEN,    // Ekran baterii
+    TEMP_SCREEN,       // Ekran temperatur
     PRESSURE_SCREEN,   // Ekran ciśnienia
     USB_SCREEN,        // Ekran sterowania USB
     MAIN_SCREEN_COUNT  // Liczba głównych ekranów
@@ -213,51 +320,51 @@ enum SpeedSubScreen {
     SPEED_KMH,       // Aktualna prędkość
     SPEED_AVG_KMH,   // Średnia prędkość
     SPEED_MAX_KMH,   // Maksymalna prędkość
-    SPEED_SUB_COUNT  
+    SPEED_SUB_COUNT  // Liczba ekranów
 };
 
 enum CadenceSubScreen {
     CADENCE_RPM,       // Aktualna kadencja
     CADENCE_AVG_RPM,   // Średnia kadencja
     CADENCE_MAX_RPM,   // Maksymalna kadencja
-    CADENCE_SUB_COUNT  
+    CADENCE_SUB_COUNT  // Liczba ekranów  
 };
 
 enum TempSubScreen {
-    TEMP_AIR,
-    TEMP_CONTROLLER,
-    TEMP_MOTOR,
-    TEMP_SUB_COUNT
+    TEMP_AIR,         // Temperatura powietrza
+    TEMP_CONTROLLER,  // Temperatura sterownika
+    TEMP_MOTOR,       // Temperatura silnika
+    TEMP_SUB_COUNT    // Liczba ekranów
 };
 
 enum RangeSubScreen {
-    RANGE_KM,
-    DISTANCE_KM,
-    ODOMETER_KM,
-    RANGE_SUB_COUNT
+    ODOMETER_KM,     // Przebieg
+    DISTANCE_KM,     // Dystans
+    RANGE_KM,        // Zasięg
+    RANGE_SUB_COUNT  // Liczba ekranów
 };
 
 enum BatterySubScreen {
-    BATTERY_VOLTAGE,
-    BATTERY_CURRENT,
-    BATTERY_CAPACITY_WH,
-    BATTERY_CAPACITY_AH,
-    BATTERY_CAPACITY_PERCENT,
-    BATTERY_SUB_COUNT
+    BATTERY_CAPACITY_AH,       // Pojemność w Ah
+    BATTERY_CAPACITY_WH,       // Pojemność w Wh
+    BATTERY_CAPACITY_PERCENT,  // Poziom naładowania w %
+    BATTERY_VOLTAGE,           // Napięcie baterii
+    BATTERY_CURRENT,           // Prąd baterii
+    BATTERY_SUB_COUNT          // Liczba ekranów
 };
 
 enum PowerSubScreen {
-    POWER_W,
-    POWER_AVG_W,
-    POWER_MAX_W,
-    POWER_SUB_COUNT
+    POWER_W,         // Aktualna moc
+    POWER_AVG_W,     // Średnia moc
+    POWER_MAX_W,     // Maksymalna moc
+    POWER_SUB_COUNT  // Liczba ekranów
 };
 
 enum PressureSubScreen {
-    PRESSURE_BAR,
-    PRESSURE_VOLTAGE,
-    PRESSURE_TEMP,
-    PRESSURE_SUB_COUNT
+    PRESSURE_BAR,       // Ciśnienie w bar
+    PRESSURE_VOLTAGE,   // Napięcie czujnika
+    PRESSURE_TEMP,      // Temperatura czujnika
+    PRESSURE_SUB_COUNT  // Liczba ekranów
 };
 
 /********************************************************************
@@ -269,7 +376,6 @@ OdometerManager odometer;
 Preferences preferences;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
-//AsyncEventSource events("/events");
 
 // Zmienne stanu systemu
 bool configModeActive = false;
@@ -279,7 +385,7 @@ bool displayActive = false;
 bool showingWelcome = false;
 
 // Zmienne stanu ekranu
-MainScreen currentMainScreen = SPEED_SCREEN;
+MainScreen currentMainScreen = RANGE_SCREEN;
 int currentSubScreen = 0;
 bool inSubScreen = false;
 uint8_t displayBrightness = 16;  // Wartość od 0 do 255 (jasność wyświetlacza)
@@ -295,6 +401,8 @@ float battery_voltage;
 float battery_current;
 float battery_capacity_wh;
 float battery_capacity_ah;
+float speed_sum = 0;
+int speed_count = 0;
 int battery_capacity_percent;
 int power_w;
 int power_avg_w;
@@ -302,32 +410,24 @@ int power_max_w;
 float speed_avg_kmh;
 float speed_max_kmh;
 // kadencja
-#define CADENCE_PULSES_PER_REVOLUTION 1  // Domyślnie 1 impuls na obrót (zakres 1-24)
 #define CADENCE_SAMPLES_WINDOW 4
-volatile unsigned long cadence_pulse_times[CADENCE_SAMPLES_WINDOW] = {0};
-volatile unsigned long cadence_last_pulse_time = 0;
-int cadence_rpm = 0;
-int cadence_avg_rpm = 0;
-int cadence_max_rpm = 0;
-uint32_t cadence_sum = 0;
-uint32_t cadence_samples = 0;
-unsigned long last_avg_max_update = 0;
-const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
-// strzałki kadencji
 #define CADENCE_OPTIMAL_MIN 75
 #define CADENCE_OPTIMAL_MAX 95
 #define CADENCE_HYSTERESIS 2
 enum CadenceArrow { ARROW_NONE, ARROW_UP, ARROW_DOWN };
 CadenceArrow cadence_arrow_state = ARROW_NONE;
+volatile unsigned long cadence_pulse_times[CADENCE_SAMPLES_WINDOW] = {0};
+volatile unsigned long cadence_last_pulse_time = 0;
+int cadence_rpm = 0;
+int cadence_avg_rpm = 0;
+int cadence_max_rpm = 0;
+uint8_t cadence_pulses_per_revolution = 1;  // Zakres 1-24
+uint32_t cadence_sum = 0;
+uint32_t cadence_samples = 0;
 unsigned long lastCadenceArrowUpdate = 0;
-const unsigned long ARROW_PERSIST_TIME = 1500; // ms
-unsigned long lastCadenceTime = 0;
+unsigned long last_avg_max_update = 0;
+const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
 const unsigned long cadenceArrowTimeout = 1000; // czas wyświetlania strzałek w milisekundach (1 sekunda)
-bool cadenceArrowsOn = false;
-// Zmienne dla strzałek kadencji
-unsigned long ostatniCzasKadencji = 0;
-const unsigned long czasWyswietlaniaStrzalek = 1000; // czas w milisekundach (1 sekunda)
-bool strzalkiAktywne = false;
 
 // Zmienne dla czujników ciśnienia kół
 float pressure_bar;           // przednie koło
@@ -339,7 +439,6 @@ float pressure_rear_temp;     // temperatura tylnego czujnika
 
 // Zmienne dla czujnika temperatury
 float currentTemp = DEVICE_DISCONNECTED_C;
-//bool temperatureReady = false;
 bool conversionRequested = false;
 unsigned long lastTempRequest = 0;
 unsigned long ds18b20RequestTime;
@@ -352,7 +451,6 @@ unsigned long upPressStartTime = 0;
 unsigned long downPressStartTime = 0;
 unsigned long setPressStartTime = 0;
 unsigned long messageStartTime = 0;
-//bool firstClick = false;
 bool upLongPressExecuted = false;
 bool downLongPressExecuted = false;
 bool setLongPressExecuted = false;
@@ -494,9 +592,9 @@ class TemperatureSensor {
 
 void IRAM_ATTR cadence_ISR() {
     unsigned long now = millis();
-    // Uwzględnij minimalny odstęp czasu dla maksymalnej kadencji
-    // Przy 24 impulsach na obrót i max 300 RPM, minimalny odstęp to ~8ms
-    if (now - cadence_last_pulse_time > (200 / CADENCE_PULSES_PER_REVOLUTION)) { 
+    unsigned long minDelay = max(8, 200 / cadence_pulses_per_revolution); // Minimum 8ms
+    
+    if (now - cadence_last_pulse_time > minDelay) {
         for (int i = CADENCE_SAMPLES_WINDOW - 1; i > 0; i--) {
             cadence_pulse_times[i] = cadence_pulse_times[i - 1];
         }
@@ -529,42 +627,37 @@ void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic,
                 // Pozostała pojemność (0.1Ah)
                 bmsData.remainingCapacity = (float)((pData[8] << 8) | pData[9]) / 10.0;
                 
-                // SOC (%)
-                bmsData.soc = pData[23];
+                // SOC (%) - dodane zabezpieczenie przed indeksem out-of-bounds
+                if (length > 23) {
+                    bmsData.soc = pData[23];
                 
-                // Status ładowania/rozładowania
-                uint8_t status = pData[22];
-                bmsData.charging = (status & 0x01);
-                bmsData.discharging = (status & 0x02);
-                
-                #ifdef DEBUG
-                Serial.printf("Voltage: %.1fV, Current: %.1fA, SOC: %d%%\n", 
-                            bmsData.voltage, bmsData.current, bmsData.soc);
-                #endif
+                    // Status ładowania/rozładowania - dodane zabezpieczenie
+                    if (length > 22) {
+                        uint8_t status = pData[22];
+                        bmsData.charging = (status & 0x01);
+                        bmsData.discharging = (status & 0x02);
+                    }
+                }
             }
             break;
 
         case 0x04:  // Cell info
             if (length >= 34) {  // Sprawdź czy mamy kompletny pakiet
-                for (int i = 0; i < 16; i++) {
+                const int maxCells = std::min(16, (int)((length - 4) / 2));
+                for (int i = 0; i < maxCells; i++) {
                     bmsData.cellVoltages[i] = (float)((pData[4 + i*2] << 8) | pData[5 + i*2]) / 1000.0;
                 }
-                #ifdef DEBUG
-                Serial.println("Cell voltages updated");
-                #endif
             }
             break;
 
         case 0x08:  // Temperature info
             if (length >= 12) {
-                for (int i = 0; i < 4; i++) {
+                const int maxTemps = std::min(4, (int)((length - 4) / 2));
+                for (int i = 0; i < maxTemps; i++) {
                     // Konwersja z K na °C
                     int16_t temp = ((pData[4 + i*2] << 8) | pData[5 + i*2]) - 2731;
                     bmsData.temperatures[i] = (float)temp / 10.0;
                 }
-                #ifdef DEBUG
-                Serial.println("Temperatures updated");
-                #endif
             }
             break;
     }
@@ -580,16 +673,30 @@ void requestBmsData(const uint8_t* command, size_t length) {
 // aktualizacja danych BMS
 void updateBmsData() {
     static unsigned long lastBmsUpdate = 0;
+    static uint8_t requestState = 0; // Stan sekwencji zapytań
     const unsigned long BMS_UPDATE_INTERVAL = 1000; // Aktualizuj co 1 sekundę
+    const unsigned long SEQUENTIAL_DELAY = 100; // Opóźnienie między krokami sekwencji
 
-    if (millis() - lastBmsUpdate >= BMS_UPDATE_INTERVAL) {
-        if (bleClient && bleClient->isConnected()) {
-            requestBmsData(BMS_BASIC_INFO, sizeof(BMS_BASIC_INFO));
-            delay(100);  // Krótkie opóźnienie między zapytaniami
-            requestBmsData(BMS_CELL_INFO, sizeof(BMS_CELL_INFO));
-            delay(100);
-            requestBmsData(BMS_TEMP_INFO, sizeof(BMS_TEMP_INFO));
-            lastBmsUpdate = millis();
+    if (!bleClient || !bleClient->isConnected()) {
+        return;
+    }
+
+    unsigned long currentTime = millis();
+    if (currentTime - lastBmsUpdate >= SEQUENTIAL_DELAY) {
+        switch(requestState) {
+            case 0:
+                requestBmsData(BMS_BASIC_INFO, sizeof(BMS_BASIC_INFO));
+                requestState = 1;
+                break;
+            case 1:
+                requestBmsData(BMS_CELL_INFO, sizeof(BMS_CELL_INFO));
+                requestState = 2;
+                break;
+            case 2:
+                requestBmsData(BMS_TEMP_INFO, sizeof(BMS_TEMP_INFO));
+                requestState = 0;
+                lastBmsUpdate = currentTime; // Reset głównego timera tylko po pełnej sekwencji
+                break;
         }
     }
 }
@@ -794,6 +901,7 @@ void loadBacklightSettingsFromFile() {
         Serial.println("Brak pliku konfiguracyjnego, używam ustawień domyślnych");
         #endif
         // Ustaw wartości domyślne
+        backlightSettings.Brightness = 70;
         backlightSettings.dayBrightness = 100;
         backlightSettings.nightBrightness = 50;
         backlightSettings.autoMode = false;
@@ -934,7 +1042,7 @@ void drawHorizontalLine() {
 
 // rysowanie linii pionowej
 void drawVerticalLine() {
-    display.drawVLine(25, 16, 28);
+    display.drawVLine(24, 16, 28);
     display.drawVLine(68, 16, 28);
 }
 
@@ -981,10 +1089,10 @@ void drawLightStatus() {
 
     switch (lightMode) {
         case 1:
-            display.drawStr(30, 45, "Dzien");
+            display.drawStr(28, 45, "Dzien");
             break;
         case 2:
-            display.drawStr(30, 45, "Noc");
+            display.drawStr(28, 45, "Noc");
             break;
     }
 }
@@ -1058,8 +1166,8 @@ void drawAssistLevel() {
             modeText2 = "";
             break;
     }
-    display.drawStr(30, 23, modeText);  // wyświetl rodzaj sterowania
-    display.drawStr(30, 34, modeText2);  // wyświetl STOP przy hamowaniu
+    display.drawStr(28, 23, modeText);  // wyświetl rodzaj sterowania
+    display.drawStr(28, 34, modeText2);  // wyświetl STOP przy hamowaniu
 }
 
 // wyświetlanie wartości i jednostki
@@ -1092,20 +1200,14 @@ void drawValueAndUnit(const char* valueStr, const char* unitStr) {
 
 // --- Funkcje rysujące ---
 void drawUpArrow() {
-    // Strzałka w górę: od lewej 50, od góry 15 (grot na 58,15)
-    //display.drawTriangle(53, 23, 58, 15, 63, 23);
     display.drawTriangle(56, 23, 61, 15, 66, 23);
 }
 
 void drawCircleIcon() {
-    // Kółko: środek od lewej 58, od góry 25 (promień 6)
-    //display.drawCircle(58, 25, 6);
     display.drawCircle(61, 25, 6);
 }
 
 void drawDownArrow() {
-    // Strzałka w dół: od lewej 50, od góry 35 (grot na 58,43)
-    //display.drawTriangle(53, 35, 58, 43, 63, 35);
     display.drawTriangle(56, 35, 61, 43, 66, 35);
 }
 
@@ -1133,16 +1235,18 @@ void updateCadenceLogic() {
     
     switch (cadence_arrow_state) {
         case ARROW_NONE:
+            // ZMIANA: Przy niskiej kadencji pokazuj strzałkę w dół (sugerując niższy bieg)
             if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN)
-                cadence_arrow_state = ARROW_UP;
-            else if (cadence_rpm > CADENCE_OPTIMAL_MAX)
                 cadence_arrow_state = ARROW_DOWN;
+            // ZMIANA: Przy wysokiej kadencji pokazuj strzałkę w górę (sugerując wyższy bieg)
+            else if (cadence_rpm > CADENCE_OPTIMAL_MAX)
+                cadence_arrow_state = ARROW_UP;
             break;
-        case ARROW_UP:
+        case ARROW_DOWN: // ZMIANA: Był ARROW_UP
             if (cadence_rpm >= CADENCE_OPTIMAL_MIN + CADENCE_HYSTERESIS)
                 cadence_arrow_state = ARROW_NONE;
             break;
-        case ARROW_DOWN:
+        case ARROW_UP: // ZMIANA: Był ARROW_DOWN
             if (cadence_rpm <= CADENCE_OPTIMAL_MAX - CADENCE_HYSTERESIS)
                 cadence_arrow_state = ARROW_NONE;
             break;
@@ -1162,10 +1266,48 @@ void drawMainDisplay() {
     const char* descText;
 
     if (inSubScreen) {
-
         switch (currentMainScreen) {
-      
-            case SPEED_SCREEN:
+            case RANGE_SCREEN: // Teraz pierwszy ekran
+                switch (currentSubScreen) {
+                    case ODOMETER_KM: // Nowa kolejność
+                        sprintf(valueStr, "%4.0f", odometer.getRawTotal());
+                        unitStr = "km";
+                        descText = ">Przebieg";
+                        break;
+                    case DISTANCE_KM:
+                        sprintf(valueStr, "%4.1f", distance_km);
+                        unitStr = "km";
+                        descText = ">Dystans";
+                        break;
+                    case RANGE_KM:
+                        sprintf(valueStr, "%4.1f", range_km);
+                        unitStr = "km";
+                        descText = ">Zasieg";
+                        break;
+                }
+                break;
+
+            case CADENCE_SCREEN: // Teraz drugi ekran
+                switch (currentSubScreen) {
+                    case CADENCE_RPM:
+                        sprintf(valueStr, "%4d", cadence_rpm);
+                        unitStr = "RPM";
+                        descText = ">Kadencja";
+                        break;
+                    case CADENCE_AVG_RPM:
+                        sprintf(valueStr, "%4d", cadence_avg_rpm);
+                        unitStr = "RPM";
+                        descText = ">Kadencja AVG";
+                        break;
+                    case CADENCE_MAX_RPM: 
+                        sprintf(valueStr, "%4d", cadence_max_rpm);
+                        unitStr = "RPM";
+                        descText = ">Kadencja MAX";
+                        break;
+                }
+                break;
+
+            case SPEED_SCREEN: // Teraz trzeci ekran
                 switch (currentSubScreen) {
                     case SPEED_KMH:
                         sprintf(valueStr, "%4.1f", speed_kmh);
@@ -1185,29 +1327,57 @@ void drawMainDisplay() {
                 }
                 break;
 
-            case CADENCE_SCREEN:
+            case POWER_SCREEN: // Teraz czwarty ekran
                 switch (currentSubScreen) {
-                    case CADENCE_RPM:
-                        sprintf(valueStr, "%4d", cadence_rpm);
-                        unitStr = "RPM";
-                        descText = ">Kadencja";
+                    case POWER_W:
+                        sprintf(valueStr, "%4d", power_w);
+                        unitStr = "W";
+                        descText = ">Moc";
                         break;
-
-                    case CADENCE_AVG_RPM:
-                        sprintf(valueStr, "%4d", cadence_avg_rpm);
-                        unitStr = "RPM";
-                        descText = ">Kadencja AVG";
+                    case POWER_AVG_W:
+                        sprintf(valueStr, "%4d", power_avg_w);
+                        unitStr = "W";
+                        descText = ">Moc AVG";
                         break;
-
-                    case CADENCE_MAX_RPM: 
-                        sprintf(valueStr, "%4d", cadence_max_rpm);
-                        unitStr = "RPM";
-                        descText = ">Kadencja MAX";
+                    case POWER_MAX_W:
+                        sprintf(valueStr, "%4d", power_max_w);
+                        unitStr = "W";
+                        descText = ">Moc MAX";
                         break;
                 }
                 break;
 
-            case TEMP_SCREEN:
+            case BATTERY_SCREEN: // Teraz piąty ekran z nową kolejnością podekranów
+                switch (currentSubScreen) {
+                    case BATTERY_CAPACITY_AH:
+                        sprintf(valueStr, "%4.1f", battery_capacity_ah);
+                        unitStr = "Ah";
+                        descText = ">Pojemnosc";
+                        break;
+                    case BATTERY_CAPACITY_WH:
+                        sprintf(valueStr, "%4.0f", battery_capacity_wh);
+                        unitStr = "Wh";
+                        descText = ">Energia";
+                        break;
+                    case BATTERY_CAPACITY_PERCENT:
+                        sprintf(valueStr, "%3d", battery_capacity_percent);
+                        unitStr = "%";
+                        descText = ">Bateria";
+                        break;
+                    case BATTERY_VOLTAGE:
+                        sprintf(valueStr, "%4.1f", battery_voltage);
+                        unitStr = "V";
+                        descText = ">Napiecie";
+                        break;
+                    case BATTERY_CURRENT:
+                        sprintf(valueStr, "%4.1f", battery_current);
+                        unitStr = "A";
+                        descText = ">Natezenie";
+                        break;
+                }
+                break;
+
+            case TEMP_SCREEN: // Teraz szósty ekran
                 switch (currentSubScreen) {
                     case TEMP_AIR:
                         if (currentTemp != TEMP_ERROR && currentTemp != DEVICE_DISCONNECTED_C) {
@@ -1231,77 +1401,7 @@ void drawMainDisplay() {
                 }
                 break;
 
-            case RANGE_SCREEN:
-                switch (currentSubScreen) {
-                    case RANGE_KM:
-                        sprintf(valueStr, "%4.1f", range_km);
-                        unitStr = "km";
-                        descText = ">Zasieg";
-                        break;
-                    case DISTANCE_KM:
-                        sprintf(valueStr, "%4.1f", distance_km);
-                        unitStr = "km";
-                        descText = ">Dystans";
-                        break;
-                    case ODOMETER_KM:
-                        sprintf(valueStr, "%4.0f", odometer.getRawTotal());
-                        unitStr = "km";
-                        descText = ">Przebieg";
-                        break;
-                }
-                break;
-
-            case BATTERY_SCREEN:
-                switch (currentSubScreen) {
-                    case BATTERY_VOLTAGE:
-                        sprintf(valueStr, "%4.1f", battery_voltage);
-                        unitStr = "V";
-                        descText = ">Napiecie";
-                        break;
-                    case BATTERY_CURRENT:
-                        sprintf(valueStr, "%4.1f", battery_current);
-                        unitStr = "A";
-                        descText = ">Natezenie";
-                        break;
-                    case BATTERY_CAPACITY_WH:
-                        sprintf(valueStr, "%4.0f", battery_capacity_wh);
-                        unitStr = "Wh";
-                        descText = ">Energia";
-                        break;
-                    case BATTERY_CAPACITY_AH:
-                        sprintf(valueStr, "%4.1f", battery_capacity_wh);
-                        unitStr = "Ah";
-                        descText = ">Pojemnosc";
-                        break;
-                    case BATTERY_CAPACITY_PERCENT:
-                        sprintf(valueStr, "%3d", battery_capacity_percent);
-                        unitStr = "%";
-                        descText = ">Bateria";
-                        break;
-                }
-                break;
-
-            case POWER_SCREEN:
-                switch (currentSubScreen) {
-                    case POWER_W:
-                        sprintf(valueStr, "%4d", power_w);
-                        unitStr = "W";
-                        descText = ">Moc";
-                        break;
-                    case POWER_AVG_W:
-                        sprintf(valueStr, "%4d", power_avg_w);
-                        unitStr = "W";
-                        descText = ">Moc AVG";
-                        break;
-                    case POWER_MAX_W:
-                        sprintf(valueStr, "%4d", power_max_w);
-                        unitStr = "W";
-                        descText = ">Moc MAX";
-                        break;
-                }
-                break;
-
-            case PRESSURE_SCREEN:
+            case PRESSURE_SCREEN: // Teraz siódmy ekran
                 char combinedStr[16];
                 switch (currentSubScreen) {
                     case PRESSURE_BAR:
@@ -1329,20 +1429,37 @@ void drawMainDisplay() {
     } else {
         // Wyświetlanie głównych ekranów
         switch (currentMainScreen) {
-
-            case SPEED_SCREEN:
-                sprintf(valueStr, "%4.1f", speed_kmh);
-                unitStr = "km/h";
-                descText = " Predkosc";
+            case RANGE_SCREEN: // Teraz pierwszy ekran
+                sprintf(valueStr, "%4.0f", odometer.getRawTotal());
+                unitStr = "km";
+                descText = " Przebieg";
                 break;
-          
-            case CADENCE_SCREEN:
+
+            case CADENCE_SCREEN: // Teraz drugi ekran
                 sprintf(valueStr, "%4d", cadence_rpm);
                 unitStr = "RPM";
                 descText = " Kadencja";
                 break;  
 
-            case TEMP_SCREEN:
+            case SPEED_SCREEN: // Teraz trzeci ekran
+                sprintf(valueStr, "%4.1f", speed_kmh);
+                unitStr = "km/h";
+                descText = " Predkosc";
+                break;
+
+            case POWER_SCREEN: // Teraz czwarty ekran
+                sprintf(valueStr, "%4d", power_w);
+                unitStr = "W";
+                descText = " Moc";
+                break;
+
+            case BATTERY_SCREEN: // Teraz piąty ekran
+                sprintf(valueStr, "%4.1f", battery_capacity_ah);
+                unitStr = "Ah";
+                descText = " Bateria";
+                break;
+
+            case TEMP_SCREEN: // Teraz szósty ekran
                 if (currentTemp != TEMP_ERROR && currentTemp != DEVICE_DISCONNECTED_C) {
                     sprintf(valueStr, "%4.1f", currentTemp);
                 } else {
@@ -1352,31 +1469,13 @@ void drawMainDisplay() {
                 descText = " Temperatura";
                 break;
 
-            case RANGE_SCREEN:
-                sprintf(valueStr, "%4.1f", range_km);
-                unitStr = "km";
-                descText = " Zasieg";
-                break;
-
-            case BATTERY_SCREEN:
-                sprintf(valueStr, "%3d", battery_capacity_percent);
-                unitStr = "%";
-                descText = " Bateria";
-                break;
-
-            case POWER_SCREEN:
-                sprintf(valueStr, "%4d", power_w);
-                unitStr = "W";
-                descText = " Moc";
-                break;
-
-            case PRESSURE_SCREEN:
+            case PRESSURE_SCREEN: // Teraz siódmy ekran
                 sprintf(valueStr, "%.1f/%.1f", pressure_bar, pressure_rear_bar);
                 unitStr = "bar";
                 descText = " Kola";
                 break;
 
-            case USB_SCREEN:
+            case USB_SCREEN: // Teraz ósmy ekran
                 display.setFont(czcionka_srednia);
                 display.drawStr(48, 61, usbEnabled ? "Wlaczone" : "Wylaczone");
                 descText = " USB";
@@ -1425,14 +1524,14 @@ void drawCadenceArrowsAndCircle() {
     
     // Tylko jeśli powinniśmy pokazywać strzałki
     if (showArrows) {
-        // Strzałka w górę - pokazuj stabilnie gdy RPM jest poniżej optymalnego
+        // ZMIANA: Strzałka w dół - pokazuj przy niskiej kadencji (sugerując niższy bieg)
         if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN) {
-            drawUpArrow();
+            drawDownArrow();
         }
         
-        // Strzałka w dół - pokazuj stabilnie gdy RPM jest powyżej optymalnego
+        // ZMIANA: Strzałka w górę - pokazuj przy wysokiej kadencji (sugerując wyższy bieg)
         else if (cadence_rpm > CADENCE_OPTIMAL_MAX) {
-            drawDownArrow();
+            drawUpArrow();
         }
     }
 }
@@ -1472,7 +1571,7 @@ void showWelcomeMessage() {
     int x = 128; // Start poza prawą krawędzią
 
     // Przygotuj tekst wersji
-    String versionText = "System ver. ";
+    String versionText = "System ";
     versionText += VERSION;
 
     unsigned long lastUpdate = millis();
@@ -1527,6 +1626,7 @@ void handleButtons() {
     static unsigned long downPressTime = 0;
     const unsigned long buttonDebounce = 50;
     static unsigned long legalModeStart = 0;
+    static unsigned long resetTripStart = 0;
 
     // Obsługa włączania/wyłączania wyświetlacza
     if (!displayActive) {
@@ -1567,6 +1667,25 @@ void handleButtons() {
             }
         } else {
             legalModeStart = 0;
+        }
+
+        // Sprawdzanie kombinacji SET + DOWN - reset danych przejazdu
+        if (displayActive && !showingWelcome && !setState && !downState) {
+            if (resetTripStart == 0) {
+                resetTripStart = currentTime;
+            } else if ((currentTime - resetTripStart) > 500) { // 2 sekundy przytrzymania
+                resetTripData();                
+                clearTripData();
+                
+                // Czekaj na puszczenie przycisków
+                while (!digitalRead(BTN_DOWN) || !digitalRead(BTN_SET)) {
+                    delay(10);
+                }
+                resetTripStart = 0;
+                return;
+            }
+        } else {
+            resetTripStart = 0;
         }
 
         // Obsługa przycisku UP (zmiana asysty)
@@ -1789,6 +1908,20 @@ void toggleLegalMode() {
     display.sendBuffer();
 }
 
+void clearTripData() {
+    // Wyświetl komunikat o zresetowaniu danych
+    display.clearBuffer();
+
+    drawCenteredText("Reset danych", 25, czcionka_srednia);
+    drawCenteredText("przejazdu", 40, czcionka_srednia);
+
+    display.sendBuffer();
+    delay(1500);
+
+    display.clearBuffer();
+    display.sendBuffer();
+}
+
 // --- Funkcje pomocnicze ---
 
 // sprawdzanie pod-ekranów
@@ -1820,12 +1953,33 @@ int getSubScreenCount(MainScreen screen) {
     }
 }
 
+void resetTripData() {
+    speed_avg_kmh = 0;
+    speed_max_kmh = 0;
+    distance_km = 0;
+    cadence_avg_rpm = 0;
+    cadence_max_rpm = 0;
+    cadence_sum = 0;
+    cadence_samples = 0;
+    power_avg_w = 0;
+    power_max_w = 0;
+    
+    // Zresetuj liczniki używane do obliczania średnich
+    speed_sum = 0;
+    speed_count = 0;
+    
+    #ifdef DEBUG
+    Serial.println("Zresetowano dane przejazdu");
+    #endif
+}
+
 //
 void setCadencePulsesPerRevolution(uint8_t pulses) {
-    // Walidacja zakresu
     if (pulses >= 1 && pulses <= 24) {
-        // Tutaj używamy predefiniowanej stałej, więc faktycznie musimy zmienić wartość w inny sposób
-        // W przyszłości można to zaimplementować poprzez zapis do pamięci EEPROM/NVS
+        cadence_pulses_per_revolution = pulses;
+        preferences.begin("cadence", false);
+        preferences.putUChar("pulses", pulses);
+        preferences.end();
         #ifdef DEBUG
         Serial.printf("Ustawiono %d impulsów na obrót korby\n", pulses);
         #endif
@@ -2530,46 +2684,35 @@ void setupWebServer() {
     server.begin();
 }
 
-// zapis ustawień zegara
-// void handleSaveClockSettings(AsyncWebServerRequest *request) {
-//     if (request->hasParam("hour")) {
-//         int hour = request->getParam("hour")->value().toInt();
-//     }
-//     request->redirect("/");
-// }
-
-// zapis ustawień roweru
-// void handleSaveBikeSettings(AsyncWebServerRequest *request) {
-//     if (request->hasParam("wheel")) {
-//         bikeSettings.wheelCircumference = request->getParam("wheel")->value().toInt();
-//     }
-//     request->redirect("/");
-// }
-
 // --- Funkcje systemu plików ---
 
 // Sprawdzenie i formatowanie systemu plików przy starcie
-void initLittleFS() {
-    if (!LittleFS.begin(true)) {
+// Lepsza obsługa błędów w funkcji initLittleFS
+bool initLittleFS() {
+    if (!LittleFS.begin(false)) { // Najpierw spróbuj bez formatowania
         #ifdef DEBUG
-        Serial.println("LittleFS Mount Failed");
+        Serial.println("LittleFS Mount Failed - próba formatowania");
         #endif
+        
         if (!LittleFS.format()) {
             #ifdef DEBUG
             Serial.println("LittleFS Format Failed");
             #endif
-            return;
+            return false;
         }
+        
         if (!LittleFS.begin()) {
             #ifdef DEBUG
             Serial.println("LittleFS Mount Failed After Format");
             #endif
-            return;
+            return false;
         }
     }
+    
     #ifdef DEBUG
     Serial.println("LittleFS Mounted Successfully");
     #endif
+    return true;
 }
 
 // listowanie plików
@@ -2668,29 +2811,6 @@ void syncRTCWithNTP() {
     }
 }
 
-// synchronizacja czasu NTP
-void synchronizeTime() {
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-    #ifdef DEBUG
-    Serial.println("Waiting for NTP time sync...");
-    #endif
-    time_t now = time(nullptr);
-    while (now < 8 * 3600 * 2) {
-        delay(500);
-        #ifdef DEBUG
-        Serial.print(".");
-        #endif
-        now = time(nullptr);
-    }
-    Serial.println();
-
-    struct tm timeinfo;
-    gmtime_r(&now, &timeinfo);
-    rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1,
-                        timeinfo.tm_mday, timeinfo.tm_hour,
-                        timeinfo.tm_min, timeinfo.tm_sec));
-}
-
 /********************************************************************
  * DEKLARACJE I IMPLEMENTACJE FUNKCJI
  ********************************************************************/
@@ -2704,7 +2824,7 @@ void initializeDefaultSettings() {
     timeSettings.seconds = 0;
     timeSettings.day = 1;
     timeSettings.month = 1;
-    timeSettings.year = 2024;
+    timeSettings.year = 2025;
 
     // Ustawienia świateł
     lightSettings.dayLights = LightSettings::FRONT;
@@ -2830,6 +2950,10 @@ void setup() {
     cadence_max_rpm = 0;
     cadence_sum = 0;
     cadence_samples = 0;
+
+    preferences.begin("cadence", false);
+    cadence_pulses_per_revolution = preferences.getUChar("pulses", 1); // Domyślnie 1
+    preferences.end();
 
     // Ładowarka USB
     pinMode(UsbPin, OUTPUT);
@@ -2978,6 +3102,15 @@ void loop() {
         lastWebSocketUpdate = currentTime;
     }
 
+    unsigned long lastAutoSaveTime = 0;
+    const unsigned long AUTO_SAVE_INTERVAL = 60000; // Co minutę
+
+    // W funkcji loop() dodać:
+    if (currentTime - lastAutoSaveTime >= AUTO_SAVE_INTERVAL) {
+        // Zapisz dane odometru i inne ważne dane
+        lastAutoSaveTime = currentTime;
+    }
+
     // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla komunikatów
     if (displayActive && messageStartTime == 0) {
         display.clearBuffer();
@@ -2987,7 +3120,6 @@ void loop() {
         drawAssistLevel();
         drawMainDisplay();
         drawLightStatus();
-        //display.sendBuffer();
         handleTemperature();
         updateBmsData();
 
@@ -3009,23 +3141,25 @@ void loop() {
             if (valid_intervals > 0 && (now - cadence_pulse_times[0]) < 2000) {
                 float avg_period = (float)dt_sum / valid_intervals;
                 // Uwzględnij liczbę impulsów na jeden obrót
-                rpm = (60000.0 / avg_period) / CADENCE_PULSES_PER_REVOLUTION;
+                rpm = (60000.0 / avg_period) / cadence_pulses_per_revolution;
             }
             cadence_rpm = rpm;
 
             // Histereza dla strzałki kadencji
             switch (cadence_arrow_state) {
                 case ARROW_NONE:
+                    // ZMIANA: Przy niskiej kadencji strzałka w dół (niższy bieg)
                     if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN)
-                        cadence_arrow_state = ARROW_UP;
-                    else if (cadence_rpm > CADENCE_OPTIMAL_MAX)
                         cadence_arrow_state = ARROW_DOWN;
+                    // ZMIANA: Przy wysokiej kadencji strzałka w górę (wyższy bieg)
+                    else if (cadence_rpm > CADENCE_OPTIMAL_MAX)
+                        cadence_arrow_state = ARROW_UP;
                     break;
-                case ARROW_UP:
+                case ARROW_DOWN: // Był ARROW_UP
                     if (cadence_rpm >= CADENCE_OPTIMAL_MIN + CADENCE_HYSTERESIS)
                         cadence_arrow_state = ARROW_NONE;
                     break;
-                case ARROW_DOWN:
+                case ARROW_UP: // Był ARROW_DOWN
                     if (cadence_rpm <= CADENCE_OPTIMAL_MAX - CADENCE_HYSTERESIS)
                         cadence_arrow_state = ARROW_NONE;
                     break;
@@ -3075,7 +3209,6 @@ void loop() {
             pressure_rear_bar = 2.0 + (random(20) / 10.0);
             pressure_rear_voltage = 0.5 + (random(20) / 100.0);
             pressure_rear_temp = 20.0 + (random(100) / 10.0);
-            // Aktualizacja średniej prędkości (przykładowa implementacja)
             static float speed_sum = 0;
             static int speed_count = 0;
             speed_sum += speed_kmh;
