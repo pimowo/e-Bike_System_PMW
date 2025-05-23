@@ -201,7 +201,7 @@ private:
 
     void saveToFile() {
         #ifdef DEBUG
-        Serial.println("Zapisywanie licznika do pliku...");
+        //Serial.println("Zapisywanie licznika do pliku...");
         #endif
 
         File file = LittleFS.open(filename, "w");
@@ -290,7 +290,7 @@ public:
     void updateTotal(float newValue) {
         if (newValue > currentTotal) {
             #ifdef DEBUG
-            Serial.printf("Aktualizacja licznika z %.2f na %.2f\n", currentTotal, newValue);
+            //Serial.printf("Aktualizacja licznika z %.2f na %.2f\n", currentTotal, newValue);
             #endif
 
             currentTotal = newValue;
@@ -678,7 +678,8 @@ void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic,
 class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice advertisedDevice) {
         if (advertisedDevice.haveManufacturerData()) {
-            std::string manufacturerData = advertisedDevice.getManufacturerData();
+            // Tutaj jest problem - zamienimy na użycie String zamiast std::string
+            String manufacturerData = advertisedDevice.getManufacturerData();
             
             // Sprawdź czy dane mają właściwy format (przynajmniej 18 bajtów)
             if (manufacturerData.length() >= 18) {
@@ -726,7 +727,7 @@ class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
                         char hexStr[3];
                         sprintf(hexStr, "%02X", (uint8_t)manufacturerData[i]);
                         strcat(fullAddress, hexStr);
-                        if (i < 7) strcat(fullAddress, ":");
+                        if (i < 7 && i != 4) strcat(fullAddress, ":");
                     }
                     
                     // Aktualizuj dane
