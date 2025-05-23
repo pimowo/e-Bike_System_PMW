@@ -165,8 +165,15 @@ struct GeneralSettings {
 struct BluetoothConfig {
     bool bmsEnabled;
     bool tpmsEnabled;
+    char bmsMac[18];         // Dodaj to pole (już może istnieć)
+    char frontTpmsMac[18];   // Dodaj to pole
+    char rearTpmsMac[18];    // Dodaj to pole
     
-    BluetoothConfig() : bmsEnabled(false), tpmsEnabled(false) {}
+    BluetoothConfig() : bmsEnabled(false), tpmsEnabled(false) {
+        bmsMac[0] = '\0';
+        frontTpmsMac[0] = '\0';
+        rearTpmsMac[0] = '\0';
+    }
 };
 
 struct BmsData {
@@ -221,7 +228,7 @@ private:
             #endif
         } else {
             #ifdef DEBUG
-            Serial.printf("Zapisano licznik: %.2f\n", currentTotal);
+            //Serial.printf("Zapisano licznik: %.2f\n", currentTotal);
             #endif
         }
         
@@ -677,6 +684,23 @@ void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic,
 // Dodaj po callbacku dla BMS
 class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice advertisedDevice) {
+        // Jeśli TPMS nie jest włączone, nie rób nic
+        if (!bluetoothConfig.tpmsEnabled) {
+            return;
+        }
+        
+        // Pobierz adres urządzenia
+        String deviceAddress = advertisedDevice.getAddress().toString().c_str();
+        
+        // Sprawdź czy to jeden z naszych czujników
+        bool isFrontSensor = (strcmp(deviceAddress.c_str(), bluetoothConfig.frontTpmsMac) == 0);
+        bool isRearSensor = (strcmp(deviceAddress.c_str(), bluetoothConfig.rearTpmsMac) == 0);
+        
+        // Jeśli to nie jest żaden z naszych czujników, ignorujemy
+        if (!isFrontSensor && !isRearSensor) {
+            return;
+        }
+        
         if (advertisedDevice.haveManufacturerData()) {
             // Tutaj jest problem - zamienimy na użycie String zamiast std::string
             String manufacturerData = advertisedDevice.getManufacturerData();
@@ -728,6 +752,19 @@ class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
                         sprintf(hexStr, "%02X", (uint8_t)manufacturerData[i]);
                         strcat(fullAddress, hexStr);
                         if (i < 7 && i != 4) strcat(fullAddress, ":");
+                    }
+                    
+                    // Dodaj informację o rodzaju czujnika
+                    if (isFrontSensor) {
+                        #ifdef DEBUG
+                        Serial.println("Znaleziono dane z przedniego czujnika");
+                        #endif
+                        sensorNumber = 0x80; // Wymuszamy przedni czujnik
+                    } else if (isRearSensor) {
+                        #ifdef DEBUG
+                        Serial.println("Znaleziono dane z tylnego czujnika");
+                        #endif
+                        sensorNumber = 0x81; // Wymuszamy tylny czujnik
                     }
                     
                     // Aktualizuj dane
@@ -944,18 +981,22 @@ void updateTpmsData(const char* address, uint8_t sensorNumber, float pressure, f
 }
 
 void startTpmsScan() {
-    if (tpmsScanning) return;
+    if (tpmsScanning || !bluetoothConfig.tpmsEnabled) return;
     
     #ifdef DEBUG
-    Serial.println("Rozpoczynam skanowanie TPMS...");
+    Serial.println("Rozpoczynam nasłuchiwanie TPMS...");
+    Serial.print("Przedni czujnik MAC: ");
+    Serial.println(bluetoothConfig.frontTpmsMac);
+    Serial.print("Tylny czujnik MAC: ");
+    Serial.println(bluetoothConfig.rearTpmsMac);
     #endif
     
     BLEScan* pBLEScan = BLEDevice::getScan();
     pBLEScan->setAdvertisedDeviceCallbacks(new TpmsAdvertisedDeviceCallbacks());
-    pBLEScan->setActiveScan(true);
-    pBLEScan->setInterval(100);   // Interwał w ms
-    pBLEScan->setWindow(99);      // Mniej niż interwał
-    pBLEScan->start(5, false);    // Skanuj przez 5 sekund, bez zatrzymywania
+    pBLEScan->setActiveScan(false); // Pasywne skanowanie (mniej energii)
+    pBLEScan->setInterval(100);
+    pBLEScan->setWindow(99);
+    pBLEScan->start(0, true); // Skanowanie ciągłe w trybie pasywnym
     tpmsScanning = true;
     lastTpmsScanTime = millis();
 }
@@ -1209,9 +1250,12 @@ void saveBluetoothConfigToFile() {
         return;
     }
 
-    StaticJsonDocument<64> doc;
+    StaticJsonDocument<256> doc; // Zwiększ rozmiar dokumentu
     doc["bmsEnabled"] = bluetoothConfig.bmsEnabled;
     doc["tpmsEnabled"] = bluetoothConfig.tpmsEnabled;
+    doc["bmsMac"] = bluetoothConfig.bmsMac;
+    doc["frontTpmsMac"] = bluetoothConfig.frontTpmsMac; // Dodaj to
+    doc["rearTpmsMac"] = bluetoothConfig.rearTpmsMac;   // Dodaj to
 
     serializeJson(doc, file);
     file.close();
@@ -1227,12 +1271,25 @@ void loadBluetoothConfigFromFile() {
         return;
     }
 
-    StaticJsonDocument<64> doc;
+    StaticJsonDocument<256> doc; // Zwiększ rozmiar dokumentu
     DeserializationError error = deserializeJson(doc, file);
     
     if (!error) {
         bluetoothConfig.bmsEnabled = doc["bmsEnabled"] | false;
         bluetoothConfig.tpmsEnabled = doc["tpmsEnabled"] | false;
+        
+        // Dodaj obsługę MAC adresów
+        if (doc.containsKey("bmsMac")) {
+            strlcpy(bluetoothConfig.bmsMac, doc["bmsMac"], sizeof(bluetoothConfig.bmsMac));
+        }
+        
+        if (doc.containsKey("frontTpmsMac")) {
+            strlcpy(bluetoothConfig.frontTpmsMac, doc["frontTpmsMac"], sizeof(bluetoothConfig.frontTpmsMac));
+        }
+        
+        if (doc.containsKey("rearTpmsMac")) {
+            strlcpy(bluetoothConfig.rearTpmsMac, doc["rearTpmsMac"], sizeof(bluetoothConfig.rearTpmsMac));
+        }
     }
     
     file.close();
@@ -2820,9 +2877,12 @@ void setupWebServer() {
 
     // Dodaj w setupWebServer():
     server.on("/get-bluetooth-config", HTTP_GET, [](AsyncWebServerRequest *request) {
-        StaticJsonDocument<64> doc;
+        StaticJsonDocument<256> doc; // Zwiększ rozmiar dokumentu
         doc["bmsEnabled"] = bluetoothConfig.bmsEnabled;
         doc["tpmsEnabled"] = bluetoothConfig.tpmsEnabled;
+        doc["bmsMac"] = bluetoothConfig.bmsMac;
+        doc["frontTpmsMac"] = bluetoothConfig.frontTpmsMac; // Dodaj to
+        doc["rearTpmsMac"] = bluetoothConfig.rearTpmsMac;   // Dodaj to
         
         String response;
         serializeJson(doc, response);
@@ -2846,6 +2906,42 @@ void setupWebServer() {
             }
         } else {
             request->send(400, "application/json", "{\"success\":false,\"error\":\"No data\"}");
+        }
+    });
+
+    server.on("/save-bluetooth-config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+    [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        if (index + len != total) {
+            return; // Nie wszystkie dane zostały otrzymane
+        }
+
+        // Dodaj null terminator do danych
+        data[len] = '\0';
+        
+        StaticJsonDocument<256> doc;
+        DeserializationError error = deserializeJson(doc, (const char*)data);
+        
+        if (!error) {
+            bluetoothConfig.bmsEnabled = doc["bmsEnabled"] | false;
+            bluetoothConfig.tpmsEnabled = doc["tpmsEnabled"] | false;
+            
+            // Dodaj obsługę MAC adresów
+            if (doc.containsKey("bmsMac")) {
+                strlcpy(bluetoothConfig.bmsMac, doc["bmsMac"], sizeof(bluetoothConfig.bmsMac));
+            }
+            
+            if (doc.containsKey("frontTpmsMac")) {
+                strlcpy(bluetoothConfig.frontTpmsMac, doc["frontTpmsMac"], sizeof(bluetoothConfig.frontTpmsMac));
+            }
+            
+            if (doc.containsKey("rearTpmsMac")) {
+                strlcpy(bluetoothConfig.rearTpmsMac, doc["rearTpmsMac"], sizeof(bluetoothConfig.rearTpmsMac));
+            }
+            
+            saveBluetoothConfigToFile();
+            request->send(200, "application/json", "{\"success\":true}");
+        } else {
+            request->send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
         }
     });
     
