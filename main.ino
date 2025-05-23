@@ -376,7 +376,6 @@ OdometerManager odometer;
 Preferences preferences;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
-//AsyncEventSource events("/events");
 
 // Zmienne stanu systemu
 bool configModeActive = false;
@@ -386,7 +385,6 @@ bool displayActive = false;
 bool showingWelcome = false;
 
 // Zmienne stanu ekranu
-//MainScreen currentMainScreen = SPEED_SCREEN;
 MainScreen currentMainScreen = RANGE_SCREEN;
 int currentSubScreen = 0;
 bool inSubScreen = false;
@@ -1628,6 +1626,7 @@ void handleButtons() {
     static unsigned long downPressTime = 0;
     const unsigned long buttonDebounce = 50;
     static unsigned long legalModeStart = 0;
+    static unsigned long resetTripStart = 0;
 
     // Obsługa włączania/wyłączania wyświetlacza
     if (!displayActive) {
@@ -1668,6 +1667,25 @@ void handleButtons() {
             }
         } else {
             legalModeStart = 0;
+        }
+
+        // Sprawdzanie kombinacji SET + DOWN - reset danych przejazdu
+        if (displayActive && !showingWelcome && !setState && !downState) {
+            if (resetTripStart == 0) {
+                resetTripStart = currentTime;
+            } else if ((currentTime - resetTripStart) > 500) { // 2 sekundy przytrzymania
+                resetTripData();                
+                clearTripData();
+                
+                // Czekaj na puszczenie przycisków
+                while (!digitalRead(BTN_DOWN) || !digitalRead(BTN_SET)) {
+                    delay(10);
+                }
+                resetTripStart = 0;
+                return;
+            }
+        } else {
+            resetTripStart = 0;
         }
 
         // Obsługa przycisku UP (zmiana asysty)
@@ -1886,6 +1904,20 @@ void toggleLegalMode() {
     display.sendBuffer();
     delay(1500);
     
+    display.clearBuffer();
+    display.sendBuffer();
+}
+
+void clearTripData() {
+    // Wyświetl komunikat o zresetowaniu danych
+    display.clearBuffer();
+
+    drawCenteredText("Reset danych", 25, czcionka_srednia);
+    drawCenteredText("przejazdu", 40, czcionka_srednia);
+
+    display.sendBuffer();
+    delay(1500);
+
     display.clearBuffer();
     display.sendBuffer();
 }
