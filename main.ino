@@ -40,7 +40,6 @@
 
 // --- Biblioteki czasu ---
 #include <RTClib.h>             // Biblioteka do obsługi zegara czasu rzeczywistego (RTC)
-//#include <TimeLib.h>            // Biblioteka do obsługi funkcji czasowych
 
 // --- Biblioteki czujników temperatury ---
 #include <OneWire.h>            // Biblioteka do komunikacji z czujnikami OneWire
@@ -48,7 +47,6 @@
 
 // --- Biblioteki Bluetooth ---
 #include <BLEDevice.h>          // Główna biblioteka BLE
-//#include <BLEServer.h>          // Biblioteka do tworzenia serwera BLE
 #include <BLEUtils.h>           // Narzędzia BLE
 #include <BLE2902.h>            // Deskryptor powiadomień BLE
 
@@ -424,7 +422,6 @@ int cadence_max_rpm = 0;
 uint8_t cadence_pulses_per_revolution = 1;  // Zakres 1-24
 uint32_t cadence_sum = 0;
 uint32_t cadence_samples = 0;
-unsigned long lastCadenceArrowUpdate = 0;
 unsigned long last_avg_max_update = 0;
 const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
 const unsigned long cadenceArrowTimeout = 1000; // czas wyświetlania strzałek w milisekundach (1 sekunda)
@@ -444,8 +441,6 @@ unsigned long lastTempRequest = 0;
 unsigned long ds18b20RequestTime;
 
 // Zmienne dla przycisków
-unsigned long lastClickTime = 0;
-unsigned long lastButtonPress = 0;
 unsigned long lastDebounceTime = 0;
 unsigned long upPressStartTime = 0;
 unsigned long downPressStartTime = 0;
@@ -1605,6 +1600,20 @@ void showWelcomeMessage() {
     welcomeAnimationDone = true;
 }
 
+// wyświetlanie komunikatu kasowania danych
+void clearTripData() {
+    display.clearBuffer();
+
+    drawCenteredText("Reset danych", 25, czcionka_srednia);
+    drawCenteredText("przejazdu", 40, czcionka_srednia);
+
+    display.sendBuffer();
+    delay(1500);
+
+    display.clearBuffer();
+    display.sendBuffer();
+}
+
 // --- Funkcje obsługi przycisków ---
 
 // obsługa przycisków
@@ -1619,11 +1628,6 @@ void handleButtons() {
     bool downState = digitalRead(BTN_DOWN);
 
     static unsigned long lastButtonCheck = 0;
-    static unsigned long bothPressStart = 0;
-    static bool upPressed = false;
-    static bool downPressed = false;
-    static unsigned long upPressTime = 0;
-    static unsigned long downPressTime = 0;
     const unsigned long buttonDebounce = 50;
     static unsigned long legalModeStart = 0;
     static unsigned long resetTripStart = 0;
@@ -1904,20 +1908,6 @@ void toggleLegalMode() {
     display.sendBuffer();
     delay(1500);
     
-    display.clearBuffer();
-    display.sendBuffer();
-}
-
-void clearTripData() {
-    // Wyświetl komunikat o zresetowaniu danych
-    display.clearBuffer();
-
-    drawCenteredText("Reset danych", 25, czcionka_srednia);
-    drawCenteredText("przejazdu", 40, czcionka_srednia);
-
-    display.sendBuffer();
-    delay(1500);
-
     display.clearBuffer();
     display.sendBuffer();
 }
@@ -2789,26 +2779,6 @@ bool loadConfig() {
     Serial.println("Config file loaded successfully");
     #endif
     return true;
-}
-
-// --- Funkcje czasu ---
-
-// Synchronizacja RTC z NTP
-void syncRTCWithNTP() {
-    configTime(0, 0, "pool.ntp.org");
-    delay(1000);
-    time_t now;
-    struct tm timeinfo;
-    if (getLocalTime(&timeinfo)) {
-        rtc.adjust(DateTime(
-            timeinfo.tm_year + 1900,
-            timeinfo.tm_mon + 1,
-            timeinfo.tm_mday,
-            timeinfo.tm_hour,
-            timeinfo.tm_min,
-            timeinfo.tm_sec
-        ));
-    }
 }
 
 /********************************************************************
