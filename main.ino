@@ -403,6 +403,8 @@ float battery_voltage;
 float battery_current;
 float battery_capacity_wh;
 float battery_capacity_ah;
+float speed_sum = 0;
+int speed_count = 0;
 int battery_capacity_percent;
 int power_w;
 int power_avg_w;
@@ -627,42 +629,37 @@ void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic,
                 // Pozostała pojemność (0.1Ah)
                 bmsData.remainingCapacity = (float)((pData[8] << 8) | pData[9]) / 10.0;
                 
-                // SOC (%)
-                bmsData.soc = pData[23];
+                // SOC (%) - dodane zabezpieczenie przed indeksem out-of-bounds
+                if (length > 23) {
+                    bmsData.soc = pData[23];
                 
-                // Status ładowania/rozładowania
-                uint8_t status = pData[22];
-                bmsData.charging = (status & 0x01);
-                bmsData.discharging = (status & 0x02);
-                
-                #ifdef DEBUG
-                Serial.printf("Voltage: %.1fV, Current: %.1fA, SOC: %d%%\n", 
-                            bmsData.voltage, bmsData.current, bmsData.soc);
-                #endif
+                    // Status ładowania/rozładowania - dodane zabezpieczenie
+                    if (length > 22) {
+                        uint8_t status = pData[22];
+                        bmsData.charging = (status & 0x01);
+                        bmsData.discharging = (status & 0x02);
+                    }
+                }
             }
             break;
 
         case 0x04:  // Cell info
             if (length >= 34) {  // Sprawdź czy mamy kompletny pakiet
-                for (int i = 0; i < 16; i++) {
+                const int maxCells = std::min(16, (int)((length - 4) / 2));
+                for (int i = 0; i < maxCells; i++) {
                     bmsData.cellVoltages[i] = (float)((pData[4 + i*2] << 8) | pData[5 + i*2]) / 1000.0;
                 }
-                #ifdef DEBUG
-                Serial.println("Cell voltages updated");
-                #endif
             }
             break;
 
         case 0x08:  // Temperature info
             if (length >= 12) {
-                for (int i = 0; i < 4; i++) {
+                const int maxTemps = std::min(4, (int)((length - 4) / 2));
+                for (int i = 0; i < maxTemps; i++) {
                     // Konwersja z K na °C
                     int16_t temp = ((pData[4 + i*2] << 8) | pData[5 + i*2]) - 2731;
                     bmsData.temperatures[i] = (float)temp / 10.0;
                 }
-                #ifdef DEBUG
-                Serial.println("Temperatures updated");
-                #endif
             }
             break;
     }
@@ -678,16 +675,30 @@ void requestBmsData(const uint8_t* command, size_t length) {
 // aktualizacja danych BMS
 void updateBmsData() {
     static unsigned long lastBmsUpdate = 0;
+    static uint8_t requestState = 0; // Stan sekwencji zapytań
     const unsigned long BMS_UPDATE_INTERVAL = 1000; // Aktualizuj co 1 sekundę
+    const unsigned long SEQUENTIAL_DELAY = 100; // Opóźnienie między krokami sekwencji
 
-    if (millis() - lastBmsUpdate >= BMS_UPDATE_INTERVAL) {
-        if (bleClient && bleClient->isConnected()) {
-            requestBmsData(BMS_BASIC_INFO, sizeof(BMS_BASIC_INFO));
-            delay(100);  // Krótkie opóźnienie między zapytaniami
-            requestBmsData(BMS_CELL_INFO, sizeof(BMS_CELL_INFO));
-            delay(100);
-            requestBmsData(BMS_TEMP_INFO, sizeof(BMS_TEMP_INFO));
-            lastBmsUpdate = millis();
+    if (!bleClient || !bleClient->isConnected()) {
+        return;
+    }
+
+    unsigned long currentTime = millis();
+    if (currentTime - lastBmsUpdate >= SEQUENTIAL_DELAY) {
+        switch(requestState) {
+            case 0:
+                requestBmsData(BMS_BASIC_INFO, sizeof(BMS_BASIC_INFO));
+                requestState = 1;
+                break;
+            case 1:
+                requestBmsData(BMS_CELL_INFO, sizeof(BMS_CELL_INFO));
+                requestState = 2;
+                break;
+            case 2:
+                requestBmsData(BMS_TEMP_INFO, sizeof(BMS_TEMP_INFO));
+                requestState = 0;
+                lastBmsUpdate = currentTime; // Reset głównego timera tylko po pełnej sekwencji
+                break;
         }
     }
 }
@@ -1910,6 +1921,26 @@ int getSubScreenCount(MainScreen screen) {
     }
 }
 
+void resetTripData() {
+    speed_avg_kmh = 0;
+    speed_max_kmh = 0;
+    distance_km = 0;
+    cadence_avg_rpm = 0;
+    cadence_max_rpm = 0;
+    cadence_sum = 0;
+    cadence_samples = 0;
+    power_avg_w = 0;
+    power_max_w = 0;
+    
+    // Zresetuj liczniki używane do obliczania średnich
+    speed_sum = 0;
+    speed_count = 0;
+    
+    #ifdef DEBUG
+    Serial.println("Zresetowano dane przejazdu");
+    #endif
+}
+
 //
 void setCadencePulsesPerRevolution(uint8_t pulses) {
     if (pulses >= 1 && pulses <= 24) {
@@ -2621,46 +2652,35 @@ void setupWebServer() {
     server.begin();
 }
 
-// zapis ustawień zegara
-// void handleSaveClockSettings(AsyncWebServerRequest *request) {
-//     if (request->hasParam("hour")) {
-//         int hour = request->getParam("hour")->value().toInt();
-//     }
-//     request->redirect("/");
-// }
-
-// zapis ustawień roweru
-// void handleSaveBikeSettings(AsyncWebServerRequest *request) {
-//     if (request->hasParam("wheel")) {
-//         bikeSettings.wheelCircumference = request->getParam("wheel")->value().toInt();
-//     }
-//     request->redirect("/");
-// }
-
 // --- Funkcje systemu plików ---
 
 // Sprawdzenie i formatowanie systemu plików przy starcie
-void initLittleFS() {
-    if (!LittleFS.begin(true)) {
+// Lepsza obsługa błędów w funkcji initLittleFS
+bool initLittleFS() {
+    if (!LittleFS.begin(false)) { // Najpierw spróbuj bez formatowania
         #ifdef DEBUG
-        Serial.println("LittleFS Mount Failed");
+        Serial.println("LittleFS Mount Failed - próba formatowania");
         #endif
+        
         if (!LittleFS.format()) {
             #ifdef DEBUG
             Serial.println("LittleFS Format Failed");
             #endif
-            return;
+            return false;
         }
+        
         if (!LittleFS.begin()) {
             #ifdef DEBUG
             Serial.println("LittleFS Mount Failed After Format");
             #endif
-            return;
+            return false;
         }
     }
+    
     #ifdef DEBUG
     Serial.println("LittleFS Mounted Successfully");
     #endif
+    return true;
 }
 
 // listowanie plików
@@ -2759,29 +2779,6 @@ void syncRTCWithNTP() {
     }
 }
 
-// synchronizacja czasu NTP
-void synchronizeTime() {
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-    #ifdef DEBUG
-    Serial.println("Waiting for NTP time sync...");
-    #endif
-    time_t now = time(nullptr);
-    while (now < 8 * 3600 * 2) {
-        delay(500);
-        #ifdef DEBUG
-        Serial.print(".");
-        #endif
-        now = time(nullptr);
-    }
-    Serial.println();
-
-    struct tm timeinfo;
-    gmtime_r(&now, &timeinfo);
-    rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1,
-                        timeinfo.tm_mday, timeinfo.tm_hour,
-                        timeinfo.tm_min, timeinfo.tm_sec));
-}
-
 /********************************************************************
  * DEKLARACJE I IMPLEMENTACJE FUNKCJI
  ********************************************************************/
@@ -2795,7 +2792,7 @@ void initializeDefaultSettings() {
     timeSettings.seconds = 0;
     timeSettings.day = 1;
     timeSettings.month = 1;
-    timeSettings.year = 2024;
+    timeSettings.year = 2025;
 
     // Ustawienia świateł
     lightSettings.dayLights = LightSettings::FRONT;
@@ -3073,6 +3070,15 @@ void loop() {
         lastWebSocketUpdate = currentTime;
     }
 
+    unsigned long lastAutoSaveTime = 0;
+    const unsigned long AUTO_SAVE_INTERVAL = 60000; // Co minutę
+
+    // W funkcji loop() dodać:
+    if (currentTime - lastAutoSaveTime >= AUTO_SAVE_INTERVAL) {
+        // Zapisz dane odometru i inne ważne dane
+        lastAutoSaveTime = currentTime;
+    }
+
     // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla komunikatów
     if (displayActive && messageStartTime == 0) {
         display.clearBuffer();
@@ -3082,7 +3088,6 @@ void loop() {
         drawAssistLevel();
         drawMainDisplay();
         drawLightStatus();
-        //display.sendBuffer();
         handleTemperature();
         updateBmsData();
 
@@ -3154,8 +3159,6 @@ void loop() {
             speed_kmh = (speed_kmh >= 35.0) ? 0.0 : speed_kmh + 0.1;
             temp_motor = 30.0 + random(20);
             range_km = 50.0 - (random(20) / 10.0);
-            // Aktualizacja dystansu            
-            //odometer.update(distance_km);
             odometer.updateTotal(distance_km);
             distance_km += 0.1;
             power_w = 100 + random(300);
@@ -3174,7 +3177,6 @@ void loop() {
             pressure_rear_bar = 2.0 + (random(20) / 10.0);
             pressure_rear_voltage = 0.5 + (random(20) / 100.0);
             pressure_rear_temp = 20.0 + (random(100) / 10.0);
-            // Aktualizacja średniej prędkości (przykładowa implementacja)
             static float speed_sum = 0;
             static int speed_count = 0;
             speed_sum += speed_kmh;
