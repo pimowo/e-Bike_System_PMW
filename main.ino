@@ -77,7 +77,7 @@
 //#define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "21.5.25";
+const char* VERSION = "23.5.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -302,32 +302,24 @@ int power_max_w;
 float speed_avg_kmh;
 float speed_max_kmh;
 // kadencja
-#define CADENCE_PULSES_PER_REVOLUTION 1  // Domyślnie 1 impuls na obrót (zakres 1-24)
 #define CADENCE_SAMPLES_WINDOW 4
-volatile unsigned long cadence_pulse_times[CADENCE_SAMPLES_WINDOW] = {0};
-volatile unsigned long cadence_last_pulse_time = 0;
-int cadence_rpm = 0;
-int cadence_avg_rpm = 0;
-int cadence_max_rpm = 0;
-uint32_t cadence_sum = 0;
-uint32_t cadence_samples = 0;
-unsigned long last_avg_max_update = 0;
-const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
-// strzałki kadencji
 #define CADENCE_OPTIMAL_MIN 75
 #define CADENCE_OPTIMAL_MAX 95
 #define CADENCE_HYSTERESIS 2
 enum CadenceArrow { ARROW_NONE, ARROW_UP, ARROW_DOWN };
 CadenceArrow cadence_arrow_state = ARROW_NONE;
+volatile unsigned long cadence_pulse_times[CADENCE_SAMPLES_WINDOW] = {0};
+volatile unsigned long cadence_last_pulse_time = 0;
+int cadence_rpm = 0;
+int cadence_avg_rpm = 0;
+int cadence_max_rpm = 0;
+uint8_t cadence_pulses_per_revolution = 1;  // Zakres 1-24
+uint32_t cadence_sum = 0;
+uint32_t cadence_samples = 0;
 unsigned long lastCadenceArrowUpdate = 0;
-const unsigned long ARROW_PERSIST_TIME = 1500; // ms
-unsigned long lastCadenceTime = 0;
+unsigned long last_avg_max_update = 0;
+const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
 const unsigned long cadenceArrowTimeout = 1000; // czas wyświetlania strzałek w milisekundach (1 sekunda)
-bool cadenceArrowsOn = false;
-// Zmienne dla strzałek kadencji
-unsigned long ostatniCzasKadencji = 0;
-const unsigned long czasWyswietlaniaStrzalek = 1000; // czas w milisekundach (1 sekunda)
-bool strzalkiAktywne = false;
 
 // Zmienne dla czujników ciśnienia kół
 float pressure_bar;           // przednie koło
@@ -339,7 +331,6 @@ float pressure_rear_temp;     // temperatura tylnego czujnika
 
 // Zmienne dla czujnika temperatury
 float currentTemp = DEVICE_DISCONNECTED_C;
-//bool temperatureReady = false;
 bool conversionRequested = false;
 unsigned long lastTempRequest = 0;
 unsigned long ds18b20RequestTime;
@@ -352,7 +343,6 @@ unsigned long upPressStartTime = 0;
 unsigned long downPressStartTime = 0;
 unsigned long setPressStartTime = 0;
 unsigned long messageStartTime = 0;
-//bool firstClick = false;
 bool upLongPressExecuted = false;
 bool downLongPressExecuted = false;
 bool setLongPressExecuted = false;
@@ -494,9 +484,9 @@ class TemperatureSensor {
 
 void IRAM_ATTR cadence_ISR() {
     unsigned long now = millis();
-    // Uwzględnij minimalny odstęp czasu dla maksymalnej kadencji
-    // Przy 24 impulsach na obrót i max 300 RPM, minimalny odstęp to ~8ms
-    if (now - cadence_last_pulse_time > (200 / CADENCE_PULSES_PER_REVOLUTION)) { 
+    unsigned long minDelay = max(8, 200 / cadence_pulses_per_revolution); // Minimum 8ms
+    
+    if (now - cadence_last_pulse_time > minDelay) {
         for (int i = CADENCE_SAMPLES_WINDOW - 1; i > 0; i--) {
             cadence_pulse_times[i] = cadence_pulse_times[i - 1];
         }
@@ -794,6 +784,7 @@ void loadBacklightSettingsFromFile() {
         Serial.println("Brak pliku konfiguracyjnego, używam ustawień domyślnych");
         #endif
         // Ustaw wartości domyślne
+        backlightSettings.Brightness = 70;
         backlightSettings.dayBrightness = 100;
         backlightSettings.nightBrightness = 50;
         backlightSettings.autoMode = false;
@@ -1092,20 +1083,14 @@ void drawValueAndUnit(const char* valueStr, const char* unitStr) {
 
 // --- Funkcje rysujące ---
 void drawUpArrow() {
-    // Strzałka w górę: od lewej 50, od góry 15 (grot na 58,15)
-    //display.drawTriangle(53, 23, 58, 15, 63, 23);
     display.drawTriangle(56, 23, 61, 15, 66, 23);
 }
 
 void drawCircleIcon() {
-    // Kółko: środek od lewej 58, od góry 25 (promień 6)
-    //display.drawCircle(58, 25, 6);
     display.drawCircle(61, 25, 6);
 }
 
 void drawDownArrow() {
-    // Strzałka w dół: od lewej 50, od góry 35 (grot na 58,43)
-    //display.drawTriangle(53, 35, 58, 43, 63, 35);
     display.drawTriangle(56, 35, 61, 43, 66, 35);
 }
 
@@ -1269,7 +1254,7 @@ void drawMainDisplay() {
                         descText = ">Energia";
                         break;
                     case BATTERY_CAPACITY_AH:
-                        sprintf(valueStr, "%4.1f", battery_capacity_wh);
+                        sprintf(valueStr, "%4.1f", battery_capacity_ah);
                         unitStr = "Ah";
                         descText = ">Pojemnosc";
                         break;
@@ -1472,7 +1457,7 @@ void showWelcomeMessage() {
     int x = 128; // Start poza prawą krawędzią
 
     // Przygotuj tekst wersji
-    String versionText = "System ver. ";
+    String versionText = "System ";
     versionText += VERSION;
 
     unsigned long lastUpdate = millis();
@@ -1822,10 +1807,11 @@ int getSubScreenCount(MainScreen screen) {
 
 //
 void setCadencePulsesPerRevolution(uint8_t pulses) {
-    // Walidacja zakresu
     if (pulses >= 1 && pulses <= 24) {
-        // Tutaj używamy predefiniowanej stałej, więc faktycznie musimy zmienić wartość w inny sposób
-        // W przyszłości można to zaimplementować poprzez zapis do pamięci EEPROM/NVS
+        cadence_pulses_per_revolution = pulses;
+        preferences.begin("cadence", false);
+        preferences.putUChar("pulses", pulses);
+        preferences.end();
         #ifdef DEBUG
         Serial.printf("Ustawiono %d impulsów na obrót korby\n", pulses);
         #endif
@@ -2831,6 +2817,10 @@ void setup() {
     cadence_sum = 0;
     cadence_samples = 0;
 
+    preferences.begin("cadence", false);
+    cadence_pulses_per_revolution = preferences.getUChar("pulses", 1); // Domyślnie 1
+    preferences.end();
+
     // Ładowarka USB
     pinMode(UsbPin, OUTPUT);
     digitalWrite(UsbPin, LOW);
@@ -3009,7 +2999,7 @@ void loop() {
             if (valid_intervals > 0 && (now - cadence_pulse_times[0]) < 2000) {
                 float avg_period = (float)dt_sum / valid_intervals;
                 // Uwzględnij liczbę impulsów na jeden obrót
-                rpm = (60000.0 / avg_period) / CADENCE_PULSES_PER_REVOLUTION;
+                rpm = (60000.0 / avg_period) / cadence_pulses_per_revolution;
             }
             cadence_rpm = rpm;
 
@@ -3047,7 +3037,6 @@ void loop() {
                 cadence_avg_rpm = 0;
             // NIE zerujemy sumatorów ani max!
             last_avg_max_update = now;
-            //}
         }
 
         updateCadenceLogic();
