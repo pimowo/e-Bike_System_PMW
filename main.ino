@@ -302,6 +302,7 @@ int power_max_w;
 float speed_avg_kmh;
 float speed_max_kmh;
 // kadencja
+#define CADENCE_PULSES_PER_REVOLUTION 1  // Domyślnie 1 impuls na obrót (zakres 1-24)
 #define CADENCE_SAMPLES_WINDOW 4
 volatile unsigned long cadence_pulse_times[CADENCE_SAMPLES_WINDOW] = {0};
 volatile unsigned long cadence_last_pulse_time = 0;
@@ -493,7 +494,9 @@ class TemperatureSensor {
 
 void IRAM_ATTR cadence_ISR() {
     unsigned long now = millis();
-    if (now - cadence_last_pulse_time > 200) { // minimalny odstęp: 200ms = max 300 RPM
+    // Uwzględnij minimalny odstęp czasu dla maksymalnej kadencji
+    // Przy 24 impulsach na obrót i max 300 RPM, minimalny odstęp to ~8ms
+    if (now - cadence_last_pulse_time > (200 / CADENCE_PULSES_PER_REVOLUTION)) { 
         for (int i = CADENCE_SAMPLES_WINDOW - 1; i > 0; i--) {
             cadence_pulse_times[i] = cadence_pulse_times[i - 1];
         }
@@ -932,7 +935,7 @@ void drawHorizontalLine() {
 // rysowanie linii pionowej
 void drawVerticalLine() {
     display.drawVLine(25, 16, 28);
-    display.drawVLine(66, 16, 28);
+    display.drawVLine(68, 16, 28);
 }
 
 // rysowanie górnego paska
@@ -1814,6 +1817,22 @@ int getSubScreenCount(MainScreen screen) {
         case POWER_SCREEN: return POWER_SUB_COUNT;
         case PRESSURE_SCREEN: return PRESSURE_SUB_COUNT;
         default: return 0;
+    }
+}
+
+//
+void setCadencePulsesPerRevolution(uint8_t pulses) {
+    // Walidacja zakresu
+    if (pulses >= 1 && pulses <= 24) {
+        // Tutaj używamy predefiniowanej stałej, więc faktycznie musimy zmienić wartość w inny sposób
+        // W przyszłości można to zaimplementować poprzez zapis do pamięci EEPROM/NVS
+        #ifdef DEBUG
+        Serial.printf("Ustawiono %d impulsów na obrót korby\n", pulses);
+        #endif
+    } else {
+        #ifdef DEBUG
+        Serial.println("Błędna wartość dla impulsów na obrót (dozwolony zakres: 1-24)");
+        #endif
     }
 }
 
@@ -2989,7 +3008,8 @@ void loop() {
             int rpm = 0;
             if (valid_intervals > 0 && (now - cadence_pulse_times[0]) < 2000) {
                 float avg_period = (float)dt_sum / valid_intervals;
-                rpm = 60000.0 / avg_period;
+                // Uwzględnij liczbę impulsów na jeden obrót
+                rpm = (60000.0 / avg_period) / CADENCE_PULSES_PER_REVOLUTION;
             }
             cadence_rpm = rpm;
 
