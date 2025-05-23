@@ -1532,6 +1532,22 @@ const infoContent = {
         title: '📶 Konfiguracja Bluetooth',
         description: `Panel konfiguracji połączeń bezprzewodowych.
 
+	'front-tpms-mac-info': {
+		title: 'Adres MAC przedniego czujnika TPMS',
+		description: `Wprowadź adres MAC przedniego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.    
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.    
+		Przykład: A1:B2:C3:D4:E5:F6`
+	},
+
+	'rear-tpms-mac-info': {
+		title: 'Adres MAC tylnego czujnika TPMS',
+		description: `Wprowadź adres MAC tylnego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.
+		
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.
+		
+		Przykład: A1:B2:C3:D4:E5:F6`
+	},
+
     🔋 BMS (Battery Management System):
       - Monitoring stanu baterii
       - Pomiar temperatury ogniw
@@ -1651,6 +1667,22 @@ async function loadBluetoothConfig() {
         if (data) {
             document.getElementById('bms-enabled').value = data.bmsEnabled.toString();
             document.getElementById('tpms-enabled').value = data.tpmsEnabled.toString();
+            
+            // Dodaj obsługę MAC adresów TPMS
+            const tpmsFields = document.getElementById('tpms-fields');
+            if (tpmsFields) {
+                // Pokaż/ukryj pola w zależności od włączenia TPMS
+                tpmsFields.style.display = data.tpmsEnabled ? 'block' : 'none';
+            }
+            
+            // Ustaw wartości MAC adresów jeśli istnieją
+            if (document.getElementById('front-tpms-mac')) {
+                document.getElementById('front-tpms-mac').value = data.frontTpmsMac || '';
+            }
+            
+            if (document.getElementById('rear-tpms-mac')) {
+                document.getElementById('rear-tpms-mac').value = data.rearTpmsMac || '';
+            }
         }
     } catch (error) {
         console.error('Błąd podczas pobierania konfiguracji Bluetooth:', error);
@@ -1667,25 +1699,43 @@ function saveBluetoothConfig() {
     const bmsEnabled = document.getElementById('bms-enabled').value;
     const tpmsEnabled = document.getElementById('tpms-enabled').value;
     
-    // Tutaj dodaj kod do zapisywania konfiguracji
+    // Przygotuj dane do wysłania
+    const configData = {
+        bmsEnabled: bmsEnabled === 'true',
+        tpmsEnabled: tpmsEnabled === 'true'
+    };
+    
+    // Dodaj MAC adresy tylko jeśli TPMS jest włączone
+    if (tpmsEnabled === 'true') {
+        if (document.getElementById('front-tpms-mac')) {
+            configData.frontTpmsMac = document.getElementById('front-tpms-mac').value;
+        }
+        
+        if (document.getElementById('rear-tpms-mac')) {
+            configData.rearTpmsMac = document.getElementById('rear-tpms-mac').value;
+        }
+    }
+    
+    // Wyślij dane do serwera
     fetch('/save-bluetooth-config', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            bmsEnabled: bmsEnabled === 'true',
-            tpmsEnabled: tpmsEnabled === 'true'
-        })
+        body: JSON.stringify(configData)
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
             console.log('Konfiguracja Bluetooth zapisana pomyślnie');
+            alert('Zapisano konfigurację Bluetooth');
+        } else {
+            alert('Błąd podczas zapisywania konfiguracji');
         }
     })
     .catch(error => {
         console.error('Błąd podczas zapisywania konfiguracji Bluetooth:', error);
+        alert('Błąd podczas zapisywania konfiguracji: ' + error.message);
     });
 }
 
@@ -1720,6 +1770,26 @@ function initializeCollapsibleSections() {
         }
     });
 }
+
+// Funkcja do pokazywania/ukrywania pól MAC adresów TPMS
+function toggleTpmsFields() {
+    const tpmsEnabled = document.getElementById('tpms-enabled').value === 'true';
+    const tpmsFields = document.getElementById('tpms-fields');
+    
+    if (tpmsFields) {
+        tpmsFields.style.display = tpmsEnabled ? 'block' : 'none';
+    }
+}
+
+// Dodaj nasłuchiwanie zmiany ustawienia TPMS
+document.addEventListener('DOMContentLoaded', function() {
+    const tpmsEnabledSelect = document.getElementById('tpms-enabled');
+    if (tpmsEnabledSelect) {
+        tpmsEnabledSelect.addEventListener('change', toggleTpmsFields);
+        // Wywołaj od razu po załadowaniu, aby ustawić początkowy stan
+        toggleTpmsFields();
+    }
+});
 
 // Zastąp istniejącą funkcję saveGeneralSettings tą nową wersją
 async function saveGeneralSettings() {
