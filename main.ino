@@ -72,7 +72,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "23.5.25";
+const char* VERSION = "24.5.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -2889,25 +2889,25 @@ void setupWebServer() {
         request->send(200, "application/json", response);
     });
 
-    server.on("/save-bluetooth-config", HTTP_POST, [](AsyncWebServerRequest *request) {
-        if (request->hasParam("body", true)) {
-            String json = request->getParam("body", true)->value();
-            StaticJsonDocument<64> doc;
-            DeserializationError error = deserializeJson(doc, json);
+    // server.on("/save-bluetooth-config", HTTP_POST, [](AsyncWebServerRequest *request) {
+    //     if (request->hasParam("body", true)) {
+    //         String json = request->getParam("body", true)->value();
+    //         StaticJsonDocument<64> doc;
+    //         DeserializationError error = deserializeJson(doc, json);
 
-            if (!error) {
-                bluetoothConfig.bmsEnabled = doc["bmsEnabled"] | false;
-                bluetoothConfig.tpmsEnabled = doc["tpmsEnabled"] | false;
+    //         if (!error) {
+    //             bluetoothConfig.bmsEnabled = doc["bmsEnabled"] | false;
+    //             bluetoothConfig.tpmsEnabled = doc["tpmsEnabled"] | false;
                 
-                saveBluetoothConfigToFile();
-                request->send(200, "application/json", "{\"success\":true}");
-            } else {
-                request->send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
-            }
-        } else {
-            request->send(400, "application/json", "{\"success\":false,\"error\":\"No data\"}");
-        }
-    });
+    //             saveBluetoothConfigToFile();
+    //             request->send(200, "application/json", "{\"success\":true}");
+    //         } else {
+    //             request->send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
+    //         }
+    //     } else {
+    //         request->send(400, "application/json", "{\"success\":false,\"error\":\"No data\"}");
+    //     }
+    // });
 
     server.on("/save-bluetooth-config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
@@ -3292,6 +3292,21 @@ void setup() {
         loadBacklightSettingsFromFile();
         loadGeneralSettingsFromFile();
         loadBluetoothConfigFromFile();
+        
+        File file = LittleFS.open("/bluetooth_config.json", "r");
+        if (!file) {
+            #ifdef DEBUG
+            Serial.println("Tworzę domyślny plik konfiguracyjny Bluetooth");
+            #endif
+            bluetoothConfig.bmsEnabled = false;
+            bluetoothConfig.tpmsEnabled = false;
+            strcpy(bluetoothConfig.bmsMac, "");
+            strcpy(bluetoothConfig.frontTpmsMac, "");
+            strcpy(bluetoothConfig.rearTpmsMac, "");
+            saveBluetoothConfigToFile();
+        } else {
+            file.close();
+        }
     }
 
     // Inicjalizacja licznika
