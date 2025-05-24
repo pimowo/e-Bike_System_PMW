@@ -1588,7 +1588,21 @@ const infoContent = {
     • Ciśnienie w oponach (bar)
     • Temperatura opon (°C)
     • Stan baterii czujników (V)`
-    }
+    },
+	
+	'front-tpms-mac-info': {
+		title: 'Adres MAC przedniego czujnika TPMS',
+		description: `Wprowadź adres MAC przedniego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.    
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.    
+		Przykład: A1:B2:C3:D4:E5:F6`
+	},
+
+	'rear-tpms-mac-info': {
+		title: 'Adres MAC tylnego czujnika TPMS',
+		description: `Wprowadź adres MAC tylnego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.		
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.		
+		Przykład: A1:B2:C3:D4:E5:F6`
+	}
 };
 
 function showRTCInfo() {
@@ -1694,6 +1708,26 @@ window.onload = function() {
     loadBluetoothConfig();
     // ... (pozostałe istniejące wywołania)
 };
+
+// Funkcja do pokazywania/ukrywania pól MAC adresów TPMS
+function toggleTpmsFields() {
+    const tpmsEnabled = document.getElementById('tpms-enabled').value === 'true';
+    const tpmsFields = document.getElementById('tpms-fields');
+    
+    if (tpmsFields) {
+        tpmsFields.style.display = tpmsEnabled ? 'block' : 'none';
+    }
+}
+
+// Dodaj nasłuchiwanie zmiany ustawienia TPMS
+document.addEventListener('DOMContentLoaded', function() {
+    const tpmsEnabledSelect = document.getElementById('tpms-enabled');
+    if (tpmsEnabledSelect) {
+        tpmsEnabledSelect.addEventListener('change', toggleTpmsFields);
+        // Wywołaj od razu po załadowaniu, aby ustawić początkowy stan
+        toggleTpmsFields();
+    }
+});
 
 function saveBluetoothConfig() {
     const bmsEnabled = document.getElementById('bms-enabled').value;
