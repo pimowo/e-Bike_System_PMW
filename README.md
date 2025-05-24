@@ -42,11 +42,13 @@ e-Bike System PMW to zaawansowany system zaprojektowany dla rowerów elektryczny
 
 ## 📱 Interfejs webowy
 System oferuje intuicyjny interfejs webowy dostępny przez przeglądarkę, który umożliwia:
-- Podgląd wszystkich parametrów systemu w czasie rzeczywistym
 - Konfigurację ustawień systemu
 - Ustawianie zegara RTC
-- Sterowanie oświetleniem i portem USB (ładowarką telefonu)
+- Konfigurację oświetlenia
 - Kalibrację czujników
+- Konfigurację sterownika 
+- Konfigurację BLE (BMS, TPMS)
+- Ustawienia wyświetlacza 
 
 ## 💻 Użytkowanie
 1. **⚙️ Instalacja**:
