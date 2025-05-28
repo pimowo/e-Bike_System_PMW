@@ -483,6 +483,11 @@ bool usbEnabled = false;  // Stan wyjścia USB
 unsigned long lastBlinkTime = 0;  // Czas ostatniego mrugania
 bool blinkState = false;          // Stan mrugania (włączone/wyłączone)
 
+// Zmienne dla trybu prowadzenia roweru
+unsigned long lastDownRelease = 0;
+bool waitingForSecondDownClick = false;
+bool walkAssistActive = false;
+
 // Czcionki
 const uint8_t* czcionka_mala = u8g2_font_profont11_mf;      // opis ekranów
 const uint8_t* czcionka_srednia = u8g2_font_pxplusibmvga9_mf; // górna belka
@@ -1859,6 +1864,23 @@ void drawCenteredText(const char* text, int y, const uint8_t* font) {
     display.drawStr(x, y, text);
 }
 
+// Wyświetlanie komunikatu "Prowadzenie roweru"
+void showWalkAssistMode() {
+    // Zachowaj normalny interfejs, ale dodaj komunikat
+    display.clearBuffer();
+    drawTopBar();
+    drawHorizontalLine();
+    drawVerticalLine();
+    drawAssistLevel();
+    drawLightStatus();
+    
+    // Wyświetl duży napis na środku ekranu
+    drawCenteredText("Prowadzenie", 32, czcionka_srednia);
+    drawCenteredText("roweru", 45, czcionka_srednia);
+    
+    display.sendBuffer();
+}
+
 // wyświetlanie wiadomości powitalnej
 void showWelcomeMessage() {
     display.clearBuffer();
@@ -2034,12 +2056,45 @@ void handleButtons() {
                 downLongPressExecuted = true;
             }
         } else if (downState && downPressStartTime) {
+            unsigned long releaseTime = currentTime;
+            
             if (!downLongPressExecuted && (currentTime - downPressStartTime) < LONG_PRESS_TIME) {
-                if (assistLevel > 0) assistLevel--;
+                // Sprawdź, czy to podwójne kliknięcie DOWN
+                if (waitingForSecondDownClick && (releaseTime - lastDownRelease) < DOUBLE_CLICK_TIME) {
+                    // To było podwójne kliknięcie, czekamy teraz na przytrzymanie po drugim kliknięciu
+                    waitingForSecondDownClick = false;
+                } else {
+                    // Zwykłe kliknięcie DOWN (zmniejszenie asysty)
+                    if (assistLevel > 0) assistLevel--;
+                    waitingForSecondDownClick = true;
+                    lastDownRelease = releaseTime;
+                }
             }
+            
             downPressStartTime = 0;
             downLongPressExecuted = false;
             lastDebounceTime = currentTime;
+        }
+
+        // Dodaj poniżej obsługę podwójnego kliknięcia i przytrzymania DOWN
+        // Wykonuj to tylko jeśli wyświetlacz jest aktywny
+        if (displayActive && !showingWelcome) {
+            // Sprawdź czy było podwójne kliknięcie i teraz przytrzymujemy DOWN
+            if (waitingForSecondDownClick && !downState && (currentTime - lastDownRelease) < DOUBLE_CLICK_TIME) {
+                walkAssistActive = true;
+                showWalkAssistMode();
+            }
+            
+            // Gdy przycisk został puszczony, wyłącz tryb prowadzenia
+            if (walkAssistActive && downState) {
+                walkAssistActive = false;
+                waitingForSecondDownClick = false;
+            }
+            
+            // Reset flagi oczekiwania na drugie kliknięcie po upływie czasu
+            if (waitingForSecondDownClick && (currentTime - lastDownRelease) >= DOUBLE_CLICK_TIME) {
+                waitingForSecondDownClick = false;
+            }
         }
 
         // Obsługa przycisku SET
@@ -3463,10 +3518,16 @@ void loop() {
         drawHorizontalLine();
         drawVerticalLine();
         drawAssistLevel();
-        drawMainDisplay();
-        drawLightStatus();
-        handleTemperature();
-        updateBmsData();
+        
+        // sprawdzanie trybu prowadzenia roweru
+        if (walkAssistActive) {
+            showWalkAssistMode();
+        } else {
+            drawMainDisplay();
+            drawLightStatus();
+            handleTemperature();
+            updateBmsData();
+        }
 
         unsigned long now = millis();
         static unsigned long last_rpm_calc = 0;
