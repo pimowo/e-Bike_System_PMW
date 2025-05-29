@@ -2300,6 +2300,11 @@ void handleButtons() {
 
 // sprawdzanie trybu konfiguracji
 void checkConfigMode() {
+    // Dodaj sprawdzenie czy wyświetlacz jest aktywny
+    if (!displayActive) {
+        return; // Jeśli system jest wyłączony, nie aktywuj trybu konfiguracji
+    }
+
     static unsigned long upDownPressTime = 0;
     static bool bothButtonsPressed = false;
 
@@ -2470,6 +2475,10 @@ void setCadencePulsesPerRevolution(uint8_t pulses) {
 
 // tryb uśpienia
 void goToSleep() {
+    #ifdef DEBUG
+    Serial.println("Wchodzę w tryb głębokiego uśpienia (deep sleep)...");
+    #endif
+
     // Wyłącz wszystkie LEDy
     digitalWrite(FrontDayPin, LOW);
     digitalWrite(FrontPin, LOW);
@@ -2486,6 +2495,12 @@ void goToSleep() {
     // Zapisz licznik całkowity
     //odometer.shutdown();
     //odometer.save();
+
+    #ifdef DEBUG
+    Serial.println("Konfiguracja wybudzania przez przycisk SET (GPIO12)");
+    Serial.println("Przechodzę do deep sleep teraz. Do zobaczenia po wybudzeniu!");
+    Serial.flush(); // Upewnij się, że wszystkie dane zostały wysłane
+    #endif
 
     // Konfiguracja wybudzania przez przycisk SET
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_12, 0);  // GPIO12 (BTN_SET) stan niski
@@ -3351,7 +3366,38 @@ void setup() {
     
     #ifdef DEBUG
     Serial.println("\n=== Inicjalizacja systemu ===");
+    Serial.print("Przyczyna wybudzenia: ");
+    switch(wakeup_reason) {
+        case ESP_SLEEP_WAKEUP_EXT0: Serial.println("Przycisk SET"); break;
+        case ESP_SLEEP_WAKEUP_UNDEFINED: Serial.println("Normalne uruchomienie"); break;
+        default: Serial.printf("Inna (%d)\n", wakeup_reason);
+    }
     #endif
+    
+    // Inicjalizacja podstawowych komponentów
+    Wire.begin();
+    display.begin();
+    display.setFontDirection(0);
+    display.clearBuffer();
+    display.sendBuffer();
+    
+    // Konfiguracja pinu przycisku SET (niezbędnego do wybudzenia)
+    pinMode(BTN_SET, INPUT_PULLUP);
+
+    // Jeśli nie zostaliśmy wybudzeni przez przycisk, natychmiast przechodzimy do trybu uśpienia
+    if (wakeup_reason != ESP_SLEEP_WAKEUP_EXT0) {
+        #ifdef DEBUG
+        Serial.println("Normalne uruchomienie - przechodzę do trybu uśpienia");
+        Serial.flush(); // Upewnij się, że dane zostały wysłane
+        #endif
+        
+        // Natychmiast przechodzimy do trybu uśpienia
+        goToSleep();
+        // Ten kod nigdy nie zostanie wykonany, ponieważ esp_deep_sleep_start() nie wraca
+        return;
+    }
+    
+    // Od tego momentu wiemy, że zostaliśmy wybudzeni przez przycisk SET
     
     // Najpierw wyczyść NVS
     esp_err_t err = nvs_flash_erase();
@@ -3388,15 +3434,6 @@ void setup() {
     // Poczekaj chwilę przed dalszą inicjalizacją
     delay(100);
 
-    // Inicjalizacja I2C
-    Wire.begin();
-
-    // Inicjalizacja wyświetlacza
-    display.begin();
-    display.setFontDirection(0);
-    display.clearBuffer();
-    display.sendBuffer();
-
     // Inicjalizacja DS18B20
     sensorsAir.begin();
     sensorsController.begin();
@@ -3424,10 +3461,9 @@ void setup() {
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
-    // Konfiguracja pinów
+    // Konfiguracja pozostałych pinów przycisków
     pinMode(BTN_UP, INPUT_PULLUP);
     pinMode(BTN_DOWN, INPUT_PULLUP);
-    pinMode(BTN_SET, INPUT_PULLUP);
 
     // Konfiguracja pinów LED
     pinMode(FrontDayPin, OUTPUT);
@@ -3551,24 +3587,22 @@ void setup() {
         Serial.println("-------------------\n");
     #endif
 
-    // Jeśli wybudzenie przez przycisk SET
-    if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
-        unsigned long startTime = millis();
-        while (!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
-            if ((millis() - startTime) > SET_LONG_PRESS) {
-                displayActive = true;
-                showingWelcome = true;
-                messageStartTime = millis();
-                if (!welcomeAnimationDone) {
-                    showWelcomeMessage();  // Pokaż animację powitania
-                }                
-                while (!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
-                    delay(10);
-                }
-                break;
+    // Obsługa przycisku SET po wybudzeniu
+    unsigned long startTime = millis();
+    while (!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
+        if ((millis() - startTime) > SET_LONG_PRESS) {
+            displayActive = true;
+            showingWelcome = true;
+            messageStartTime = millis();
+            if (!welcomeAnimationDone) {
+                showWelcomeMessage();  // Pokaż animację powitania
+            }                
+            while (!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
+                delay(10);
             }
-            delay(10);
+            break;
         }
+        delay(10);
     }
 }
 
