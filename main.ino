@@ -630,6 +630,77 @@ void IRAM_ATTR cadence_ISR() {
  * DEKLARACJE I IMPLEMENTACJE FUNKCJI
  ********************************************************************/
 
+// --- Deklaracje funkcji obsługi świateł ---
+void setLights();
+void saveLightSettings();
+void loadLightSettings();
+void applyBacklightSettings();
+
+// --- Deklaracje funkcji obsługi ekranu ---
+void drawHorizontalLine();
+void drawVerticalLine();
+void drawTopBar();
+void drawLightStatus();
+void drawAssistLevel();
+void drawValueAndUnit(const char* valueStr, const char* unitStr);
+void drawUpArrow();
+void drawCircleIcon();
+void drawDownArrow();
+void drawMainDisplay();
+void drawCadenceArrowsAndCircle();
+void drawCenteredText(const char* text, int y, const uint8_t* font);
+void showWalkAssistMode(bool sendBuffer = false);
+void showWelcomeMessage();
+void clearTripData();
+
+// --- Deklaracje funkcji obsługi przycisków ---
+void handleButtons();
+void checkConfigMode();
+void activateConfigMode();
+void deactivateConfigMode();
+void toggleLegalMode();
+
+// --- Deklaracje funkcji pomocniczych ---
+bool hasSubScreens(MainScreen screen);
+int getSubScreenCount(MainScreen screen);
+void resetTripData();
+void setCadencePulsesPerRevolution(uint8_t pulses);
+void goToSleep();
+bool isValidTemperature(float temp);
+void handleTemperature();
+
+// --- Deklaracje funkcji konfiguracyjnych ---
+void loadSettings();
+void saveSettings();
+int getParamIndex(const String& param);
+void updateControllerParam(const String& param, int value);
+const char* getLightModeString(LightSettings::LightMode mode);
+void setupWebServer();
+bool initLittleFS();
+void listFiles();
+bool loadConfig();
+void initializeDefaultSettings();
+void setDisplayBrightness(uint8_t brightness);
+void saveBacklightSettingsToFile();
+void loadBacklightSettingsFromFile();
+void saveGeneralSettingsToFile();
+void saveBluetoothConfigToFile();
+void loadBluetoothConfigFromFile();
+void loadGeneralSettingsFromFile();
+
+// --- Deklaracje funkcji TPMS ---
+void updateTpmsData(const char* address, uint8_t sensorNumber, float pressure, float temperature, uint8_t batteryPercent, bool alarm);
+void saveTpmsAddresses();
+void startTpmsScan();
+void stopTpmsScan();
+void loadTpmsAddresses();
+void checkTpmsTimeout();
+
+// --- Deklaracje funkcji BMS ---
+void requestBmsData(const uint8_t* command, size_t length);
+void updateBmsData();
+void connectToBms();       
+
 // --- Funkcje BLE ---
 
 // callback dla BLE
