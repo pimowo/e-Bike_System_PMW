@@ -2498,6 +2498,7 @@ void setCadencePulsesPerRevolution(uint8_t pulses) {
 void goToSleep() {
     #ifdef DEBUG
     Serial.println("Wchodzę w tryb głębokiego uśpienia (deep sleep)...");
+    Serial.printf("Aktualny tryb świateł: %d\n", lightMode);
     #endif
 
     // Wyłącz wszystkie LEDy
@@ -2513,9 +2514,8 @@ void goToSleep() {
     display.sendBuffer();
     display.setPowerSave(1);  // Wprowadź OLED w tryb oszczędzania energii
 
-    // Zapisz licznik całkowity
-    //odometer.shutdown();
-    //odometer.save();
+    // Zapisz stan trybu świateł przed uśpieniem
+    saveLightMode();
 
     #ifdef DEBUG
     Serial.println("Konfiguracja wybudzania przez przycisk SET (GPIO12)");
@@ -2537,6 +2537,10 @@ void setLights() {
     digitalWrite(FrontPin, LOW);
     digitalWrite(RearPin, LOW);
 
+    #ifdef DEBUG
+    Serial.printf("setLights: lightMode=%d, configModeActive=%d\n", lightMode, configModeActive);
+    #endif
+
     // Jeśli światła wyłączone (lightMode == 0) lub tryb konfiguracji jest aktywny, kończymy
     if (lightMode == 0 || configModeActive) {
         #ifdef DEBUG
@@ -2554,19 +2558,38 @@ void setLights() {
         shouldBlink = true;
     }
 
+    #ifdef DEBUG
+    if (shouldBlink) {
+        Serial.printf("Miganie aktywne, blinkState=%d\n", blinkState);
+    }
+    #endif
+
     // Zastosuj ustawienia zgodnie z trybem
     if (lightMode == 1) { // Tryb dzienny
         switch (lightSettings.dayLights) {
             case LightSettings::NONE:
                 // Wszystkie światła pozostają wyłączone
+                #ifdef DEBUG
+                Serial.println("Tryb dzienny: NONE");
+                #endif
                 break;
             case LightSettings::FRONT:
                 digitalWrite(FrontDayPin, HIGH);
+                #ifdef DEBUG
+                Serial.println("Tryb dzienny: FRONT");
+                #endif
                 break;
             case LightSettings::REAR:
                 // Tylne światło - z uwzględnieniem migania
                 if (!shouldBlink || blinkState) {
                     digitalWrite(RearPin, HIGH);
+                    #ifdef DEBUG
+                    Serial.println("Tryb dzienny: REAR (włączone)");
+                    #endif
+                } else {
+                    #ifdef DEBUG
+                    Serial.println("Tryb dzienny: REAR (wyłączone - miganie)");
+                    #endif
                 }
                 break;
             case LightSettings::BOTH:
@@ -2574,6 +2597,13 @@ void setLights() {
                 // Tylne światło - z uwzględnieniem migania
                 if (!shouldBlink || blinkState) {
                     digitalWrite(RearPin, HIGH);
+                    #ifdef DEBUG
+                    Serial.println("Tryb dzienny: BOTH (tylne włączone)");
+                    #endif
+                } else {
+                    #ifdef DEBUG
+                    Serial.println("Tryb dzienny: BOTH (tylne wyłączone - miganie)");
+                    #endif
                 }
                 break;
         }
@@ -2581,14 +2611,27 @@ void setLights() {
         switch (lightSettings.nightLights) {
             case LightSettings::NONE:
                 // Wszystkie światła pozostają wyłączone
+                #ifdef DEBUG
+                Serial.println("Tryb nocny: NONE");
+                #endif
                 break;
             case LightSettings::FRONT:
                 digitalWrite(FrontPin, HIGH);
+                #ifdef DEBUG
+                Serial.println("Tryb nocny: FRONT");
+                #endif
                 break;
             case LightSettings::REAR:
                 // Tylne światło - z uwzględnieniem migania
                 if (!shouldBlink || blinkState) {
                     digitalWrite(RearPin, HIGH);
+                    #ifdef DEBUG
+                    Serial.println("Tryb nocny: REAR (włączone)");
+                    #endif
+                } else {
+                    #ifdef DEBUG
+                    Serial.println("Tryb nocny: REAR (wyłączone - miganie)");
+                    #endif
                 }
                 break;
             case LightSettings::BOTH:
@@ -2596,6 +2639,13 @@ void setLights() {
                 // Tylne światło - z uwzględnieniem migania
                 if (!shouldBlink || blinkState) {
                     digitalWrite(RearPin, HIGH);
+                    #ifdef DEBUG
+                    Serial.println("Tryb nocny: BOTH (tylne włączone)");
+                    #endif
+                } else {
+                    #ifdef DEBUG
+                    Serial.println("Tryb nocny: BOTH (tylne wyłączone - miganie)");
+                    #endif
                 }
                 break;
         }
@@ -2671,8 +2721,15 @@ void handleTemperature() {
 // zapisywanie trybu świateł
 void saveLightMode() {
     #ifdef DEBUG
-    Serial.println("Zapisywanie trybu świateł");
+    Serial.printf("Zapisywanie trybu świateł: %d\n", lightMode);
     #endif
+
+    if (!LittleFS.begin(false)) {
+        #ifdef DEBUG
+        Serial.println("Błąd montowania LittleFS przy zapisie trybu świateł");
+        #endif
+        return;
+    }
 
     // Przygotuj dokument JSON
     StaticJsonDocument<64> doc;
@@ -2692,6 +2749,10 @@ void saveLightMode() {
         #ifdef DEBUG
         Serial.println("Błąd podczas zapisu trybu świateł do pliku");
         #endif
+    } else {
+        #ifdef DEBUG
+        Serial.println("Zapisano pomyślnie");
+        #endif
     }
 
     file.close();
@@ -2708,8 +2769,8 @@ void loadLightMode() {
     #endif
 
     // Domyślnie światła wyłączone
-    lightMode = 0;
-
+    int defaultLightMode = 0;
+    
     if (LittleFS.exists("/light_mode.json")) {
         File file = LittleFS.open("/light_mode.json", "r");
         if (file) {
@@ -2717,21 +2778,30 @@ void loadLightMode() {
             DeserializationError error = deserializeJson(doc, file);
             file.close();
 
-            if (!error) {
-                lightMode = doc["lightMode"] | 0; // Domyślnie 0 jeśli brak
+            if (!error && doc.containsKey("lightMode")) {
+                lightMode = doc["lightMode"] | defaultLightMode;
                 #ifdef DEBUG
                 Serial.printf("Wczytano tryb świateł: %d\n", lightMode);
                 #endif
             } else {
                 #ifdef DEBUG
-                Serial.println("Błąd podczas parsowania light_mode.json");
+                Serial.println("Błąd podczas parsowania light_mode.json lub brak klucza lightMode");
+                Serial.println("Używam domyślnego trybu świateł (wyłączone)");
                 #endif
+                lightMode = defaultLightMode;
             }
+        } else {
+            #ifdef DEBUG
+            Serial.println("Nie można otworzyć pliku light_mode.json");
+            Serial.println("Używam domyślnego trybu świateł (wyłączone)");
+            #endif
+            lightMode = defaultLightMode;
         }
     } else {
         #ifdef DEBUG
         Serial.println("Plik light_mode.json nie istnieje, używam trybu domyślnego (wyłączone)");
         #endif
+        lightMode = defaultLightMode;
         // Zapisz domyślny tryb
         saveLightMode();
     }
@@ -3607,7 +3677,7 @@ void setup() {
     digitalWrite(UsbPin, LOW);
 
     // Domyślnie światła wyłączone przy starcie
-    lightMode = 0;
+    //lightMode = 0;
 
     // Inicjalizacja LittleFS i wczytanie ustawień
     if (!LittleFS.begin(true)) {
