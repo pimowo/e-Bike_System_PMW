@@ -72,7 +72,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "24.5.25";
+const char* VERSION = "28.5.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -1865,20 +1865,24 @@ void drawCenteredText(const char* text, int y, const uint8_t* font) {
 }
 
 // Wyświetlanie komunikatu "Prowadzenie roweru"
-void showWalkAssistMode() {
-    // Zachowaj normalny interfejs, ale dodaj komunikat
-    display.clearBuffer();
-    drawTopBar();
-    drawHorizontalLine();
-    drawVerticalLine();
-    drawAssistLevel();
-    drawLightStatus();
+void showWalkAssistMode(bool sendBuffer = false) {
+    // Wyczyść bufor tylko jeśli funkcja została wywołana samodzielnie
+    if (sendBuffer) {
+        display.clearBuffer();
+        drawTopBar();
+        drawHorizontalLine();
+        drawVerticalLine();
+        drawAssistLevel();
+    }
     
     // Wyświetl duży napis na środku ekranu
     drawCenteredText("Prowadzenie", 32, czcionka_srednia);
     drawCenteredText("roweru", 45, czcionka_srednia);
     
-    display.sendBuffer();
+    // Wysyłamy bufor tylko jeśli funkcja została wywołana samodzielnie
+    if (sendBuffer) {
+        display.sendBuffer();
+    }
 }
 
 // wyświetlanie wiadomości powitalnej
