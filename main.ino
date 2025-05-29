@@ -72,7 +72,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "28.5.25";
+const char* VERSION = "29.5.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -2059,7 +2059,7 @@ void handleButtons() {
                 assistLevelAsText = !assistLevelAsText;
                 downLongPressExecuted = true;
             }
-        } else if (downState && downPressStartTime) {
+        else if (downState && downPressStartTime) {
             unsigned long releaseTime = currentTime;
             
             if (!downLongPressExecuted && (currentTime - downPressStartTime) < LONG_PRESS_TIME) {
@@ -2069,7 +2069,7 @@ void handleButtons() {
                     waitingForSecondDownClick = false;
                 } else {
                     // Zwykłe kliknięcie DOWN (zmniejszenie asysty)
-                    if (assistLevel > 0) assistLevel--;
+                    if (!walkAssistActive && assistLevel > 0) assistLevel--;
                     waitingForSecondDownClick = true;
                     lastDownRelease = releaseTime;
                 }
@@ -2085,8 +2085,10 @@ void handleButtons() {
         if (displayActive && !showingWelcome) {
             // Sprawdź czy było podwójne kliknięcie i teraz przytrzymujemy DOWN
             if (waitingForSecondDownClick && !downState && (currentTime - lastDownRelease) < DOUBLE_CLICK_TIME) {
+                // Zachowaj obecny poziom wspomagania przed aktywacją trybu prowadzenia
                 walkAssistActive = true;
-                showWalkAssistMode();
+                waitingForSecondDownClick = false;  // Resetujemy flagę od razu
+                showWalkAssistMode(true);  // Wyślij bufor, żeby od razu pokazać ekran
             }
             
             // Gdy przycisk został puszczony, wyłącz tryb prowadzenia
@@ -3518,14 +3520,16 @@ void loop() {
     // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla komunikatów
     if (displayActive && messageStartTime == 0) {
         display.clearBuffer();
-        // drawTopBar();
-        // drawHorizontalLine();
-        // drawVerticalLine();
-        // drawAssistLevel();
         
         // sprawdzanie trybu prowadzenia roweru
         if (walkAssistActive) {
-            showWalkAssistMode();
+            display.clearBuffer();
+            drawTopBar();
+            drawHorizontalLine();
+            drawVerticalLine();
+            drawAssistLevel();
+            showWalkAssistMode(false);
+            display.sendBuffer();
         } else {
             drawTopBar();
             drawHorizontalLine();
