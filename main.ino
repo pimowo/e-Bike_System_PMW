@@ -474,6 +474,8 @@ unsigned long messageStartTime = 0;
 bool upLongPressExecuted = false;
 bool downLongPressExecuted = false;
 bool setLongPressExecuted = false;
+unsigned long lastSpecialComboTime = 0; // Czas ostatniej obsługi specjalnej kombinacji
+const unsigned long SPECIAL_COMBO_LOCKOUT = 500; // Czas blokady po kombinacji (500ms)
 
 // Zmienne konfiguracyjne
 int assistLevel = 3;
@@ -2044,7 +2046,19 @@ void handleButtons() {
     const unsigned long buttonDebounce = 50;
     static unsigned long legalModeStart = 0;
     static unsigned long resetTripStart = 0;
-    static bool specialCombinationHandled = false;
+
+    // Sprawdź najpierw czy nie jesteśmy w czasie blokady po specjalnej kombinacji
+    if (currentTime - lastSpecialComboTime < SPECIAL_COMBO_LOCKOUT) {
+        // Jesteśmy w okresie blokady po kombinacji klawiszy - ignorujemy wszystkie klawisze
+        // Resetujemy też stany, aby uniknąć niepożądanych akcji
+        upPressStartTime = 0;
+        downPressStartTime = 0;
+        setPressStartTime = 0;
+        upLongPressExecuted = false;
+        downLongPressExecuted = false;
+        setLongPressExecuted = false;
+        return;
+    }
 
     // Obsługa włączania/wyłączania wyświetlacza
     if (!displayActive) {
@@ -2071,9 +2085,6 @@ void handleButtons() {
     // Obsługa przycisków gdy wyświetlacz jest aktywny
     if (!showingWelcome) {
 
-        // Resetujemy flagę na początku każdego cyklu
-        specialCombinationHandled = false;
-
         // Sprawdzanie trybu legal (UP + SET) - przełączanie trybu legalnego
         if (displayActive && !showingWelcome && !upState && !setState) {
             if (legalModeStart == 0) {
@@ -2085,7 +2096,19 @@ void handleButtons() {
                 }
                 legalModeStart = 0;
                 lastDebounceTime = currentTime;
-                specialCombinationHandled = true; // Ustawiamy flagę, że obsłużyliśmy specjalną kombinację
+                
+                // Ustaw czas ostatniej kombinacji
+                lastSpecialComboTime = currentTime;
+                
+                // Reset wszystkich stanów przycisków
+                upPressStartTime = 0;
+                downPressStartTime = 0;
+                setPressStartTime = 0;
+                upLongPressExecuted = false;
+                downLongPressExecuted = false;
+                setLongPressExecuted = false;
+                
+                return; // Zakończ funkcję handleButtons po obsłudze kombinacji SET+UP
             }
         } else {
             legalModeStart = 0;
@@ -2105,15 +2128,22 @@ void handleButtons() {
                 }
                 resetTripStart = 0;
                 lastDebounceTime = currentTime;
-                specialCombinationHandled = true; // Ustawiamy flagę, że obsłużyliśmy specjalną kombinację
+                
+                // Ustaw czas ostatniej kombinacji
+                lastSpecialComboTime = currentTime;
+                
+                // Reset wszystkich stanów przycisków
+                upPressStartTime = 0;
+                downPressStartTime = 0;
+                setPressStartTime = 0;
+                upLongPressExecuted = false;
+                downLongPressExecuted = false;
+                setLongPressExecuted = false;
+                
+                return; // Zakończ funkcję handleButtons po obsłudze kombinacji SET+DOWN
             }
         } else {
             resetTripStart = 0;
-        }
-
-        // Jeśli obsłużyliśmy specjalną kombinację, pomijamy resztę przetwarzania w tym cyklu
-        if (specialCombinationHandled) {
-            return;
         }
 
         // Obsługa przycisku UP (zmiana asysty/światła)
@@ -2247,24 +2277,24 @@ void handleButtons() {
 
         // Reset flagi oczekiwania na drugie kliknięcie po upływie czasu
         if (waitingForSecondClick && (currentTime - lastSetRelease) >= DOUBLE_CLICK_TIME) {
-          // Wykonaj akcję pojedynczego kliknięcia
-          if (inSubScreen) {
-            currentSubScreen = (currentSubScreen + 1) % getSubScreenCount(currentMainScreen);
-          } else {
-            currentMainScreen = (MainScreen)((currentMainScreen + 1) % MAIN_SCREEN_COUNT);
-          }
-          waitingForSecondClick = false;
+            // Wykonaj akcję pojedynczego kliknięcia
+            if (inSubScreen) {
+                currentSubScreen = (currentSubScreen + 1) % getSubScreenCount(currentMainScreen);
+            } else {
+                currentMainScreen = (MainScreen)((currentMainScreen + 1) % MAIN_SCREEN_COUNT);
+            }
+            waitingForSecondClick = false;
         }
     }
 
     // Obsługa komunikatów powitalnych/pożegnalnych
     if (messageStartTime > 0 && (currentTime - messageStartTime) >= GOODBYE_DELAY) {
-      if (!showingWelcome) {
-          displayActive = false;
-          goToSleep();
-      }
-      messageStartTime = 0;
-      showingWelcome = false;
+        if (!showingWelcome) {
+            displayActive = false;
+            goToSleep();
+        }
+        messageStartTime = 0;
+        showingWelcome = false;
     }
 }
 
