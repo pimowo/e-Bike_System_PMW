@@ -1209,7 +1209,16 @@ void loadLightSettings() {
 
                 lightSettings.dayBlink = doc["dayBlink"] | false;
                 lightSettings.nightBlink = doc["nightBlink"] | false;
+                // W funkcji loadLightSettings (około linii 1210):
                 lightSettings.blinkFrequency = doc["blinkFrequency"] | 500;
+
+                #ifdef DEBUG
+                Serial.println("Wczytane ustawienia migania:");
+                Serial.print("dayBlink: "); Serial.println(lightSettings.dayBlink ? "ON" : "OFF");
+                Serial.print("nightBlink: "); Serial.println(lightSettings.nightBlink ? "ON" : "OFF");
+                Serial.print("blinkFrequency: "); Serial.println(lightSettings.blinkFrequency);
+                #endif
+           
             }
         }
     } else {
@@ -2530,6 +2539,24 @@ void setLights() {
         return;
     }
 
+    // Sprawdź, czy powinniśmy używać migania
+    bool useBlink = false;
+    if (lightMode == 1) { // tryb dzienny
+        useBlink = lightSettings.dayBlink;
+    } else if (lightMode == 2) { // tryb nocny
+        useBlink = lightSettings.nightBlink;
+    }
+
+    // Jeśli miganie jest aktywne, sprawdź stan migania
+    if (useBlink) {
+        // Jeśli światła mają migać, a aktualnie jest faza wyłączenia, nie włączaj ich
+        if (!blinkState) {
+            // Dodaj wywołanie funkcji aktualizującej jasność wyświetlacza
+            applyBacklightSettings();
+            return;
+        }
+    }
+
     // Zastosuj ustawienia zgodnie z trybem
     if (lightMode == 1) { // Tryb dzienny
         switch (lightSettings.dayLights) {
@@ -3738,6 +3765,25 @@ void loop() {
             ws.textAll(json);
         }
         lastWebSocketUpdate = currentTime;
+    }
+
+    // Obsługa migania świateł
+    static unsigned long lastBlinkToggle = 0;
+    bool useBlink = false;
+    unsigned long blinkFrequency = lightSettings.blinkFrequency;
+
+    // Sprawdź, czy miganie jest włączone
+    if (lightMode == 1) { // tryb dzienny
+        useBlink = lightSettings.dayBlink;
+    } else if (lightMode == 2) { // tryb nocny
+        useBlink = lightSettings.nightBlink;
+    }
+
+    // Jeśli miganie jest włączone, sprawdź czy czas na zmianę stanu
+    if (useBlink && (currentTime - lastBlinkToggle >= blinkFrequency)) {
+        blinkState = !blinkState; // Przełącz stan migania
+        lastBlinkToggle = currentTime;
+        setLights(); // Zastosuj nowe ustawienia
     }
 
     unsigned long lastAutoSaveTime = 0;
