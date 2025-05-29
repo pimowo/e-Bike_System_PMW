@@ -1472,8 +1472,9 @@ void drawLightStatus() {
 void drawAssistLevel() {
     display.setFont(czcionka_duza);
 
-    if (assistLevelAsText) {
-         display.drawStr(2, 40, "T");
+    // Wyświetl "T" gdy tempomat jest aktywny
+    if (cruiseControlActive) {
+        display.drawStr(2, 40, "T");
     } else {
         // Wyświetlanie poziomu asysty
         if (legalMode) {
@@ -1511,33 +1512,19 @@ void drawAssistLevel() {
     display.setFont(czcionka_mala);
     const char* modeText = "";  // Domyślna wartość
     const char* modeText2 = ""; // Domyślna wartość
-    switch (assistMode) {
-        case 0:
-            modeText = "";     // Pusty tekst dla trybu 0
-            modeText2 = "STOP";
-            break;
-        case 1:
-            modeText = "PAS";
-            modeText2 = "";
-            break;
-        case 2:           
-            modeText = "TENS";
-            modeText2 = "";
-            break;
-        case 3:
-            modeText = "GAZ";
-            modeText2 = "";
-            break;
-        case 4:
-            modeText = "MIX";
-            modeText2 = "";
-            break;
-        default:
-            modeText = "";
-            modeText2 = "";
-            break;
+    
+    // Sprawdź czy jest aktywna kadencja (pedałowanie)
+    unsigned long now = millis();
+    bool isPedaling = (now - cadence_last_pulse_time < 2000) && (cadence_rpm > 0);
+    
+    // Ustawienie trybu PAS gdy jest kadencja
+    if (isPedaling) {
+        modeText = "PAS";
+    } else if (assistMode == 0) {
+        modeText2 = "STOP";
     }
-    display.drawStr(28, 23, modeText);  // wyświetl rodzaj sterowania
+    
+    display.drawStr(28, 23, modeText);  // wyświetl PAS gdy pedałowanie aktywne
     display.drawStr(28, 34, modeText2);  // wyświetl STOP przy hamowaniu
 }
 
@@ -2022,7 +2009,6 @@ void clearTripData() {
 // --- Funkcje obsługi przycisków ---
 
 // obsługa przycisków
-// obsługa przycisków
 void handleButtons() {
     if (configModeActive) {
         return; // W trybie konfiguracji nie obsługuj normalnych funkcji przycisków
@@ -2130,35 +2116,34 @@ void handleButtons() {
                 // Długie przytrzymanie przycisku DOWN
                 if (speed_kmh >= 10.0) {
                     // Prędkość >= 10 km/h - włącz tempomat
-                    cruiseControlActive = true;
+                    cruiseControlActive = !cruiseControlActive; // Przełącz stan tempomatu
+                    assistLevelAsText = cruiseControlActive; // Pokaż "T" gdy tempomat aktywny
+                    
                     #ifdef DEBUG
-                    Serial.println("Aktywacja tempomatu");
+                    Serial.print(cruiseControlActive ? "Aktywacja" : "Dezaktywacja");
+                    Serial.println(" tempomatu");
                     #endif
+                    
+                    downLongPressExecuted = true;
                 } else if (speed_kmh < 8.0) {
                     // Prędkość < 8 km/h - włącz tryb prowadzenia roweru
                     walkAssistActive = true;
                     showWalkAssistMode(true);  // Wyślij bufor, żeby od razu pokazać ekran
+                    
                     #ifdef DEBUG
                     Serial.println("Aktywacja trybu prowadzenia roweru");
                     #endif
+                    
+                    downLongPressExecuted = true;
                 }
-                downLongPressExecuted = true;
             }
         } else if (downState && downPressStartTime) {
             // Przycisk puszczony
             if (walkAssistActive) {
-                // Wyłącz tryb prowadzenia roweru
+                // Wyłącz tryb prowadzenia roweru gdy przycisk DOWN jest puszczony
                 walkAssistActive = false;
                 #ifdef DEBUG
                 Serial.println("Dezaktywacja trybu prowadzenia roweru");
-                #endif
-            }
-            
-            if (cruiseControlActive) {
-                // Wyłącz tempomat
-                cruiseControlActive = false;
-                #ifdef DEBUG
-                Serial.println("Dezaktywacja tempomatu");
                 #endif
             }
             
@@ -3704,7 +3689,7 @@ void loop() {
             battery_capacity_wh = 14.5 - (random(20) / 10.0);
             battery_capacity_percent = (battery_capacity_percent <= 0) ? 100 : battery_capacity_percent - 1;
             battery_voltage = (battery_voltage <= 42.0) ? 50.0 : battery_voltage - 0.1;
-            assistMode = (assistMode + 1) % 5;
+            //assistMode = (assistMode + 1) % 5;
             lastUpdate = currentTime;
             static float speed_sum = 0;
             static int speed_count = 0;
