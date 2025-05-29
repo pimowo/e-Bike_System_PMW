@@ -674,6 +674,8 @@ void setCadencePulsesPerRevolution(uint8_t pulses);
 void goToSleep();
 bool isValidTemperature(float temp);
 void handleTemperature();
+void saveLightMode();
+void loadLightMode();
 
 // --- Deklaracje funkcji konfiguracyjnych ---
 void loadSettings();
@@ -1166,7 +1168,7 @@ void saveLightSettings() {
     #endif
 
     // Od razu zastosuj nowe ustawienia
-    //setLights();
+    setLights();
 }
 
 // wczytywanie ustawień świateł
@@ -1253,6 +1255,9 @@ void saveBacklightSettingsToFile() {
     }
     
     file.close();
+
+    // Zastosuj nowe ustawienia
+    applyBacklightSettings();
 }
 
 // wczytywanie ustawień podświetlenia
@@ -2159,6 +2164,7 @@ void handleButtons() {
                 #endif
                 
                 setLights(); // Zastosuj ustawienia zgodnie z trybem
+                saveLightMode(); // Zapisz tryb świateł
                 upLongPressExecuted = true;
             }
         } else if (upState && upPressStartTime) {
@@ -2623,6 +2629,75 @@ void handleTemperature() {
         currentTemp = sensorsAir.getTempCByIndex(0);
         temp_controller = sensorsController.getTempCByIndex(0);
         conversionRequested = false;
+    }
+}
+
+// zapisywanie trybu świateł
+void saveLightMode() {
+    #ifdef DEBUG
+    Serial.println("Zapisywanie trybu świateł");
+    #endif
+
+    // Przygotuj dokument JSON
+    StaticJsonDocument<64> doc;
+    doc["lightMode"] = lightMode;
+
+    // Otwórz plik do zapisu
+    File file = LittleFS.open("/light_mode.json", "w");
+    if (!file) {
+        #ifdef DEBUG
+        Serial.println("Nie można otworzyć pliku trybu świateł do zapisu");
+        #endif
+        return;
+    }
+
+    // Zapisz JSON do pliku
+    if (serializeJson(doc, file) == 0) {
+        #ifdef DEBUG
+        Serial.println("Błąd podczas zapisu trybu świateł do pliku");
+        #endif
+    }
+
+    file.close();
+
+    #ifdef DEBUG
+    Serial.printf("Zapisano tryb świateł: %d\n", lightMode);
+    #endif
+}
+
+// wczytywanie trybu świateł
+void loadLightMode() {
+    #ifdef DEBUG
+    Serial.println("Wczytywanie trybu świateł");
+    #endif
+
+    // Domyślnie światła wyłączone
+    lightMode = 0;
+
+    if (LittleFS.exists("/light_mode.json")) {
+        File file = LittleFS.open("/light_mode.json", "r");
+        if (file) {
+            StaticJsonDocument<64> doc;
+            DeserializationError error = deserializeJson(doc, file);
+            file.close();
+
+            if (!error) {
+                lightMode = doc["lightMode"] | 0; // Domyślnie 0 jeśli brak
+                #ifdef DEBUG
+                Serial.printf("Wczytano tryb świateł: %d\n", lightMode);
+                #endif
+            } else {
+                #ifdef DEBUG
+                Serial.println("Błąd podczas parsowania light_mode.json");
+                #endif
+            }
+        }
+    } else {
+        #ifdef DEBUG
+        Serial.println("Plik light_mode.json nie istnieje, używam trybu domyślnego (wyłączone)");
+        #endif
+        // Zapisz domyślny tryb
+        saveLightMode();
     }
 }
 
@@ -3507,6 +3582,7 @@ void setup() {
         // Wczytaj ustawienia z pliku
         loadSettings();              // Wczytaj główne ustawienia
         loadLightSettings();         // Wczytaj ustawienia świateł
+        loadLightMode();             // Wczytaj tryb świateł 
         loadBacklightSettingsFromFile();
         loadGeneralSettingsFromFile();
         loadBluetoothConfigFromFile();
