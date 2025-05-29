@@ -2338,6 +2338,12 @@ void checkConfigMode() {
 // Implementacja aktywacji trybu konfiguracji
 void activateConfigMode() {
     configModeActive = true;
+
+    // Wyłącz wszystkie światła przy wejściu w tryb konfiguracji
+    digitalWrite(FrontDayPin, LOW);
+    digitalWrite(FrontPin, LOW);
+    digitalWrite(RearPin, LOW);
+    lightMode = 0; // Wymuś tryb świateł na "wyłączone"
     
     // 1. Inicjalizacja LittleFS
     if (!LittleFS.begin(true)) {
@@ -2531,30 +2537,21 @@ void setLights() {
     digitalWrite(FrontPin, LOW);
     digitalWrite(RearPin, LOW);
 
-    // Jeśli światła wyłączone (lightMode == 0), kończymy
-    if (lightMode == 0) {
+    // Jeśli światła wyłączone (lightMode == 0) lub tryb konfiguracji jest aktywny, kończymy
+    if (lightMode == 0 || configModeActive) {
         #ifdef DEBUG
         Serial.println("Światła wyłączone");
         #endif
+        applyBacklightSettings(); // Aktualizuj jasność wyświetlacza
         return;
     }
 
-    // Sprawdź, czy powinniśmy używać migania
-    bool useBlink = false;
-    if (lightMode == 1) { // tryb dzienny
-        useBlink = lightSettings.dayBlink;
-    } else if (lightMode == 2) { // tryb nocny
-        useBlink = lightSettings.nightBlink;
-    }
-
-    // Jeśli miganie jest aktywne, sprawdź stan migania
-    if (useBlink) {
-        // Jeśli światła mają migać, a aktualnie jest faza wyłączenia, nie włączaj ich
-        if (!blinkState) {
-            // Dodaj wywołanie funkcji aktualizującej jasność wyświetlacza
-            applyBacklightSettings();
-            return;
-        }
+    // Sprawdź, czy mruganie jest włączone dla trybu świateł (dotyczy tylko tylnego światła)
+    bool shouldBlink = false;
+    if (lightMode == 1 && lightSettings.dayBlink) { // tryb dzienny
+        shouldBlink = true;
+    } else if (lightMode == 2 && lightSettings.nightBlink) { // tryb nocny
+        shouldBlink = true;
     }
 
     // Zastosuj ustawienia zgodnie z trybem
@@ -2567,11 +2564,17 @@ void setLights() {
                 digitalWrite(FrontDayPin, HIGH);
                 break;
             case LightSettings::REAR:
-                digitalWrite(RearPin, HIGH);
+                // Tylne światło - z uwzględnieniem migania
+                if (!shouldBlink || blinkState) {
+                    digitalWrite(RearPin, HIGH);
+                }
                 break;
             case LightSettings::BOTH:
                 digitalWrite(FrontDayPin, HIGH);
-                digitalWrite(RearPin, HIGH);
+                // Tylne światło - z uwzględnieniem migania
+                if (!shouldBlink || blinkState) {
+                    digitalWrite(RearPin, HIGH);
+                }
                 break;
         }
     } else if (lightMode == 2) { // Tryb nocny
@@ -2583,16 +2586,22 @@ void setLights() {
                 digitalWrite(FrontPin, HIGH);
                 break;
             case LightSettings::REAR:
-                digitalWrite(RearPin, HIGH);
+                // Tylne światło - z uwzględnieniem migania
+                if (!shouldBlink || blinkState) {
+                    digitalWrite(RearPin, HIGH);
+                }
                 break;
             case LightSettings::BOTH:
                 digitalWrite(FrontPin, HIGH);
-                digitalWrite(RearPin, HIGH);
+                // Tylne światło - z uwzględnieniem migania
+                if (!shouldBlink || blinkState) {
+                    digitalWrite(RearPin, HIGH);
+                }
                 break;
         }
     }
     
-    // Dodaj wywołanie funkcji aktualizującej jasność wyświetlacza
+    // Aktualizuj jasność wyświetlacza
     applyBacklightSettings();
 }
 
@@ -3596,6 +3605,9 @@ void setup() {
     // Ładowarka USB
     pinMode(UsbPin, OUTPUT);
     digitalWrite(UsbPin, LOW);
+
+    // Domyślnie światła wyłączone przy starcie
+    lightMode = 0;
 
     // Inicjalizacja LittleFS i wczytanie ustawień
     if (!LittleFS.begin(true)) {
