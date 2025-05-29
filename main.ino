@@ -2022,6 +2022,7 @@ void clearTripData() {
 // --- Funkcje obsługi przycisków ---
 
 // obsługa przycisków
+// obsługa przycisków
 void handleButtons() {
     if (configModeActive) {
         return; // W trybie konfiguracji nie obsługuj normalnych funkcji przycisków
@@ -2066,7 +2067,7 @@ void handleButtons() {
         if (displayActive && !showingWelcome && !upState && !setState) {
             if (legalModeStart == 0) {
                 legalModeStart = currentTime;
-            } else if ((currentTime - legalModeStart) > 500) { // 2 sekundy  przytrzymania
+            } else if ((currentTime - legalModeStart) > 500) { // 2 sekundy przytrzymania
                 toggleLegalMode();
                 while (!digitalRead(BTN_UP) || !digitalRead(BTN_SET)) {
                     delay(10); // Czekaj na puszczenie przycisków
@@ -2097,7 +2098,7 @@ void handleButtons() {
             resetTripStart = 0;
         }
 
-        // Obsługa przycisku UP (zmiana asysty)
+        // Obsługa przycisku UP (zmiana asysty/światła)
         if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!upPressStartTime) {
                 upPressStartTime = currentTime;
@@ -2121,7 +2122,6 @@ void handleButtons() {
             lastDebounceTime = currentTime;
         }
 
-        // Obsługa przycisku DOWN (zmiana asysty)
         // Obsługa przycisku DOWN (zmiana asysty/tryb prowadzenia/tempomat)
         if (!downState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!downPressStartTime) {
@@ -2130,15 +2130,14 @@ void handleButtons() {
                 // Długie przytrzymanie przycisku DOWN
                 if (speed_kmh >= 10.0) {
                     // Prędkość >= 10 km/h - włącz tempomat
+                    cruiseControlActive = true;
                     #ifdef DEBUG
                     Serial.println("Aktywacja tempomatu");
                     #endif
-                    // Tutaj kod aktywujący tempomat
-                    // ...
                 } else if (speed_kmh < 8.0) {
                     // Prędkość < 8 km/h - włącz tryb prowadzenia roweru
                     walkAssistActive = true;
-                    showWalkAssistMode(true);  // Wyświetl ekran prowadzenia roweru
+                    showWalkAssistMode(true);  // Wyślij bufor, żeby od razu pokazać ekran
                     #ifdef DEBUG
                     Serial.println("Aktywacja trybu prowadzenia roweru");
                     #endif
@@ -2155,6 +2154,14 @@ void handleButtons() {
                 #endif
             }
             
+            if (cruiseControlActive) {
+                // Wyłącz tempomat
+                cruiseControlActive = false;
+                #ifdef DEBUG
+                Serial.println("Dezaktywacja tempomatu");
+                #endif
+            }
+            
             if (!downLongPressExecuted && (currentTime - downPressStartTime) < LONG_PRESS_TIME) {
                 // Krótkie kliknięcie DOWN - zmniejszenie asysty
                 if (assistLevel > 0) assistLevel--;
@@ -2163,29 +2170,6 @@ void handleButtons() {
             downPressStartTime = 0;
             downLongPressExecuted = false;
             lastDebounceTime = currentTime;
-        }
-
-        // Dodaj poniżej obsługę podwójnego kliknięcia i przytrzymania DOWN
-        // Wykonuj to tylko jeśli wyświetlacz jest aktywny
-        if (displayActive && !showingWelcome) {
-            // Sprawdź czy było podwójne kliknięcie i teraz przytrzymujemy DOWN
-            if (waitingForSecondDownClick && !downState && (currentTime - lastDownRelease) < DOUBLE_CLICK_TIME) {
-                // Zachowaj obecny poziom wspomagania przed aktywacją trybu prowadzenia
-                walkAssistActive = true;
-                waitingForSecondDownClick = false;  // Resetujemy flagę od razu
-                showWalkAssistMode(true);  // Wyślij bufor, żeby od razu pokazać ekran
-            }
-            
-            // Gdy przycisk został puszczony, wyłącz tryb prowadzenia
-            if (walkAssistActive && downState) {
-                walkAssistActive = false;
-                waitingForSecondDownClick = false;
-            }
-            
-            // Reset flagi oczekiwania na drugie kliknięcie po upływie czasu
-            if (waitingForSecondDownClick && (currentTime - lastDownRelease) >= DOUBLE_CLICK_TIME) {
-                waitingForSecondDownClick = false;
-            }
         }
 
         // Obsługa przycisku SET
