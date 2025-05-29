@@ -3518,15 +3518,19 @@ void loop() {
     // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla komunikatów
     if (displayActive && messageStartTime == 0) {
         display.clearBuffer();
-        drawTopBar();
-        drawHorizontalLine();
-        drawVerticalLine();
-        drawAssistLevel();
+        // drawTopBar();
+        // drawHorizontalLine();
+        // drawVerticalLine();
+        // drawAssistLevel();
         
         // sprawdzanie trybu prowadzenia roweru
         if (walkAssistActive) {
             showWalkAssistMode();
         } else {
+            drawTopBar();
+            drawHorizontalLine();
+            drawVerticalLine();
+            drawAssistLevel();
             drawMainDisplay();
             drawLightStatus();
             handleTemperature();
