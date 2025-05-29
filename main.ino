@@ -94,6 +94,8 @@ const char* LIGHT_CONFIG_FILE = "/light_config.json";
 #define TEMP_CONTROLLER_PIN 4  // temperatura sterownika (DS18B20)
 // kadencja
 #define CADENCE_SENSOR_PIN 27
+// hamulec
+#define BRAKE_SENSOR_PIN 26  // czujnik hamulca
 
 // Stałe czasowe
 const unsigned long DEBOUNCE_DELAY = 25;
@@ -486,6 +488,9 @@ bool blinkState = false;          // Stan mrugania (włączone/wyłączone)
 
 // Zmienne dla trybu prowadzenia roweru
 bool walkAssistActive = false;
+
+// Zmienna do śledzenia stanu hamulca
+bool brakeActive = false;
 
 // Czcionki
 const uint8_t* czcionka_mala = u8g2_font_profont11_mf;      // opis ekranów
@@ -1469,6 +1474,7 @@ void drawLightStatus() {
 }
 
 // wyświetlanie poziomu wspomagania
+// wyświetlanie poziomu wspomagania
 void drawAssistLevel() {
     display.setFont(czcionka_duza);
 
@@ -1520,12 +1526,15 @@ void drawAssistLevel() {
     // Ustawienie trybu PAS gdy jest kadencja
     if (isPedaling) {
         modeText = "PAS";
-    } else if (assistMode == 0) {
+    }
+    
+    // Wyświetl STOP gdy hamulec jest aktywny
+    if (brakeActive) {
         modeText2 = "STOP";
     }
     
     display.drawStr(28, 23, modeText);  // wyświetl PAS gdy pedałowanie aktywne
-    display.drawStr(28, 34, modeText2);  // wyświetl STOP przy hamowaniu
+    display.drawStr(28, 34, modeText2);  // wyświetl STOP przy aktywnym hamulcu
 }
 
 // wyświetlanie wartości i jednostki
@@ -1571,6 +1580,18 @@ void drawDownArrow() {
 
 // logika kadencji
 void updateCadenceLogic() {
+
+    // Sprawdź stan hamulca - aktywny gdy pin jest w stanie niskim (LOW)
+    brakeActive = !digitalRead(BRAKE_SENSOR_PIN);
+
+    // Wyłącz tempomat jeśli hamulec jest aktywny
+    if (brakeActive && cruiseControlActive) {
+        cruiseControlActive = false;
+        #ifdef DEBUG
+        Serial.println("Dezaktywacja tempomatu przez hamulec");
+        #endif
+    }
+
     unsigned long now = millis();
     static unsigned long lastStateChange = 0;
     const unsigned long MIN_STATE_DURATION = 500; // Minimalny czas (ms) utrzymania tego samego stanu
@@ -2059,7 +2080,8 @@ void handleButtons() {
                     delay(10); // Czekaj na puszczenie przycisków
                 }
                 legalModeStart = 0;
-                return;
+                lastDebounceTime = currentTime; // Dodane aby zapobiec przełączaniu ekranu
+                return; // Zakończ funkcję handleButtons po obsłudze kombinacji SET+UP
             }
         } else {
             legalModeStart = 0;
@@ -2078,7 +2100,8 @@ void handleButtons() {
                     delay(10);
                 }
                 resetTripStart = 0;
-                return;
+                lastDebounceTime = currentTime; // Dodane aby zapobiec przełączaniu ekranu
+                return; // Zakończ funkcję handleButtons po obsłudze kombinacji SET+DOWN
             }
         } else {
             resetTripStart = 0;
@@ -2146,6 +2169,8 @@ void handleButtons() {
                 Serial.println("Dezaktywacja trybu prowadzenia roweru");
                 #endif
             }
+            
+            // UWAGA: Usunięto wyłączanie tempomatu przyciskiem DOWN - teraz tylko hamulec może go wyłączyć
             
             if (!downLongPressExecuted && (currentTime - downPressStartTime) < LONG_PRESS_TIME) {
                 // Krótkie kliknięcie DOWN - zmniejszenie asysty
@@ -3373,6 +3398,9 @@ void setup() {
     digitalWrite(FrontPin, LOW);
     digitalWrite(RearPin, LOW);
 
+    // hamulec
+    pinMode(BRAKE_SENSOR_PIN, INPUT_PULLUP);
+
     // kadencja
     pinMode(CADENCE_SENSOR_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(CADENCE_SENSOR_PIN), cadence_ISR, FALLING);
@@ -3578,10 +3606,10 @@ void loop() {
         // sprawdzanie trybu prowadzenia roweru
         if (walkAssistActive) {
             display.clearBuffer();
-            drawTopBar();
-            drawHorizontalLine();
-            drawVerticalLine();
-            drawAssistLevel();
+            //drawTopBar();
+            //drawHorizontalLine();
+            //drawVerticalLine();
+            //drawAssistLevel();
             showWalkAssistMode(false);
             display.sendBuffer();
         } else {
@@ -3703,3 +3731,28 @@ void loop() {
         }
     }
 }
+
+
+/*
+Piny przycisków
+GPIO 12 SET
+GPIO 13 UP
+GPIO 14 DOWN
+
+GPIO 5 FrontDay
+GPIO 18 Front
+GPIO 19 Rear
+
+GPIO 32 ładowarka USB
+
+GPIO 15 temperatura powietrza
+GPIO 4 temperatura sterownika
+
+
+GPIO 27 czujnik kadencji
+
+GPIO 21 SDA
+GPIO 22 SCL
+
+GPIO 12 (GPIO_NUM_12) - skonfigurowany jako pin wybudzający z trybu głębokiego snu (wakeup pin)
+*/
