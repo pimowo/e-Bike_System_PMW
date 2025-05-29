@@ -1089,7 +1089,7 @@ void saveLightSettings() {
     #endif
 
     // Od razu zastosuj nowe ustawienia
-    setLights();
+    //setLights();
 }
 
 // wczytywanie ustawień świateł
