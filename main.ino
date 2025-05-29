@@ -84,9 +84,9 @@ const char* LIGHT_CONFIG_FILE = "/light_config.json";
 #define BTN_DOWN 14
 #define BTN_SET 12
 // światła
-#define FrontDayPin 5  // światła dzienne
-#define FrontPin 18    // światła zwykłe
-#define RearPin 19     // tylne światło
+#define FrontDayPin 18  // światła dzienne
+#define FrontPin 19    // światła zwykłe
+#define RearPin 23     // tylne światło
 // ładowarka USB
 #define UsbPin 32  // ładowarka USB
 // czujniki temperatury
@@ -2044,6 +2044,7 @@ void handleButtons() {
     const unsigned long buttonDebounce = 50;
     static unsigned long legalModeStart = 0;
     static unsigned long resetTripStart = 0;
+    static bool specialCombinationHandled = false;
 
     // Obsługa włączania/wyłączania wyświetlacza
     if (!displayActive) {
@@ -2070,18 +2071,21 @@ void handleButtons() {
     // Obsługa przycisków gdy wyświetlacz jest aktywny
     if (!showingWelcome) {
 
+        // Resetujemy flagę na początku każdego cyklu
+        specialCombinationHandled = false;
+
         // Sprawdzanie trybu legal (UP + SET) - przełączanie trybu legalnego
         if (displayActive && !showingWelcome && !upState && !setState) {
             if (legalModeStart == 0) {
                 legalModeStart = currentTime;
-            } else if ((currentTime - legalModeStart) > 500) { // 2 sekundy przytrzymania
+            } else if ((currentTime - legalModeStart) > 500) { // 0.5 sekundy przytrzymania
                 toggleLegalMode();
                 while (!digitalRead(BTN_UP) || !digitalRead(BTN_SET)) {
                     delay(10); // Czekaj na puszczenie przycisków
                 }
                 legalModeStart = 0;
-                lastDebounceTime = currentTime; // Dodane aby zapobiec przełączaniu ekranu
-                return; // Zakończ funkcję handleButtons po obsłudze kombinacji SET+UP
+                lastDebounceTime = currentTime;
+                specialCombinationHandled = true; // Ustawiamy flagę, że obsłużyliśmy specjalną kombinację
             }
         } else {
             legalModeStart = 0;
@@ -2091,7 +2095,7 @@ void handleButtons() {
         if (displayActive && !showingWelcome && !setState && !downState) {
             if (resetTripStart == 0) {
                 resetTripStart = currentTime;
-            } else if ((currentTime - resetTripStart) > 500) { // 2 sekundy przytrzymania
+            } else if ((currentTime - resetTripStart) > 500) { // 0.5 sekundy przytrzymania
                 resetTripData();                
                 clearTripData();
                 
@@ -2100,11 +2104,16 @@ void handleButtons() {
                     delay(10);
                 }
                 resetTripStart = 0;
-                lastDebounceTime = currentTime; // Dodane aby zapobiec przełączaniu ekranu
-                return; // Zakończ funkcję handleButtons po obsłudze kombinacji SET+DOWN
+                lastDebounceTime = currentTime;
+                specialCombinationHandled = true; // Ustawiamy flagę, że obsłużyliśmy specjalną kombinację
             }
         } else {
             resetTripStart = 0;
+        }
+
+        // Jeśli obsłużyliśmy specjalną kombinację, pomijamy resztę przetwarzania w tym cyklu
+        if (specialCombinationHandled) {
+            return;
         }
 
         // Obsługa przycisku UP (zmiana asysty/światła)
@@ -3739,16 +3748,16 @@ GPIO 12 SET
 GPIO 13 UP
 GPIO 14 DOWN
 
-GPIO 5 FrontDay
-GPIO 18 Front
-GPIO 19 Rear
+GPIO 18 FrontDay
+GPIO 19 Front
+GPIO 23 Rear
 
 GPIO 32 ładowarka USB
 
 GPIO 15 temperatura powietrza
 GPIO 4 temperatura sterownika
 
-
+GPIO 26 czujnik hamulca
 GPIO 27 czujnik kadencji
 
 GPIO 21 SDA
