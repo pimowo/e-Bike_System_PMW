@@ -65,6 +65,9 @@
 #include <Preferences.h>      // Biblioteka do stałej pamięci ESP32
 #include <nvs_flash.h>
 
+// --- Własne biblioteki ---
+#include "LightManager.h"
+
 /********************************************************************
  * DEFINICJE I STAŁE GLOBALNE
  ********************************************************************/
@@ -72,7 +75,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "29.5.25";
+const char* VERSION = "30.5.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -84,9 +87,9 @@ const char* LIGHT_CONFIG_FILE = "/light_config.json";
 #define BTN_DOWN 14
 #define BTN_SET 12
 // światła
-#define FrontDayPin 18  // światła dzienne
-#define FrontPin 19    // światła zwykłe
-#define RearPin 23     // tylne światło
+#define FrontDayPin 18  // światła dzienne (DRL)
+#define FrontPin 19     // światła zwykłe (przednie główne)
+#define RearPin 23      // tylne światło
 // ładowarka USB
 #define UsbPin 32  // ładowarka USB
 // czujniki temperatury
@@ -480,13 +483,8 @@ const unsigned long SPECIAL_COMBO_LOCKOUT = 500; // Czas blokady po kombinacji (
 // Zmienne konfiguracyjne
 int assistLevel = 3;
 bool assistLevelAsText = false;
-int lightMode = 0;        // 0=off, 1=dzień, 2=noc
 int assistMode = 0;       // 0=PAS, 1=STOP, 2=GAZ, 3=P+G
 bool usbEnabled = false;  // Stan wyjścia USB
-
-// Zmienne dla świateł
-unsigned long lastBlinkTime = 0;  // Czas ostatniego mrugania
-bool blinkState = false;          // Stan mrugania (włączone/wyłączone)
 
 // Zmienne dla trybu prowadzenia roweru
 bool walkAssistActive = false;
@@ -523,12 +521,12 @@ BLERemoteCharacteristic* bleCharacteristicRx;
 // Instancje struktur konfiguracyjnych
 ControllerSettings controllerSettings;
 TimeSettings timeSettings;
-LightSettings lightSettings;
 BacklightSettings backlightSettings;
 WiFiSettings wifiSettings;
 GeneralSettings generalSettings;
 BluetoothConfig bluetoothConfig;
 BmsData bmsData;
+LightManager lightManager(FrontPin, FrontDayPin, RearPin);
 
 /********************************************************************
  * KLASY POMOCNICZE
@@ -1128,108 +1126,114 @@ void checkTpmsTimeout() {
 // --- Funkcje konfiguracji ---
 
 // zapis ustawień świateł
-void saveLightSettings() {
-    #ifdef DEBUG
-    Serial.println("Zapisywanie ustawień świateł");
-    #endif
+// void saveLightSettings() {
+//     #ifdef DEBUG
+//     Serial.println("Zapisywanie ustawień świateł");
+//     #endif
 
-    // Przygotuj dokument JSON
-    StaticJsonDocument<256> doc;
+//     // Przygotuj dokument JSON
+//     StaticJsonDocument<256> doc;
     
-    // Zapisz ustawienia
-    doc["dayLights"] = lightSettings.dayLights;
-    doc["nightLights"] = lightSettings.nightLights;
-    doc["dayBlink"] = lightSettings.dayBlink;
-    doc["nightBlink"] = lightSettings.nightBlink;
-    doc["blinkFrequency"] = lightSettings.blinkFrequency;
+//     // Zapisz ustawienia
+//     doc["dayLights"] = lightSettings.dayLights;
+//     doc["nightLights"] = lightSettings.nightLights;
+//     doc["dayBlink"] = lightSettings.dayBlink;
+//     doc["nightBlink"] = lightSettings.nightBlink;
+//     doc["blinkFrequency"] = lightSettings.blinkFrequency;
 
-    // Otwórz plik do zapisu
-    File file = LittleFS.open("/lights.json", "w");
-    if (!file) {
-        #ifdef DEBUG
-        Serial.println("Błąd otwarcia pliku do zapisu");
-        #endif
-        return;
-    }
+//     // Otwórz plik do zapisu
+//     File file = LittleFS.open("/lights.json", "w");
+//     if (!file) {
+//         #ifdef DEBUG
+//         Serial.println("Błąd otwarcia pliku do zapisu");
+//         #endif
+//         return;
+//     }
 
-    // Zapisz JSON do pliku
-    if (serializeJson(doc, file) == 0) {
-        #ifdef DEBUG
-        Serial.println("Błąd podczas zapisu do pliku");
-        #endif
-    }
+//     // Zapisz JSON do pliku
+//     if (serializeJson(doc, file) == 0) {
+//         #ifdef DEBUG
+//         Serial.println("Błąd podczas zapisu do pliku");
+//         #endif
+//     }
 
-    file.close();
+//     file.close();
 
-    #ifdef DEBUG
-    Serial.println("Ustawienia świateł zapisane");
-    Serial.print("dayLights: "); Serial.println(lightSettings.dayLights);
-    Serial.print("nightLights: "); Serial.println(lightSettings.nightLights);
-    #endif
+//     #ifdef DEBUG
+//     Serial.println("Ustawienia świateł zapisane");
+//     Serial.print("dayLights: "); Serial.println(lightSettings.dayLights);
+//     Serial.print("nightLights: "); Serial.println(lightSettings.nightLights);
+//     #endif
 
-    // Od razu zastosuj nowe ustawienia
-    setLights();
-}
+//     // Od razu zastosuj nowe ustawienia
+//     setLights();
+// }
 
 // wczytywanie ustawień świateł
-void loadLightSettings() {
-    #ifdef DEBUG
-    Serial.println("Wczytywanie ustawień świateł");
-    #endif
+// void loadLightSettings() {
+//     #ifdef DEBUG
+//     Serial.println("Wczytywanie ustawień świateł");
+//     #endif
 
-    if (LittleFS.exists("/lights.json")) {
-        File file = LittleFS.open("/lights.json", "r");
-        if (file) {
-            StaticJsonDocument<512> doc;
-            DeserializationError error = deserializeJson(doc, file);
-            file.close();
+//     if (LittleFS.exists("/lights.json")) {
+//         File file = LittleFS.open("/lights.json", "r");
+//         if (file) {
+//             StaticJsonDocument<512> doc;
+//             DeserializationError error = deserializeJson(doc, file);
+//             file.close();
 
-            if (!error) {
-                const char* dayLightsStr = doc["dayLights"] | "FRONT";
-                const char* nightLightsStr = doc["nightLights"] | "BOTH";
+//             if (!error) {
+//                 const char* dayLightsStr = doc["dayLights"] | "FRONT";
+//                 const char* nightLightsStr = doc["nightLights"] | "BOTH";
 
-                // Konwersja stringów na enum
-                if (strcmp(dayLightsStr, "FRONT") == 0) 
-                    lightSettings.dayLights = LightSettings::FRONT;
-                else if (strcmp(dayLightsStr, "REAR") == 0) 
-                    lightSettings.dayLights = LightSettings::REAR;
-                else if (strcmp(dayLightsStr, "BOTH") == 0) 
-                    lightSettings.dayLights = LightSettings::BOTH;
-                else 
-                    lightSettings.dayLights = LightSettings::NONE;
+//                 // Konwersja stringów na enum
+//                 if (strcmp(dayLightsStr, "FRONT") == 0) 
+//                     lightSettings.dayLights = LightSettings::FRONT;
+//                 else if (strcmp(dayLightsStr, "REAR") == 0) 
+//                     lightSettings.dayLights = LightSettings::REAR;
+//                 else if (strcmp(dayLightsStr, "BOTH") == 0) 
+//                     lightSettings.dayLights = LightSettings::BOTH;
+//                 else 
+//                     lightSettings.dayLights = LightSettings::NONE;
 
-                if (strcmp(nightLightsStr, "FRONT") == 0) 
-                    lightSettings.nightLights = LightSettings::FRONT;
-                else if (strcmp(nightLightsStr, "REAR") == 0) 
-                    lightSettings.nightLights = LightSettings::REAR;
-                else if (strcmp(nightLightsStr, "BOTH") == 0) 
-                    lightSettings.nightLights = LightSettings::BOTH;
-                else 
-                    lightSettings.nightLights = LightSettings::NONE;
+//                 if (strcmp(nightLightsStr, "FRONT") == 0) 
+//                     lightSettings.nightLights = LightSettings::FRONT;
+//                 else if (strcmp(nightLightsStr, "REAR") == 0) 
+//                     lightSettings.nightLights = LightSettings::REAR;
+//                 else if (strcmp(nightLightsStr, "BOTH") == 0) 
+//                     lightSettings.nightLights = LightSettings::BOTH;
+//                 else 
+//                     lightSettings.nightLights = LightSettings::NONE;
 
-                lightSettings.dayBlink = doc["dayBlink"] | false;
-                lightSettings.nightBlink = doc["nightBlink"] | false;
-                // W funkcji loadLightSettings (około linii 1210):
-                lightSettings.blinkFrequency = doc["blinkFrequency"] | 500;
+//                 lightSettings.dayBlink = doc["dayBlink"] | false;
+//                 lightSettings.nightBlink = doc["nightBlink"] | false;
+//                 // W funkcji loadLightSettings (około linii 1210):
+//                 lightSettings.blinkFrequency = doc["blinkFrequency"] | 500;
 
-                #ifdef DEBUG
-                Serial.println("Wczytane ustawienia migania:");
-                Serial.print("dayBlink: "); Serial.println(lightSettings.dayBlink ? "ON" : "OFF");
-                Serial.print("nightBlink: "); Serial.println(lightSettings.nightBlink ? "ON" : "OFF");
-                Serial.print("blinkFrequency: "); Serial.println(lightSettings.blinkFrequency);
-                #endif
+//                 #ifdef DEBUG
+//                 Serial.println("Wczytane ustawienia migania:");
+//                 Serial.print("dayBlink: "); Serial.println(lightSettings.dayBlink ? "ON" : "OFF");
+//                 Serial.print("nightBlink: "); Serial.println(lightSettings.nightBlink ? "ON" : "OFF");
+//                 Serial.print("blinkFrequency: "); Serial.println(lightSettings.blinkFrequency);
+//                 #endif
            
-            }
-        }
-    } else {
-        // Ustawienia domyślne
-        lightSettings.dayLights = LightSettings::FRONT;
-        lightSettings.nightLights = LightSettings::BOTH;
-        lightSettings.dayBlink = false;
-        lightSettings.nightBlink = false;
-        lightSettings.blinkFrequency = 500;
-    }
-}
+//             }
+//         }
+//     } else {
+//         // Ustawienia domyślne
+//         lightSettings.dayLights = LightSettings::FRONT;
+//         lightSettings.nightLights = LightSettings::BOTH;
+//         lightSettings.dayBlink = false;
+//         lightSettings.nightBlink = false;
+//         lightSettings.blinkFrequency = 500;
+//     }
+// }
+
+void setLights() {}
+void saveLightSettings() {}
+void loadLightSettings() {}
+void saveLightMode() {}
+void loadLightMode() {}
 
 // ustawianie jasności wyświetlacza
 void setDisplayBrightness(uint8_t brightness) {
@@ -2165,15 +2169,7 @@ void handleButtons() {
             if (!upPressStartTime) {
                 upPressStartTime = currentTime;
             } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
-                lightMode = (lightMode + 1) % 3;
-                
-                #ifdef DEBUG
-                Serial.print("Zmieniono tryb świateł na: ");
-                Serial.println(lightMode);
-                #endif
-                
-                setLights(); // Zastosuj ustawienia zgodnie z trybem
-                saveLightMode(); // Zapisz tryb świateł
+                lightManager.cycleMode();
                 upLongPressExecuted = true;
             }
         } else if (upState && upPressStartTime) {
@@ -2343,8 +2339,9 @@ void activateConfigMode() {
     digitalWrite(FrontDayPin, LOW);
     digitalWrite(FrontPin, LOW);
     digitalWrite(RearPin, LOW);
-    lightMode = 0; // Wymuś tryb świateł na "wyłączone"
-    
+    //lightMode = 0; // Wymuś tryb świateł na "wyłączone"
+    lightManager.setMode(LightManager::OFF);
+
     // 1. Inicjalizacja LittleFS
     if (!LittleFS.begin(true)) {
         #ifdef DEBUG
@@ -2507,15 +2504,14 @@ void goToSleep() {
     digitalWrite(RearPin, LOW);
     digitalWrite(UsbPin, LOW);
 
+    lightManager.setMode(LightManager::OFF);
+
     delay(50);
 
     // Wyłącz OLED
     display.clearBuffer();
     display.sendBuffer();
     display.setPowerSave(1);  // Wprowadź OLED w tryb oszczędzania energii
-
-    // Zapisz stan trybu świateł przed uśpieniem
-    saveLightMode();
 
     #ifdef DEBUG
     Serial.println("Konfiguracja wybudzania przez przycisk SET (GPIO12)");
@@ -2531,131 +2527,168 @@ void goToSleep() {
 }
 
 // ustawiania świateł
-void setLights() {
-    // Wyłącz wszystkie światła
-    digitalWrite(FrontDayPin, LOW);
-    digitalWrite(FrontPin, LOW);
-    digitalWrite(RearPin, LOW);
+// void setLights() {
+//     // Wyłącz wszystkie światła
+//     digitalWrite(FrontDayPin, LOW);
+//     digitalWrite(FrontPin, LOW);
+//     digitalWrite(RearPin, LOW);
 
-    #ifdef DEBUG
-    Serial.printf("setLights: lightMode=%d, configModeActive=%d\n", lightMode, configModeActive);
-    #endif
+//     #ifdef DEBUG
+//     Serial.printf("setLights: lightMode=%d, configModeActive=%d\n", lightMode, configModeActive);
+//     #endif
 
-    // Jeśli światła wyłączone (lightMode == 0) lub tryb konfiguracji jest aktywny, kończymy
-    if (lightMode == 0 || configModeActive) {
-        #ifdef DEBUG
-        Serial.println("Światła wyłączone");
-        #endif
-        applyBacklightSettings(); // Aktualizuj jasność wyświetlacza
-        return;
-    }
+//     // Jeśli światła wyłączone (lightMode == 0) lub tryb konfiguracji jest aktywny, kończymy
+//     if (lightMode == 0 || configModeActive) {
+//         #ifdef DEBUG
+//         Serial.println("Światła wyłączone");
+//         #endif
+//         applyBacklightSettings(); // Aktualizuj jasność wyświetlacza
+//         return;
+//     }
 
-    // Sprawdź, czy mruganie jest włączone dla trybu świateł (dotyczy tylko tylnego światła)
-    bool shouldBlink = false;
-    if (lightMode == 1 && lightSettings.dayBlink) { // tryb dzienny
-        shouldBlink = true;
-    } else if (lightMode == 2 && lightSettings.nightBlink) { // tryb nocny
-        shouldBlink = true;
-    }
+//     // Sprawdź, czy mruganie jest włączone dla trybu świateł (dotyczy tylko tylnego światła)
+//     bool shouldBlink = false;
+//     if (lightMode == 1 && lightSettings.dayBlink) { // tryb dzienny
+//         shouldBlink = true;
+//     } else if (lightMode == 2 && lightSettings.nightBlink) { // tryb nocny
+//         shouldBlink = true;
+//     }
 
-    #ifdef DEBUG
-    if (shouldBlink) {
-        Serial.printf("Miganie aktywne, blinkState=%d\n", blinkState);
-    }
-    #endif
+//     #ifdef DEBUG
+//     if (shouldBlink) {
+//         Serial.printf("Miganie aktywne, blinkState=%d\n", blinkState);
+//     }
+//     #endif
 
-    // Zastosuj ustawienia zgodnie z trybem
-    if (lightMode == 1) { // Tryb dzienny
-        switch (lightSettings.dayLights) {
-            case LightSettings::NONE:
-                // Wszystkie światła pozostają wyłączone
-                #ifdef DEBUG
-                Serial.println("Tryb dzienny: NONE");
-                #endif
-                break;
-            case LightSettings::FRONT:
-                digitalWrite(FrontDayPin, HIGH);
-                #ifdef DEBUG
-                Serial.println("Tryb dzienny: FRONT");
-                #endif
-                break;
-            case LightSettings::REAR:
-                // Tylne światło - z uwzględnieniem migania
-                if (!shouldBlink || blinkState) {
-                    digitalWrite(RearPin, HIGH);
-                    #ifdef DEBUG
-                    Serial.println("Tryb dzienny: REAR (włączone)");
-                    #endif
-                } else {
-                    #ifdef DEBUG
-                    Serial.println("Tryb dzienny: REAR (wyłączone - miganie)");
-                    #endif
-                }
-                break;
-            case LightSettings::BOTH:
-                digitalWrite(FrontDayPin, HIGH);
-                // Tylne światło - z uwzględnieniem migania
-                if (!shouldBlink || blinkState) {
-                    digitalWrite(RearPin, HIGH);
-                    #ifdef DEBUG
-                    Serial.println("Tryb dzienny: BOTH (tylne włączone)");
-                    #endif
-                } else {
-                    #ifdef DEBUG
-                    Serial.println("Tryb dzienny: BOTH (tylne wyłączone - miganie)");
-                    #endif
-                }
-                break;
-        }
-    } else if (lightMode == 2) { // Tryb nocny
-        switch (lightSettings.nightLights) {
-            case LightSettings::NONE:
-                // Wszystkie światła pozostają wyłączone
-                #ifdef DEBUG
-                Serial.println("Tryb nocny: NONE");
-                #endif
-                break;
-            case LightSettings::FRONT:
-                digitalWrite(FrontPin, HIGH);
-                #ifdef DEBUG
-                Serial.println("Tryb nocny: FRONT");
-                #endif
-                break;
-            case LightSettings::REAR:
-                // Tylne światło - z uwzględnieniem migania
-                if (!shouldBlink || blinkState) {
-                    digitalWrite(RearPin, HIGH);
-                    #ifdef DEBUG
-                    Serial.println("Tryb nocny: REAR (włączone)");
-                    #endif
-                } else {
-                    #ifdef DEBUG
-                    Serial.println("Tryb nocny: REAR (wyłączone - miganie)");
-                    #endif
-                }
-                break;
-            case LightSettings::BOTH:
-                digitalWrite(FrontPin, HIGH);
-                // Tylne światło - z uwzględnieniem migania
-                if (!shouldBlink || blinkState) {
-                    digitalWrite(RearPin, HIGH);
-                    #ifdef DEBUG
-                    Serial.println("Tryb nocny: BOTH (tylne włączone)");
-                    #endif
-                } else {
-                    #ifdef DEBUG
-                    Serial.println("Tryb nocny: BOTH (tylne wyłączone - miganie)");
-                    #endif
-                }
-                break;
-        }
-    }
+//     // Zastosuj ustawienia zgodnie z trybem
+//     if (lightMode == 1) { // Tryb dzienny
+//         switch (lightSettings.dayLights) {
+//             case LightSettings::NONE:
+//                 // Wszystkie światła pozostają wyłączone
+//                 #ifdef DEBUG
+//                 Serial.println("Tryb dzienny: NONE");
+//                 #endif
+//                 break;
+//             case LightSettings::FRONT:
+//                 digitalWrite(FrontDayPin, HIGH);
+//                 #ifdef DEBUG
+//                 Serial.println("Tryb dzienny: FRONT");
+//                 #endif
+//                 break;
+//             case LightSettings::REAR:
+//                 // Tylne światło - z uwzględnieniem migania
+//                 if (!shouldBlink || blinkState) {
+//                     digitalWrite(RearPin, HIGH);
+//                     #ifdef DEBUG
+//                     Serial.println("Tryb dzienny: REAR (włączone)");
+//                     #endif
+//                 } else {
+//                     #ifdef DEBUG
+//                     Serial.println("Tryb dzienny: REAR (wyłączone - miganie)");
+//                     #endif
+//                 }
+//                 break;
+//             case LightSettings::BOTH:
+//                 digitalWrite(FrontDayPin, HIGH);
+//                 // Tylne światło - z uwzględnieniem migania
+//                 if (!shouldBlink || blinkState) {
+//                     digitalWrite(RearPin, HIGH);
+//                     #ifdef DEBUG
+//                     Serial.println("Tryb dzienny: BOTH (tylne włączone)");
+//                     #endif
+//                 } else {
+//                     #ifdef DEBUG
+//                     Serial.println("Tryb dzienny: BOTH (tylne wyłączone - miganie)");
+//                     #endif
+//                 }
+//                 break;
+//         }
+//     } else if (lightMode == 2) { // Tryb nocny
+//         switch (lightSettings.nightLights) {
+//             case LightSettings::NONE:
+//                 // Wszystkie światła pozostają wyłączone
+//                 #ifdef DEBUG
+//                 Serial.println("Tryb nocny: NONE");
+//                 #endif
+//                 break;
+//             case LightSettings::FRONT:
+//                 digitalWrite(FrontPin, HIGH);
+//                 #ifdef DEBUG
+//                 Serial.println("Tryb nocny: FRONT");
+//                 #endif
+//                 break;
+//             case LightSettings::REAR:
+//                 // Tylne światło - z uwzględnieniem migania
+//                 if (!shouldBlink || blinkState) {
+//                     digitalWrite(RearPin, HIGH);
+//                     #ifdef DEBUG
+//                     Serial.println("Tryb nocny: REAR (włączone)");
+//                     #endif
+//                 } else {
+//                     #ifdef DEBUG
+//                     Serial.println("Tryb nocny: REAR (wyłączone - miganie)");
+//                     #endif
+//                 }
+//                 break;
+//             case LightSettings::BOTH:
+//                 digitalWrite(FrontPin, HIGH);
+//                 // Tylne światło - z uwzględnieniem migania
+//                 if (!shouldBlink || blinkState) {
+//                     digitalWrite(RearPin, HIGH);
+//                     #ifdef DEBUG
+//                     Serial.println("Tryb nocny: BOTH (tylne włączone)");
+//                     #endif
+//                 } else {
+//                     #ifdef DEBUG
+//                     Serial.println("Tryb nocny: BOTH (tylne wyłączone - miganie)");
+//                     #endif
+//                 }
+//                 break;
+//         }
+//     }
     
-    // Aktualizuj jasność wyświetlacza
-    applyBacklightSettings();
-}
+//     // Aktualizuj jasność wyświetlacza
+//     applyBacklightSettings();
+// }
 
 // ustawienia podświetlenia
+// void applyBacklightSettings() {
+//     int targetBrightness;
+    
+//     if (!backlightSettings.autoMode) {
+//         // Tryb manualny - użyj podstawowej jasności
+//         targetBrightness = backlightSettings.Brightness;
+//     } else {
+//         // Tryb auto - sprawdź stan świateł
+//         if (lightMode == 2) {  // Światła nocne
+//             targetBrightness = backlightSettings.nightBrightness;
+//         } else {  // Światła dzienne (lightMode == 1) lub wyłączone (lightMode == 0)
+//             targetBrightness = backlightSettings.dayBrightness;
+//         }
+//     }
+    
+//     // Nieliniowe mapowanie jasności
+//     // Używamy funkcji wykładniczej do lepszego rozłożenia jasności
+//     // Wzór: (x^2)/100 daje nam wartość od 0 do 100
+//     float normalized = (targetBrightness * targetBrightness) / 100.0;
+    
+//     // Mapujemy wartość na zakres 16-255
+//     // Minimum ustawiamy na 16, bo niektóre wyświetlacze OLED mogą się wyłączać przy niższych wartościach
+//     displayBrightness = map(normalized, 0, 100, 16, 255);
+    
+//     // Zastosuj jasność do wyświetlacza
+//     display.setContrast(displayBrightness);
+    
+//     #ifdef DEBUG
+//     Serial.print("Target brightness: ");
+//     Serial.print(targetBrightness);
+//     Serial.print("%, Normalized: ");
+//     Serial.print(normalized);
+//     Serial.print("%, Display brightness: ");
+//     Serial.println(displayBrightness);
+//     #endif
+// }
+
 void applyBacklightSettings() {
     int targetBrightness;
     
@@ -2664,9 +2697,9 @@ void applyBacklightSettings() {
         targetBrightness = backlightSettings.Brightness;
     } else {
         // Tryb auto - sprawdź stan świateł
-        if (lightMode == 2) {  // Światła nocne
+        if (lightManager.getMode() == LightManager::NIGHT) {  // Światła nocne
             targetBrightness = backlightSettings.nightBrightness;
-        } else {  // Światła dzienne (lightMode == 1) lub wyłączone (lightMode == 0)
+        } else {  // Światła dzienne (DAY) lub wyłączone (OFF)
             targetBrightness = backlightSettings.dayBrightness;
         }
     }
@@ -2719,93 +2752,93 @@ void handleTemperature() {
 }
 
 // zapisywanie trybu świateł
-void saveLightMode() {
-    #ifdef DEBUG
-    Serial.printf("Zapisywanie trybu świateł: %d\n", lightMode);
-    #endif
+// void saveLightMode() {
+//     #ifdef DEBUG
+//     Serial.printf("Zapisywanie trybu świateł: %d\n", lightMode);
+//     #endif
 
-    if (!LittleFS.begin(false)) {
-        #ifdef DEBUG
-        Serial.println("Błąd montowania LittleFS przy zapisie trybu świateł");
-        #endif
-        return;
-    }
+//     if (!LittleFS.begin(false)) {
+//         #ifdef DEBUG
+//         Serial.println("Błąd montowania LittleFS przy zapisie trybu świateł");
+//         #endif
+//         return;
+//     }
 
-    // Przygotuj dokument JSON
-    StaticJsonDocument<64> doc;
-    doc["lightMode"] = lightMode;
+//     // Przygotuj dokument JSON
+//     StaticJsonDocument<64> doc;
+//     doc["lightMode"] = lightMode;
 
-    // Otwórz plik do zapisu
-    File file = LittleFS.open("/light_mode.json", "w");
-    if (!file) {
-        #ifdef DEBUG
-        Serial.println("Nie można otworzyć pliku trybu świateł do zapisu");
-        #endif
-        return;
-    }
+//     // Otwórz plik do zapisu
+//     File file = LittleFS.open("/light_mode.json", "w");
+//     if (!file) {
+//         #ifdef DEBUG
+//         Serial.println("Nie można otworzyć pliku trybu świateł do zapisu");
+//         #endif
+//         return;
+//     }
 
-    // Zapisz JSON do pliku
-    if (serializeJson(doc, file) == 0) {
-        #ifdef DEBUG
-        Serial.println("Błąd podczas zapisu trybu świateł do pliku");
-        #endif
-    } else {
-        #ifdef DEBUG
-        Serial.println("Zapisano pomyślnie");
-        #endif
-    }
+//     // Zapisz JSON do pliku
+//     if (serializeJson(doc, file) == 0) {
+//         #ifdef DEBUG
+//         Serial.println("Błąd podczas zapisu trybu świateł do pliku");
+//         #endif
+//     } else {
+//         #ifdef DEBUG
+//         Serial.println("Zapisano pomyślnie");
+//         #endif
+//     }
 
-    file.close();
+//     file.close();
 
-    #ifdef DEBUG
-    Serial.printf("Zapisano tryb świateł: %d\n", lightMode);
-    #endif
-}
+//     #ifdef DEBUG
+//     Serial.printf("Zapisano tryb świateł: %d\n", lightMode);
+//     #endif
+// }
 
 // wczytywanie trybu świateł
-void loadLightMode() {
-    #ifdef DEBUG
-    Serial.println("Wczytywanie trybu świateł");
-    #endif
+// void loadLightMode() {
+//     #ifdef DEBUG
+//     Serial.println("Wczytywanie trybu świateł");
+//     #endif
 
-    // Domyślnie światła wyłączone
-    int defaultLightMode = 0;
+//     // Domyślnie światła wyłączone
+//     int defaultLightMode = 0;
     
-    if (LittleFS.exists("/light_mode.json")) {
-        File file = LittleFS.open("/light_mode.json", "r");
-        if (file) {
-            StaticJsonDocument<64> doc;
-            DeserializationError error = deserializeJson(doc, file);
-            file.close();
+//     if (LittleFS.exists("/light_mode.json")) {
+//         File file = LittleFS.open("/light_mode.json", "r");
+//         if (file) {
+//             StaticJsonDocument<64> doc;
+//             DeserializationError error = deserializeJson(doc, file);
+//             file.close();
 
-            if (!error && doc.containsKey("lightMode")) {
-                lightMode = doc["lightMode"] | defaultLightMode;
-                #ifdef DEBUG
-                Serial.printf("Wczytano tryb świateł: %d\n", lightMode);
-                #endif
-            } else {
-                #ifdef DEBUG
-                Serial.println("Błąd podczas parsowania light_mode.json lub brak klucza lightMode");
-                Serial.println("Używam domyślnego trybu świateł (wyłączone)");
-                #endif
-                lightMode = defaultLightMode;
-            }
-        } else {
-            #ifdef DEBUG
-            Serial.println("Nie można otworzyć pliku light_mode.json");
-            Serial.println("Używam domyślnego trybu świateł (wyłączone)");
-            #endif
-            lightMode = defaultLightMode;
-        }
-    } else {
-        #ifdef DEBUG
-        Serial.println("Plik light_mode.json nie istnieje, używam trybu domyślnego (wyłączone)");
-        #endif
-        lightMode = defaultLightMode;
-        // Zapisz domyślny tryb
-        saveLightMode();
-    }
-}
+//             if (!error && doc.containsKey("lightMode")) {
+//                 lightMode = doc["lightMode"] | defaultLightMode;
+//                 #ifdef DEBUG
+//                 Serial.printf("Wczytano tryb świateł: %d\n", lightMode);
+//                 #endif
+//             } else {
+//                 #ifdef DEBUG
+//                 Serial.println("Błąd podczas parsowania light_mode.json lub brak klucza lightMode");
+//                 Serial.println("Używam domyślnego trybu świateł (wyłączone)");
+//                 #endif
+//                 lightMode = defaultLightMode;
+//             }
+//         } else {
+//             #ifdef DEBUG
+//             Serial.println("Nie można otworzyć pliku light_mode.json");
+//             Serial.println("Używam domyślnego trybu świateł (wyłączone)");
+//             #endif
+//             lightMode = defaultLightMode;
+//         }
+//     } else {
+//         #ifdef DEBUG
+//         Serial.println("Plik light_mode.json nie istnieje, używam trybu domyślnego (wyłączone)");
+//         #endif
+//         lightMode = defaultLightMode;
+//         // Zapisz domyślny tryb
+//         saveLightMode();
+//     }
+// }
 
 // --- Funkcje konfiguracji systemu ---
 
@@ -3045,11 +3078,12 @@ void setupWebServer() {
         StaticJsonDocument<512> doc;
         JsonObject lightsObj = doc.createNestedObject("lights");
         
-        lightsObj["dayLights"] = getLightModeString(lightSettings.dayLights);
-        lightsObj["nightLights"] = getLightModeString(lightSettings.nightLights);
-        lightsObj["dayBlink"] = lightSettings.dayBlink;
-        lightsObj["nightBlink"] = lightSettings.nightBlink;
-        lightsObj["blinkFrequency"] = lightSettings.blinkFrequency;
+        lightsObj["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
+        lightsObj["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
+        lightsObj["dayBlink"] = lightManager.getDayBlink();
+        lightsObj["nightBlink"] = lightManager.getNightBlink();
+        lightsObj["blinkFrequency"] = lightManager.getBlinkFrequency();
+        lightsObj["currentMode"] = lightManager.getModeString();
         
         String response;
         serializeJson(doc, response);
@@ -3063,38 +3097,22 @@ void setupWebServer() {
             DeserializationError error = deserializeJson(doc, jsonString);
 
             if (!error) {
-                const char* dayLightsStr = doc["dayLights"] | "OFF";
-                const char* nightLightsStr = doc["nightLights"] | "OFF";
+                // Konwersja stringów na konfigurację
+                if (doc.containsKey("dayLights")) {
+                    uint8_t dayConfig = LightManager::parseConfigString(doc["dayLights"]);
+                    bool dayBlink = doc["dayBlink"] | false;
+                    lightManager.setDayConfig(dayConfig, dayBlink);
+                }
                 
-                // Konwersja stringów na enum
-                if (strcmp(dayLightsStr, "OFF") == 0) 
-                    lightSettings.dayLights = LightSettings::NONE;
-                else if (strcmp(dayLightsStr, "FRONT") == 0) 
-                    lightSettings.dayLights = LightSettings::FRONT;
-                else if (strcmp(dayLightsStr, "REAR") == 0) 
-                    lightSettings.dayLights = LightSettings::REAR;
-                else if (strcmp(dayLightsStr, "BOTH") == 0) 
-                    lightSettings.dayLights = LightSettings::BOTH;
+                if (doc.containsKey("nightLights")) {
+                    uint8_t nightConfig = LightManager::parseConfigString(doc["nightLights"]);
+                    bool nightBlink = doc["nightBlink"] | false;
+                    lightManager.setNightConfig(nightConfig, nightBlink);
+                }
                 
-                if (strcmp(nightLightsStr, "OFF") == 0)
-                    lightSettings.nightLights = LightSettings::NONE;
-                else if (strcmp(nightLightsStr, "FRONT") == 0)
-                    lightSettings.nightLights = LightSettings::FRONT;
-                else if (strcmp(nightLightsStr, "REAR") == 0)
-                    lightSettings.nightLights = LightSettings::REAR;
-                else if (strcmp(nightLightsStr, "BOTH") == 0)
-                    lightSettings.nightLights = LightSettings::BOTH;
-                
-                lightSettings.dayBlink = doc["dayBlink"] | false;
-                lightSettings.nightBlink = doc["nightBlink"] | false;
-                lightSettings.blinkFrequency = doc["blinkFrequency"] | 500;
-                
-                // Zapisz do pliku
-                saveLightSettings();
-                
-                // Od razu zastosuj nowe ustawienia jeśli jakiś tryb jest aktywny
-                if (lightMode > 0) {
-                    setLights();
+                if (doc.containsKey("blinkFrequency")) {
+                    uint16_t freq = doc["blinkFrequency"];
+                    lightManager.setBlinkFrequency(freq);
                 }
                 
                 request->send(200, "application/json", "{\"status\":\"ok\"}");
@@ -3650,9 +3668,6 @@ void setup() {
     pinMode(FrontDayPin, OUTPUT);
     pinMode(FrontPin, OUTPUT);
     pinMode(RearPin, OUTPUT);
-    digitalWrite(FrontDayPin, LOW);
-    digitalWrite(FrontPin, LOW);
-    digitalWrite(RearPin, LOW);
 
     // hamulec
     pinMode(BRAKE_SENSOR_PIN, INPUT_PULLUP);
@@ -3676,9 +3691,6 @@ void setup() {
     pinMode(UsbPin, OUTPUT);
     digitalWrite(UsbPin, LOW);
 
-    // Domyślnie światła wyłączone przy starcie
-    //lightMode = 0;
-
     // Inicjalizacja LittleFS i wczytanie ustawień
     if (!LittleFS.begin(true)) {
         #ifdef DEBUG
@@ -3689,9 +3701,7 @@ void setup() {
         Serial.println("LittleFS zamontowany pomyślnie");
         #endif
         // Wczytaj ustawienia z pliku
-        loadSettings();              // Wczytaj główne ustawienia
-        loadLightSettings();         // Wczytaj ustawienia świateł
-        loadLightMode();             // Wczytaj tryb świateł 
+        lightManager.begin(); 
         loadBacklightSettingsFromFile();
         loadGeneralSettingsFromFile();
         loadBluetoothConfigFromFile();
@@ -3855,11 +3865,7 @@ void loop() {
     unsigned long blinkFrequency = lightSettings.blinkFrequency;
 
     // Sprawdź, czy miganie jest włączone
-    if (lightMode == 1) { // tryb dzienny
-        useBlink = lightSettings.dayBlink;
-    } else if (lightMode == 2) { // tryb nocny
-        useBlink = lightSettings.nightBlink;
-    }
+    lightManager.update();
 
     // Jeśli miganie jest włączone, sprawdź czy czas na zmianę stanu
     if (useBlink && (currentTime - lastBlinkToggle >= blinkFrequency)) {
@@ -3883,10 +3889,6 @@ void loop() {
         // sprawdzanie trybu prowadzenia roweru
         if (walkAssistActive) {
             display.clearBuffer();
-            //drawTopBar();
-            //drawHorizontalLine();
-            //drawVerticalLine();
-            //drawAssistLevel();
             showWalkAssistMode(false);
             display.sendBuffer();
         } else {
