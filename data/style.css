@@ -406,3 +406,27 @@ footer a:hover {
 .collapse-btn.rotated {
     transform: rotate(180deg);
 }
+
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.light-section {
+    margin-bottom: 15px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+}
+
+.light-section h4 {
+    margin-bottom: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+}
