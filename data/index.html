@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+F<!DOCTYPE html>
 <html lang="pl">
 	<head>
 		<meta charset="UTF-8">
@@ -58,53 +58,71 @@
 							<form id="lights-form">
 
 								<!-- Światła dzienne -->
-								<div class="light-row">
-									<label for="day-lights">
-										Światła dzienne
-										<button type="button" class="info-icon" data-info="day-lights-info">ℹ</button>
-									</label>
-									<select id="day-lights">
-										<option value="off">Wyłączone</option>
-										<option value="front-day">Przód dzień</option>
-										<option value="front-normal">Przód zwykłe</option>
-										<option value="rear">Tył</option>
-										<option value="front-day-rear">Przód dzień + tył</option>
-										<option value="front-normal-rear">Przód zwykłe + tył</option>
-									</select>
-								</div>
+								<div class="light-section">
+									<h4>Światła dzienne</h4>
+									<div class="light-row">
+										<label>
+											Wybór świateł
+											<button type="button" class="info-icon" data-info="day-lights-info">ℹ</button>
+										</label>
+										<div class="checkbox-group">
+											<div class="checkbox-item">
+												<input type="checkbox" id="day-front" name="day-front">
+												<label for="day-front">Przód zwykłe</label>
+											</div>
+											<div class="checkbox-item">
+												<input type="checkbox" id="day-drl" name="day-drl">
+												<label for="day-drl">Przód DRL</label>
+											</div>
+											<div class="checkbox-item">
+												<input type="checkbox" id="day-rear" name="day-rear">
+												<label for="day-rear">Tył</label>
+											</div>
+										</div>
+									</div>
 
-								<!-- Mruganie tylnego światła w dzień -->
-								<div class="light-row">
-									<label for="day-blink">
-										Mruganie tylnego światła (dzień)
-										<button type="button" class="info-icon" data-info="day-blink-info">ℹ</button>
-									</label>
-									<input type="checkbox" id="day-blink" name="day-blink">
+									<!-- Mruganie tylnego światła w dzień -->
+									<div class="light-row">
+										<label for="day-blink">
+											Mruganie tylnego światła
+											<button type="button" class="info-icon" data-info="day-blink-info">ℹ</button>
+										</label>
+										<input type="checkbox" id="day-blink" name="day-blink">
+									</div>
 								</div>
 
 								<!-- Światła nocne -->
-								<div class="light-row">
-									<label for="night-lights">
-										Światła nocne
-										<button type="button" class="info-icon" data-info="night-lights-info">ℹ</button>
-									</label>
-									<select id="night-lights">
-										<option value="off">Wyłączone</option>
-										<option value="front-day">Przód dzień</option>
-										<option value="front-normal">Przód zwykłe</option>
-										<option value="rear">Tył</option>
-										<option value="front-day-rear">Przód dzień + tył</option>
-										<option value="front-normal-rear">Przód zwykłe + tył</option>
-									</select>
-								</div>
+								<div class="light-section">
+									<h4>Światła nocne</h4>
+									<div class="light-row">
+										<label>
+											Wybór świateł
+											<button type="button" class="info-icon" data-info="night-lights-info">ℹ</button>
+										</label>
+										<div class="checkbox-group">
+											<div class="checkbox-item">
+												<input type="checkbox" id="night-front" name="night-front">
+												<label for="night-front">Przód zwykłe</label>
+											</div>
+											<div class="checkbox-item">
+												<input type="checkbox" id="night-drl" name="night-drl">
+												<label for="night-drl">Przód DRL</label>
+											</div>
+											<div class="checkbox-item">
+												<input type="checkbox" id="night-rear" name="night-rear">
+												<label for="night-rear">Tył</label>
+											</div>
+										</div>
+									</div>
 
-								<!-- Mruganie tylnego światła w nocy -->
-								<div class="light-row">
-									<label for="night-blink">
-										Mruganie tylnego światła (noc)
-										<button type="button" class="info-icon" data-info="night-blink-info">ℹ</button>
-									</label>
-									<input type="checkbox" id="night-blink" name="night-blink">
+									<!-- Mruganie tylnego światła w nocy -->
+									<div class="light-row">
+										<label for="night-blink">
+											Mruganie tylnego światła
+											<button type="button" class="info-icon" data-info="night-blink-info">ℹ</button>
+										</label>
+										<input type="checkbox" id="night-blink" name="night-blink">
+									</div>
 								</div>
 
 								<!-- Częstotliwość mrugania -->
@@ -115,7 +133,7 @@
 									</label>
 									<div class="input-with-unit">
 										<input type="number" id="blink-frequency" name="blink-frequency" 
-											  min="100" max="2000" step="100" value="500">
+												min="100" max="2000" step="100" value="500">
 										<span class="unit">ms</span>
 									</div>
 								</div>
