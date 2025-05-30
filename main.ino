@@ -3046,6 +3046,32 @@ void setupWebServer() {
     // Serwowanie plików statycznych
     server.serveStatic("/", LittleFS, "/");
 
+    server.on("/api/filesystem/status", HTTP_GET, [](AsyncWebServerRequest* request) {
+        StaticJsonDocument<512> doc;
+        
+        // Informacje o systemie plików
+        doc["totalBytes"] = LittleFS.totalBytes();
+        doc["usedBytes"] = LittleFS.usedBytes();
+        doc["freeBytes"] = LittleFS.totalBytes() - LittleFS.usedBytes();
+        
+        // Lista plików
+        JsonArray files = doc.createNestedArray("files");
+        File root = LittleFS.open("/");
+        File file = root.openNextFile();
+        
+        while (file) {
+            JsonObject fileObj = files.createNestedObject();
+            fileObj["name"] = file.name();
+            fileObj["size"] = file.size();
+            fileObj["isDir"] = file.isDirectory();
+            file = root.openNextFile();
+        }
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+
     // Licznik całkowity 
     server.on("/api/odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
         #ifdef DEBUG
@@ -3918,13 +3944,21 @@ void loop() {
     static unsigned long lastWebSocketUpdate = 0;
     if (currentTime - lastWebSocketUpdate >= 1000) { // Aktualizuj co sekundę
         if (ws.count() > 0) {
-            String json = "{";
-            json += "\"speed\":" + String(speed_kmh) + ",";
-            json += "\"temperature\":" + String(currentTemp) + ",";
-            json += "\"battery\":" + String(battery_capacity_percent) + ",";
-            json += "\"power\":" + String(power_w);
-            json += "}";
-            ws.textAll(json);
+            DynamicJsonDocument statusDoc(512);
+            statusDoc["speed"] = speed_kmh;
+            statusDoc["temperature"] = currentTemp;
+            statusDoc["battery"] = battery_capacity_percent;
+            statusDoc["power"] = power_w;
+            
+            // Dodaj informacje o światłach
+            JsonObject lightStatus = statusDoc.createNestedObject("lights");
+            lightStatus["mode"] = lightManager.getModeString();
+            lightStatus["dayConfig"] = lightManager.getConfigString(lightManager.getDayConfig());
+            lightStatus["nightConfig"] = lightManager.getConfigString(lightManager.getNightConfig());
+            
+            String jsonStr;
+            serializeJson(statusDoc, jsonStr);
+            ws.textAll(jsonStr);
         }
         lastWebSocketUpdate = currentTime;
     }
