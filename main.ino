@@ -1235,6 +1235,29 @@ void loadLightSettings() {}
 void saveLightMode() {}
 void loadLightMode() {}
 
+void printLightConfig() {
+    if (!LittleFS.begin(false)) {
+        Serial.println("Błąd montowania systemu plików");
+        return;
+    }
+    
+    if (LittleFS.exists("/light_config.json")) {
+        File file = LittleFS.open("/light_config.json", "r");
+        if (file) {
+            Serial.println("Zawartość pliku konfiguracyjnego świateł:");
+            while (file.available()) {
+                Serial.write(file.read());
+            }
+            Serial.println();
+            file.close();
+        } else {
+            Serial.println("Nie można otworzyć pliku konfiguracyjnego");
+        }
+    } else {
+        Serial.println("Plik konfiguracyjny nie istnieje");
+    }
+}
+
 // ustawianie jasności wyświetlacza
 void setDisplayBrightness(uint8_t brightness) {
     displayBrightness = brightness;
@@ -3078,43 +3101,106 @@ void setupWebServer() {
         lightsObj["dayBlink"] = lightManager.getDayBlink();
         lightsObj["nightBlink"] = lightManager.getNightBlink();
         lightsObj["blinkFrequency"] = lightManager.getBlinkFrequency();
-        lightsObj["currentMode"] = lightManager.getModeString();
         
         String response;
         serializeJson(doc, response);
         request->send(200, "application/json", response);
     });
 
-    server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest* request) {
-        if (request->hasParam("data", true)) {
-            String jsonString = request->getParam("data", true)->value();
-            DynamicJsonDocument doc(256);
-            DeserializationError error = deserializeJson(doc, jsonString);
+server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest* request) {
+    Serial.println("Otrzymano żądanie konfiguracji świateł");
+    
+    if (request->hasParam("data", true)) {
+        String jsonString = request->getParam("data", true)->value();
+        Serial.print("Otrzymane dane JSON: ");
+        Serial.println(jsonString);
+        
+        DynamicJsonDocument doc(256);
+        DeserializationError error = deserializeJson(doc, jsonString);
 
-            if (!error) {
-                // Konwersja stringów na konfigurację
-                if (doc.containsKey("dayLights")) {
-                    uint8_t dayConfig = LightManager::parseConfigString(doc["dayLights"]);
-                    bool dayBlink = doc["dayBlink"] | false;
-                    lightManager.setDayConfig(dayConfig, dayBlink);
+        if (!error) {
+            // Pobierz stringi z konfiguracji
+            const char* dayLightsStr = doc["dayLights"] | "NONE";
+            const char* nightLightsStr = doc["nightLights"] | "NONE";
+            
+            Serial.print("Odczytane konfiguracje: dzień='");
+            Serial.print(dayLightsStr);
+            Serial.print("', noc='");
+            Serial.print(nightLightsStr);
+            Serial.println("'");
+            
+            // Konwersja stringów na bity konfiguracyjne
+            uint8_t dayConfig = LightManager::parseConfigString(dayLightsStr);
+            uint8_t nightConfig = LightManager::parseConfigString(nightLightsStr);
+            
+            bool dayBlink = doc["dayBlink"] | false;
+            bool nightBlink = doc["nightBlink"] | false;
+            uint16_t blinkFrequency = doc["blinkFrequency"] | 500;
+            
+            Serial.printf("Parsowana konfiguracja: dayConfig=%d, nightConfig=%d, dayBlink=%d, nightBlink=%d, freq=%d\n", 
+                dayConfig, nightConfig, dayBlink, nightBlink, blinkFrequency);
+            
+            // Wyświetl aktualną konfigurację przed zmianą
+            Serial.println("Aktualna konfiguracja przed zmianą:");
+            Serial.printf("dayConfig=%d, nightConfig=%d\n", 
+                lightManager.getDayConfig(), lightManager.getNightConfig());
+            
+            // Zastosuj konfigurację
+            lightManager.setDayConfig(dayConfig, dayBlink);
+            lightManager.setNightConfig(nightConfig, nightBlink);
+            lightManager.setBlinkFrequency(blinkFrequency);
+            
+            // Sprawdź czy konfiguracja została zastosowana
+            Serial.println("Konfiguracja po zmianie:");
+            Serial.printf("dayConfig=%d, nightConfig=%d\n", 
+                lightManager.getDayConfig(), lightManager.getNightConfig());
+            
+            // Sprawdź czy konfiguracja została zapisana
+            if (LittleFS.exists("/light_config.json")) {
+                File file = LittleFS.open("/light_config.json", "r");
+                if (file) {
+                    Serial.println("Zawartość pliku konfiguracyjnego świateł:");
+                    String fileContent = "";
+                    while (file.available()) {
+                        fileContent += (char)file.read();
+                    }
+                    Serial.println(fileContent);
+                    file.close();
+                } else {
+                    Serial.println("Nie można otworzyć pliku konfiguracyjnego");
                 }
-                
-                if (doc.containsKey("nightLights")) {
-                    uint8_t nightConfig = LightManager::parseConfigString(doc["nightLights"]);
-                    bool nightBlink = doc["nightBlink"] | false;
-                    lightManager.setNightConfig(nightConfig, nightBlink);
-                }
-                
-                if (doc.containsKey("blinkFrequency")) {
-                    uint16_t freq = doc["blinkFrequency"];
-                    lightManager.setBlinkFrequency(freq);
-                }
-                
-                request->send(200, "application/json", "{\"status\":\"ok\"}");
             } else {
-                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON\"}");
+                Serial.println("Plik konfiguracyjny nie istnieje");
             }
+            
+            request->send(200, "application/json", "{\"status\":\"ok\"}");
+        } else {
+            Serial.print("Błąd parsowania JSON: ");
+            Serial.println(error.c_str());
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON\"}");
         }
+    } else {
+        Serial.println("Brak parametru 'data'");
+        request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"No data parameter\"}");
+    }
+});
+
+    server.on("/api/lights/debug", HTTP_GET, [](AsyncWebServerRequest* request) {
+        StaticJsonDocument<512> doc;
+        
+        doc["currentMode"] = (int)lightManager.getMode();
+        doc["dayConfig"] = lightManager.getDayConfig();
+        doc["nightConfig"] = lightManager.getNightConfig();
+        doc["dayBlink"] = lightManager.getDayBlink();
+        doc["nightBlink"] = lightManager.getNightBlink();
+        doc["blinkFrequency"] = lightManager.getBlinkFrequency();
+        
+        doc["dayConfigString"] = lightManager.getConfigString(lightManager.getDayConfig());
+        doc["nightConfigString"] = lightManager.getConfigString(lightManager.getNightConfig());
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
     });
 
     // Endpoint do pobierania czasu (GET)
@@ -3855,7 +3941,7 @@ void loop() {
     // Obsługa migania świateł
     static unsigned long lastBlinkToggle = 0;
     bool useBlink = false;
-    unsigned long blinkFrequency = lightSettings.blinkFrequency;
+    unsigned long blinkFrequency = lightManager.getBlinkFrequency();
 
     // Sprawdź, czy miganie jest włączone
     lightManager.update();
