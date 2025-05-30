@@ -121,7 +121,7 @@ public:
         loadConfig();
         
         // Wymuś tryb wyłączony przy starcie
-        currentMode = OFF;
+        //currentMode = OFF;
         
         // Zastosuj ustawienia
         updateLights();
@@ -141,6 +141,7 @@ public:
         if (mode >= OFF && mode <= NIGHT) {
             currentMode = mode;
             updateLights();
+            saveMode(); // Zapisz nowy tryb
         }
     }
     
@@ -153,6 +154,7 @@ public:
         #endif
         
         updateLights();
+        saveMode(); // Zapisz nowy tryb
     }
     
     // Pobranie aktualnego trybu
@@ -203,34 +205,14 @@ public:
     
     // Zapisz konfigurację
     void saveConfig() {
-        // Zresetuj system plików przed zapisem
-        LittleFS.end();
-        delay(100);
-        
-        // Próba montowania - bez formatowania
+        // Nie resetuj LittleFS przed każdym zapisem
         if (!LittleFS.begin(false)) {
             #ifdef DEBUG
-            Serial.println("[LightManager] Failed to mount filesystem - trying with format");
+            Serial.println("[LightManager] Failed to mount filesystem for saving");
             #endif
-            
-            // Spróbuj z formatowaniem jako ostatnią deskę ratunku
-            if (!LittleFS.format()) {
-                #ifdef DEBUG
-                Serial.println("[LightManager] Failed to format filesystem");
-                #endif
-                return;
-            }
-            
-            // Spróbuj ponownie po formatowaniu
-            if (!LittleFS.begin(false)) {
-                #ifdef DEBUG
-                Serial.println("[LightManager] Failed to mount filesystem even after formatting");
-                #endif
-                return;
-            }
+            return;
         }
         
-        // Teraz próbujemy otworzyć plik
         File file = LittleFS.open(configPath, "w");
         if (!file) {
             #ifdef DEBUG
