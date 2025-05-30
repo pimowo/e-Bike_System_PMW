@@ -203,13 +203,34 @@ public:
     
     // Zapisz konfigurację
     void saveConfig() {
+        // Zresetuj system plików przed zapisem
+        LittleFS.end();
+        delay(100);
+        
+        // Próba montowania - bez formatowania
         if (!LittleFS.begin(false)) {
             #ifdef DEBUG
-            Serial.println("[LightManager] Failed to mount filesystem for saving");
+            Serial.println("[LightManager] Failed to mount filesystem - trying with format");
             #endif
-            return;
+            
+            // Spróbuj z formatowaniem jako ostatnią deskę ratunku
+            if (!LittleFS.format()) {
+                #ifdef DEBUG
+                Serial.println("[LightManager] Failed to format filesystem");
+                #endif
+                return;
+            }
+            
+            // Spróbuj ponownie po formatowaniu
+            if (!LittleFS.begin(false)) {
+                #ifdef DEBUG
+                Serial.println("[LightManager] Failed to mount filesystem even after formatting");
+                #endif
+                return;
+            }
         }
         
+        // Teraz próbujemy otworzyć plik
         File file = LittleFS.open(configPath, "w");
         if (!file) {
             #ifdef DEBUG
@@ -218,6 +239,7 @@ public:
             return;
         }
         
+        // Przygotuj dokument JSON
         StaticJsonDocument<256> doc;
         doc["dayConfig"] = dayConfig;
         doc["nightConfig"] = nightConfig;
@@ -225,18 +247,26 @@ public:
         doc["nightBlink"] = nightBlink;
         doc["blinkFrequency"] = blinkFrequency;
         
-        // Nie zapisujemy currentMode - zawsze startujemy z OFF
-        
+        // Zapisz do pliku
         if (serializeJson(doc, file) == 0) {
             #ifdef DEBUG
             Serial.println("[LightManager] Failed to write config file");
             #endif
         }
         
+        // Zamknij plik i wyloguj sukces
         file.close();
         
         #ifdef DEBUG
         Serial.println("[LightManager] Configuration saved");
+        
+        // Weryfikacja zapisu
+        File checkFile = LittleFS.open(configPath, "r");
+        if (checkFile) {
+            String content = checkFile.readString();
+            Serial.println("[LightManager] Saved file content: " + content);
+            checkFile.close();
+        }
         #endif
     }
     
