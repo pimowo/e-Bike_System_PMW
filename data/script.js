@@ -63,33 +63,33 @@ async function saveLightConfig() {
         try {
             // Zbieranie danych z checkboxów dla trybu dziennego
             const dayFront = document.getElementById('day-front').checked;
-            const dayDRL = document.getElementById('day-drl').checked;
-            const dayRear = document.getElementById('day-rear').checked;
-            let dayLightsConfig = 'NONE';
+			const dayDRL = document.getElementById('day-drl').checked;
+			const dayRear = document.getElementById('day-rear').checked;
+			let dayLightsConfig = 'NONE';
             
             // Budowanie konfiguracji dla trybu dziennego
             const dayParts = [];
-            if (dayFront) dayParts.push('FRONT');
-            if (dayDRL) dayParts.push('DRL');
-            if (dayRear) dayParts.push('REAR');
-            if (dayParts.length > 0) {
-                dayLightsConfig = dayParts.join('+');
-            }
+			if (dayFront) dayParts.push('FRONT');
+			if (dayDRL) dayParts.push('DRL');
+			if (dayRear) dayParts.push('REAR');
+			if (dayParts.length > 0) {
+				dayLightsConfig = dayParts.join('+');
+			}
             
             // Zbieranie danych z checkboxów dla trybu nocnego
             const nightFront = document.getElementById('night-front').checked;
-            const nightDRL = document.getElementById('night-drl').checked;
-            const nightRear = document.getElementById('night-rear').checked;
-            let nightLightsConfig = 'NONE';
+			const nightDRL = document.getElementById('night-drl').checked;
+			const nightRear = document.getElementById('night-rear').checked;
+			let nightLightsConfig = 'NONE';
             
             // Budowanie konfiguracji dla trybu nocnego
             const nightParts = [];
-            if (nightFront) nightParts.push('FRONT');
-            if (nightDRL) nightParts.push('DRL');
-            if (nightRear) nightParts.push('REAR');
-            if (nightParts.length > 0) {
-                nightLightsConfig = nightParts.join('+');
-            }
+			if (nightFront) nightParts.push('FRONT');
+			if (nightDRL) nightParts.push('DRL');
+			if (nightRear) nightParts.push('REAR');
+			if (nightParts.length > 0) {
+				nightLightsConfig = nightParts.join('+');
+			}
 
             // Zbieranie pozostałych danych
             const dayBlink = document.getElementById('day-blink').checked;
@@ -98,12 +98,15 @@ async function saveLightConfig() {
 
             // Tworzenie obiektu konfiguracji
             const lightConfig = {
-                dayLights: dayLightsConfig,
-                nightLights: nightLightsConfig,
-                dayBlink: dayBlink,
-                nightBlink: nightBlink,
-                blinkFrequency: blinkFrequency
-            };
+				dayLights: dayLightsConfig,
+				nightLights: nightLightsConfig,
+				dayBlink: dayBlink,
+				nightBlink: nightBlink,
+				blinkFrequency: blinkFrequency
+			};
+
+			console.log('Wysyłana konfiguracja:', lightConfig);
+			console.log('Jako JSON:', JSON.stringify(lightConfig));
 
             debug('Przygotowane dane:', lightConfig);
 
