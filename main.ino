@@ -1483,11 +1483,11 @@ void drawTopBar() {
 void drawLightStatus() {
     display.setFont(czcionka_mala);
 
-    switch (lightMode) {
-        case 1:
+    switch (lightManager.getMode()) {
+        case LightManager::DAY:
             display.drawStr(28, 45, "Dzien");
             break;
-        case 2:
+        case LightManager::NIGHT:
             display.drawStr(28, 45, "Noc");
             break;
     }
@@ -2495,7 +2495,7 @@ void setCadencePulsesPerRevolution(uint8_t pulses) {
 void goToSleep() {
     #ifdef DEBUG
     Serial.println("Wchodzę w tryb głębokiego uśpienia (deep sleep)...");
-    Serial.printf("Aktualny tryb świateł: %d\n", lightMode);
+    Serial.printf("Aktualny tryb świateł: %d\n", (int)lightManager.getMode());
     #endif
 
     // Wyłącz wszystkie LEDy
@@ -2504,14 +2504,15 @@ void goToSleep() {
     digitalWrite(RearPin, LOW);
     digitalWrite(UsbPin, LOW);
 
-    lightManager.setMode(LightManager::OFF);
-
     delay(50);
 
     // Wyłącz OLED
     display.clearBuffer();
     display.sendBuffer();
     display.setPowerSave(1);  // Wprowadź OLED w tryb oszczędzania energii
+
+    // Zapisz stan trybu świateł przed uśpieniem
+    // Już nie jest potrzebne - LightManager zapisuje stan automatycznie
 
     #ifdef DEBUG
     Serial.println("Konfiguracja wybudzania przez przycisk SET (GPIO12)");
@@ -2862,14 +2863,8 @@ void loadSettings() {
         return;
     }
 
-    // Wczytywanie ustawień świateł
-    if (doc.containsKey("light")) {
-        lightSettings.dayLights = static_cast<LightSettings::LightMode>(doc["light"]["dayLights"] | 0);
-        lightSettings.nightLights = static_cast<LightSettings::LightMode>(doc["light"]["nightLights"] | 0);
-        lightSettings.dayBlink = doc["light"]["dayBlink"] | false;
-        lightSettings.nightBlink = doc["light"]["nightBlink"] | false;
-        lightSettings.blinkFrequency = doc["light"]["blinkFrequency"] | 500;
-    }
+    // Wczytywanie ustawień świateł - teraz to obsługuje LightManager
+    // Nie musimy już ładować lightSettings z pliku
 
     // Wczytywanie ustawień podświetlenia
     if (doc.containsKey("backlight")) {
@@ -2883,7 +2878,6 @@ void loadSettings() {
         strlcpy(wifiSettings.ssid, doc["wifi"]["ssid"] | "", sizeof(wifiSettings.ssid));
         strlcpy(wifiSettings.password, doc["wifi"]["password"] | "", sizeof(wifiSettings.password));
     }
-
 
     // Wczytywanie ustawień sterownika
     if (doc.containsKey("controller")) {
@@ -2906,7 +2900,7 @@ void loadSettings() {
         }
     }
 
-  configFile.close();
+    configFile.close();
 }
 
 // zapis wszystkich ustawień
@@ -2923,13 +2917,14 @@ void saveSettings() {
     timeObj["month"] = timeSettings.month;
     timeObj["year"] = timeSettings.year;
 
-    // Zapisywanie ustawień świateł
+    // Zapisywanie ustawień świateł - teraz to obsługuje LightManager
     JsonObject lightObj = doc.createNestedObject("light");
-    lightObj["dayLights"] = static_cast<int>(lightSettings.dayLights);
-    lightObj["nightLights"] = static_cast<int>(lightSettings.nightLights);
-    lightObj["dayBlink"] = lightSettings.dayBlink;
-    lightObj["nightBlink"] = lightSettings.nightBlink;
-    lightObj["blinkFrequency"] = lightSettings.blinkFrequency;
+    // Użyj wartości z lightManager
+    lightObj["dayLights"] = (int)lightManager.getDayConfig();
+    lightObj["nightLights"] = (int)lightManager.getNightConfig();
+    lightObj["dayBlink"] = lightManager.getDayBlink();
+    lightObj["nightBlink"] = lightManager.getNightBlink();
+    lightObj["blinkFrequency"] = lightManager.getBlinkFrequency();
 
     // Zapisywanie ustawień podświetlenia
     JsonObject backlightObj = doc.createNestedObject("backlight");
@@ -2963,21 +2958,21 @@ void saveSettings() {
       }
     }
 
-  File configFile = LittleFS.open("/config.json", "w");
-  if (!configFile) {
-    #ifdef DEBUG
-    Serial.println("Failed to open config file for writing");
-    #endif
-    return;
-  }
+    File configFile = LittleFS.open("/config.json", "w");
+    if (!configFile) {
+        #ifdef DEBUG
+        Serial.println("Failed to open config file for writing");
+        #endif
+        return;
+    }
 
-  if (serializeJson(doc, configFile) == 0) {
-    #ifdef DEBUG
-    Serial.println("Failed to write config file");
-    #endif
-  }
+    if (serializeJson(doc, configFile) == 0) {
+        #ifdef DEBUG
+        Serial.println("Failed to write config file");
+        #endif
+    }
 
-  configFile.close();
+    configFile.close();
 }
 
 // konwersja parametru na indeks
@@ -3537,12 +3532,8 @@ void initializeDefaultSettings() {
     timeSettings.month = 1;
     timeSettings.year = 2025;
 
-    // Ustawienia świateł
-    lightSettings.dayLights = LightSettings::FRONT;
-    lightSettings.nightLights = LightSettings::BOTH;
-    lightSettings.dayBlink = false;
-    lightSettings.nightBlink = false;
-    lightSettings.blinkFrequency = 500;
+    // Ustawienia świateł - teraz obsługiwane przez LightManager
+    // lightManager zainicjalizowany jest w konstruktorze
 
     // Podświetlenie
     backlightSettings.dayBrightness = 100;
@@ -3668,6 +3659,8 @@ void setup() {
     pinMode(FrontDayPin, OUTPUT);
     pinMode(FrontPin, OUTPUT);
     pinMode(RearPin, OUTPUT);
+
+    lightManager.begin();
 
     // hamulec
     pinMode(BRAKE_SENSOR_PIN, INPUT_PULLUP);
@@ -3868,11 +3861,11 @@ void loop() {
     lightManager.update();
 
     // Jeśli miganie jest włączone, sprawdź czy czas na zmianę stanu
-    if (useBlink && (currentTime - lastBlinkToggle >= blinkFrequency)) {
-        blinkState = !blinkState; // Przełącz stan migania
-        lastBlinkToggle = currentTime;
-        setLights(); // Zastosuj nowe ustawienia
-    }
+    // if (useBlink && (currentTime - lastBlinkToggle >= blinkFrequency)) {
+    //     blinkState = !blinkState; // Przełącz stan migania
+    //     lastBlinkToggle = currentTime;
+    //     setLights(); // Zastosuj nowe ustawienia
+    // }
 
     unsigned long lastAutoSaveTime = 0;
     const unsigned long AUTO_SAVE_INTERVAL = 60000; // Co minutę
