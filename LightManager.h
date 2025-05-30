@@ -252,6 +252,97 @@ public:
         #endif
     }
     
+    // Wczytaj ostatnio użyty tryb świateł
+    void loadMode() {
+        // Sprawdź, czy system plików jest zamontowany
+        if (!LittleFS.begin(false)) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Failed to mount filesystem for loading mode");
+            #endif
+            return;
+        }
+        
+        // Ścieżka pliku przechowującego tryb
+        const char* modePath = "/light_mode.json";
+        
+        if (!LittleFS.exists(modePath)) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Mode file doesn't exist, using default (OFF)");
+            #endif
+            currentMode = OFF;
+            return;
+        }
+        
+        File file = LittleFS.open(modePath, "r");
+        if (!file) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Failed to open mode file for reading");
+            #endif
+            currentMode = OFF;
+            return;
+        }
+        
+        StaticJsonDocument<64> doc;
+        DeserializationError error = deserializeJson(doc, file);
+        file.close();
+        
+        if (error) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Failed to parse mode file");
+            #endif
+            currentMode = OFF;
+            return;
+        }
+        
+        // Wczytaj ostatni aktywny tryb
+        int mode = doc["mode"] | 0;
+        currentMode = static_cast<LightMode>(mode);
+        
+        #ifdef DEBUG
+        Serial.printf("[LightManager] Loaded mode: %d\n", currentMode);
+        #endif
+    }
+
+    // Zapisz ostatnio użyty tryb świateł
+    void saveMode() {
+        // Sprawdź, czy system plików jest zamontowany
+        if (!LittleFS.begin(false)) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Failed to mount filesystem for saving mode");
+            #endif
+            return;
+        }
+        
+        // Ścieżka pliku przechowującego tryb
+        const char* modePath = "/light_mode.json";
+        
+        File file = LittleFS.open(modePath, "w");
+        if (!file) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Failed to open mode file for writing");
+            #endif
+            return;
+        }
+        
+        // Przygotuj dokument JSON
+        StaticJsonDocument<64> doc;
+        doc["mode"] = static_cast<int>(currentMode);
+        
+        // Zapisz do pliku
+        if (serializeJson(doc, file) == 0) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Failed to write mode file");
+            #endif
+        }
+        
+        // Zamknij plik
+        file.close();
+        
+        #ifdef DEBUG
+        Serial.printf("[LightManager] Mode saved: %d\n", currentMode);
+        #endif
+    }
+
     // Wczytaj konfigurację
     void loadConfig() {
         if (!LittleFS.begin(false)) {
@@ -296,7 +387,7 @@ public:
         blinkFrequency = doc["blinkFrequency"] | 500;
         
         // currentMode zawsze ustawiamy na OFF przy starcie
-        currentMode = OFF;
+        //currentMode = OFF;
         
         #ifdef DEBUG
         Serial.println("[LightManager] Configuration loaded");
