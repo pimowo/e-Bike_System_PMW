@@ -3764,7 +3764,6 @@ void setup() {
     pinMode(RearPin, OUTPUT);
 
     lightManager.begin();
-    lightManager.loadMode(); // Wczytaj ostatnio używany tryb świateł
 
     // hamulec
     pinMode(BRAKE_SENSOR_PIN, INPUT_PULLUP);
@@ -3798,7 +3797,6 @@ void setup() {
         Serial.println("LittleFS zamontowany pomyślnie");
         #endif
         // Wczytaj ustawienia z pliku
-        lightManager.loadMode();
         loadBacklightSettingsFromFile();
         loadGeneralSettingsFromFile();
         loadBluetoothConfigFromFile();
