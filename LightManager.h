@@ -17,10 +17,10 @@ public:
     };
     
     // Flagi konfiguracji świateł (pozwalają na dowolne kombinacje)
-    static const uint8_t NONE = 0;
-    static const uint8_t FRONT = 1;
-    static const uint8_t DRL = 2;
-    static const uint8_t REAR = 4;
+    static inline const uint8_t NONE = 0;
+    static inline const uint8_t FRONT = 1;
+    static inline const uint8_t DRL = 2;
+    static inline const uint8_t REAR = 4;
     
 private:
     // Piny
@@ -132,6 +132,18 @@ public:
         #endif
     }
        
+    // Ustawianie trybu świateł
+    void setMode(LightMode mode) {
+        #ifdef DEBUG
+        Serial.printf("[LightManager] Setting mode %d\n", mode);
+        #endif
+        
+        if (mode >= OFF && mode <= NIGHT) {
+            currentMode = mode;
+            updateLights();
+        }
+    }
+
     // Zmiana trybu w sekwencji (OFF -> DAY -> NIGHT -> OFF)
     void cycleMode() {
         currentMode = static_cast<LightMode>((currentMode + 1) % 3);
