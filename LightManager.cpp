@@ -26,6 +26,52 @@ LightManager::LightManager() :
 {
 }
 
+// Dodaj po istniejącym konstruktorze
+LightManager::LightManager(uint8_t frontPin, uint8_t drlPin, uint8_t rearPin) :
+    frontPin(frontPin),
+    drlPin(drlPin),
+    rearPin(rearPin),
+    frontState(false),
+    drlState(false),
+    rearState(false),
+    currentMode(OFF),
+    dayConfig(NONE),
+    nightConfig(NONE),
+    dayBlink(false),
+    nightBlink(false),
+    blinkFrequency(500),
+    blinkState(false),
+    lastBlinkTime(0),
+    configMode(false)
+{
+    // Ustaw piny jako wyjścia
+    pinMode(frontPin, OUTPUT);
+    pinMode(drlPin, OUTPUT);
+    pinMode(rearPin, OUTPUT);
+    
+    // Wyłącz wszystkie światła na start
+    digitalWrite(frontPin, LOW);
+    digitalWrite(drlPin, LOW);
+    digitalWrite(rearPin, LOW);
+    
+    // Wczytaj konfigurację
+    if (!loadConfig()) {
+        // Domyślna konfiguracja jeśli nie udało się wczytać
+        dayConfig = FRONT | REAR;
+        nightConfig = FRONT | DRL | REAR;
+        dayBlink = false;
+        nightBlink = false;
+        blinkFrequency = 500;
+        saveConfig();  // Zapisz domyślną konfigurację
+    }
+    
+    #ifdef DEBUG
+    Serial.println("[LightManager] Initialized with pins");
+    Serial.printf("[LightManager] Day config: %s, blink: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
+    Serial.printf("[LightManager] Night config: %s, blink: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
+    #endif
+}
+
 // Inicjalizacja - przypisanie pinów GPIO
 void LightManager::begin(uint8_t frontPin, uint8_t drlPin, uint8_t rearPin) {
     this->frontPin = frontPin;
@@ -109,6 +155,26 @@ void LightManager::setBlinkFrequency(uint16_t frequency) {
     }
 }
 
+// Przełączanie trybów
+void LightManager::cycleMode() {
+    #ifdef DEBUG
+    Serial.println("[LightManager] Cycling mode");
+    #endif
+    
+    switch (currentMode) {
+        case OFF:
+            setMode(DAY);
+            break;
+        case DAY:
+            setMode(NIGHT);
+            break;
+        case NIGHT:
+        default:
+            setMode(OFF);
+            break;
+    }
+}
+
 // Aktywacja/Deaktywacja trybu konfiguracji
 void LightManager::activateConfigMode() {
     configMode = true;
@@ -185,7 +251,7 @@ void LightManager::updateLights() {
 }
 
 // Przetworzyć stan - wywołaj w pętli loop
-void LightManager::process() {
+void LightManager::update() {
     if (configMode) return; // W trybie konfiguracji nie przetwarzamy migania
     
     bool shouldBlink = false;
@@ -338,6 +404,20 @@ String LightManager::getConfigString(uint8_t config) const {
     }
     
     return result;
+}
+
+// Konwersja trybu na string
+String LightManager::getModeString() const {
+    switch (currentMode) {
+        case OFF:
+            return "OFF";
+        case DAY:
+            return "DAY";
+        case NIGHT:
+            return "NIGHT";
+        default:
+            return "UNKNOWN";
+    }
 }
 
 // Konwersja string na config (uint8_t)
