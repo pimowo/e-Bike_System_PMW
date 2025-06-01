@@ -48,12 +48,64 @@ async function saveOdometerValue() {
     }
 }
 
-// Funkcja zapisywania konfiguracji z debounce
+// Dodaj debounce dla loadLightConfig
+let loadTimeout = null;
+
+// Funkcja wczytywania konfiguracji świateł
+async function loadLightConfig() {
+    debug('Rozpoczynam wczytywanie konfiguracji świateł...');
+    
+    // Anuluj poprzedni timeout jeśli istnieje
+    if (typeof loadTimeout !== 'undefined' && loadTimeout) {
+        clearTimeout(loadTimeout);
+    }
+
+    // Ustaw nowy timeout
+    loadTimeout = setTimeout(async () => {
+        try {
+            debug('Wysyłam żądanie GET do /api/status');
+            const response = await fetch('/api/status');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            debug('Otrzymane dane:', data);
+
+            if (data.lights) {
+                debug('Aktualizacja formularza, otrzymane dane:', data.lights);
+                
+                // Parsowanie konfiguracji świateł dziennych
+                const dayLights = data.lights.dayLights || 'NONE';
+                document.getElementById('day-front').checked = dayLights.includes('FRONT');
+                document.getElementById('day-drl').checked = dayLights.includes('DRL');
+                document.getElementById('day-rear').checked = dayLights.includes('REAR');
+                document.getElementById('day-blink').checked = Boolean(data.lights.dayBlink);
+                
+                // Parsowanie konfiguracji świateł nocnych
+                const nightLights = data.lights.nightLights || 'NONE';
+                document.getElementById('night-front').checked = nightLights.includes('FRONT');
+                document.getElementById('night-drl').checked = nightLights.includes('DRL');
+                document.getElementById('night-rear').checked = nightLights.includes('REAR');
+                document.getElementById('night-blink').checked = Boolean(data.lights.nightBlink);
+                
+                // Ustawienie częstotliwości migania
+                document.getElementById('blink-frequency').value = data.lights.blinkFrequency || 500;
+
+                debug('Formularz zaktualizowany pomyślnie');
+            }
+        } catch (error) {
+            console.error('Błąd podczas wczytywania konfiguracji świateł:', error);
+        }
+    }, 250); // Czekaj 250ms przed odświeżeniem
+}
+
+// Funkcja zapisywania konfiguracji świateł
 async function saveLightConfig() {
     debug('Rozpoczynam zapisywanie konfiguracji świateł');
     
     // Anuluj poprzedni timeout jeśli istnieje
-    if (saveTimeout) {
+    if (typeof saveTimeout !== 'undefined' && saveTimeout) {
         clearTimeout(saveTimeout);
     }
 
@@ -149,52 +201,93 @@ async function saveLightConfig() {
     }, 500); // Czekaj 500ms przed zapisem
 }
 
-// Dodaj debounce dla loadLightConfig
-let loadTimeout = null;
-
-// Funkcja wczytywania konfiguracji z debounce
-async function loadLightConfig() {
-    debug('Rozpoczynam wczytywanie konfiguracji świateł...');
+// Funkcja aktualizacji formularza na podstawie otrzymanego stanu
+function updateLightForm(lights) {
+    debug('Aktualizacja formularza, otrzymane dane:', lights);
     
-    // Anuluj poprzedni timeout jeśli istnieje
-    if (loadTimeout) {
-        clearTimeout(loadTimeout);
+    try {
+        // Parsowanie konfiguracji świateł dziennych
+        const dayLights = lights.dayLights || 'NONE';
+        document.getElementById('day-front').checked = dayLights.includes('FRONT');
+        document.getElementById('day-drl').checked = dayLights.includes('DRL');
+        document.getElementById('day-rear').checked = dayLights.includes('REAR');
+        document.getElementById('day-blink').checked = Boolean(lights.dayBlink);
+        
+        // Parsowanie konfiguracji świateł nocnych
+        const nightLights = lights.nightLights || 'NONE';
+        document.getElementById('night-front').checked = nightLights.includes('FRONT');
+        document.getElementById('night-drl').checked = nightLights.includes('DRL');
+        document.getElementById('night-rear').checked = nightLights.includes('REAR');
+        document.getElementById('night-blink').checked = Boolean(lights.nightBlink);
+        
+        // Ustawienie częstotliwości migania
+        document.getElementById('blink-frequency').value = lights.blinkFrequency || 500;
+
+        debug('Formularz zaktualizowany pomyślnie');
+    } catch (error) {
+        console.error('Błąd podczas aktualizacji formularza:', error);
     }
-
-    // Ustaw nowy timeout
-    loadTimeout = setTimeout(async () => {
-        try {
-            const response = await fetch('/api/status');
-            const data = await response.json();
-            debug('Otrzymane dane:', data);
-
-            if (data.lights) {
-                debug('Aktualizacja formularza, otrzymane dane:', data.lights);
-                
-                // Parsowanie konfiguracji świateł dziennych
-                const dayLights = data.lights.dayLights || 'NONE';
-                document.getElementById('day-front').checked = dayLights.includes('FRONT');
-                document.getElementById('day-drl').checked = dayLights.includes('DRL');
-                document.getElementById('day-rear').checked = dayLights.includes('REAR');
-                document.getElementById('day-blink').checked = Boolean(data.lights.dayBlink);
-                
-                // Parsowanie konfiguracji świateł nocnych
-                const nightLights = data.lights.nightLights || 'NONE';
-                document.getElementById('night-front').checked = nightLights.includes('FRONT');
-                document.getElementById('night-drl').checked = nightLights.includes('DRL');
-                document.getElementById('night-rear').checked = nightLights.includes('REAR');
-                document.getElementById('night-blink').checked = Boolean(data.lights.nightBlink);
-                
-                // Ustawienie częstotliwości migania
-                document.getElementById('blink-frequency').value = data.lights.blinkFrequency || 500;
-
-                debug('Formularz zaktualizowany pomyślnie');
-            }
-        } catch (error) {
-            console.error('Błąd podczas wczytywania konfiguracji świateł:', error);
-        }
-    }, 250); // Czekaj 250ms przed odświeżeniem
 }
+
+// Funkcja aktualizacji statusu świateł
+function updateLightStatus(lights) {
+    try {
+        // Aktualizacja klas CSS dla wskaźników świateł (jeśli są)
+        const indicators = {
+            frontDay: document.querySelector('.light-indicator.front-day'),
+            front: document.querySelector('.light-indicator.front'),
+            rear: document.querySelector('.light-indicator.rear')
+        };
+
+        for (const [key, indicator] of Object.entries(indicators)) {
+            if (indicator) {
+                indicator.classList.toggle('active', Boolean(lights[key]));
+            }
+        }
+
+        debug('Status świateł zaktualizowany');
+    } catch (error) {
+        console.error('Błąd podczas aktualizacji statusu świateł:', error);
+    }
+}
+
+// Upewnij się, że listeners dla formularza świateł są dodane
+document.addEventListener('DOMContentLoaded', function() {
+    // Dodaj listenery do przycisków Zapisz
+    const saveButtons = document.querySelectorAll('.save-lights-btn');
+    if (saveButtons) {
+        saveButtons.forEach(button => {
+            button.addEventListener('click', saveLightConfig);
+        });
+        debug('Przyciski zapisywania ustawień świateł zainicjalizowane');
+    }
+    
+    // Dodaj listenery do checkboxów i slidera
+    const lightCheckboxes = [
+        'day-front', 'day-drl', 'day-rear', 'day-blink', 
+        'night-front', 'night-drl', 'night-rear', 'night-blink'
+    ];
+    
+    lightCheckboxes.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('change', saveLightConfig);
+        }
+    });
+    
+    const blinkFrequency = document.getElementById('blink-frequency');
+    if (blinkFrequency) {
+        blinkFrequency.addEventListener('change', saveLightConfig);
+        blinkFrequency.addEventListener('input', function() {
+            const freqValue = document.getElementById('blink-frequency-value');
+            if (freqValue) {
+                freqValue.textContent = this.value + ' ms';
+            }
+        });
+    }
+    
+    debug('Listenery formularza świateł zainicjalizowane');
+});
 
 // Funkcja pomocnicza do debugowania
 function debug(...args) {
@@ -536,34 +629,6 @@ async function fetchCurrentState() {
     }
 }
 
-// Funkcja do aktualizacji formularza na podstawie otrzymanego stanu
-function updateLightForm(lights) {
-    debug('Aktualizacja formularza, otrzymane dane:', lights);
-    
-    try {
-        // Parsowanie konfiguracji świateł dziennych
-        const dayLights = lights.dayLights || 'NONE';
-        document.getElementById('day-front').checked = dayLights.includes('FRONT');
-        document.getElementById('day-drl').checked = dayLights.includes('DRL');
-        document.getElementById('day-rear').checked = dayLights.includes('REAR');
-        document.getElementById('day-blink').checked = Boolean(lights.dayBlink);
-        
-        // Parsowanie konfiguracji świateł nocnych
-        const nightLights = lights.nightLights || 'NONE';
-        document.getElementById('night-front').checked = nightLights.includes('FRONT');
-        document.getElementById('night-drl').checked = nightLights.includes('DRL');
-        document.getElementById('night-rear').checked = nightLights.includes('REAR');
-        document.getElementById('night-blink').checked = Boolean(lights.nightBlink);
-        
-        // Ustawienie częstotliwości migania
-        document.getElementById('blink-frequency').value = lights.blinkFrequency || 500;
-
-        debug('Formularz zaktualizowany pomyślnie');
-    } catch (error) {
-        console.error('Błąd podczas aktualizacji formularza:', error);
-    }
-}
-
 function setupModal() {
     const modal = document.getElementById('info-modal');
     const modalTitle = document.getElementById('modal-title');
@@ -596,31 +661,6 @@ function setupModal() {
             modal.style.display = 'none';
         }
     });
-}
-
-// Funkcja aktualizacji statusu świateł
-function updateLightStatus(lights) {
-    try {
-        const elements = getLightFormElements();
-        if (!elements) return;
-
-        // Aktualizacja klas CSS dla wskaźników świateł (jeśli są)
-        const indicators = {
-            frontDay: document.querySelector('.light-indicator.front-day'),
-            front: document.querySelector('.light-indicator.front'),
-            rear: document.querySelector('.light-indicator.rear')
-        };
-
-        for (const [key, indicator] of Object.entries(indicators)) {
-            if (indicator) {
-                indicator.classList.toggle('active', Boolean(lights[key]));
-            }
-        }
-
-        debug('Status świateł zaktualizowany');
-    } catch (error) {
-        console.error('Błąd podczas aktualizacji statusu świateł:', error);
-    }
 }
 
 // Funkcja pobierająca konfigurację wyświetlacza
@@ -720,15 +760,6 @@ function toggleControllerParams() {
         s866Params.style.display = 'block';
     }
 }
-
-// Dodaj wywołanie przy załadowaniu strony
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicjalne wywołanie przy załadowaniu strony
-    toggleControllerParams();
-    
-    // Dodaj nasłuchiwanie zmiany typu sterownika
-    document.getElementById('controller-type').addEventListener('change', toggleControllerParams);
-});
 
 // Funkcja pobierająca konfigurację sterownika
 async function fetchControllerConfig() {
@@ -1747,16 +1778,6 @@ function toggleTpmsFields() {
         tpmsFields.style.display = tpmsEnabled ? 'block' : 'none';
     }
 }
-
-// Dodaj nasłuchiwanie zmiany ustawienia TPMS
-document.addEventListener('DOMContentLoaded', function() {
-    const tpmsEnabledSelect = document.getElementById('tpms-enabled');
-    if (tpmsEnabledSelect) {
-        tpmsEnabledSelect.addEventListener('change', toggleTpmsFields);
-        // Wywołaj od razu po załadowaniu, aby ustawić początkowy stan
-        toggleTpmsFields();
-    }
-});
 
 function saveBluetoothConfig() {
     const bmsEnabled = document.getElementById('bms-enabled').value;
