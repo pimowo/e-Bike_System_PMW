@@ -109,96 +109,110 @@ async function saveLightConfig() {
         clearTimeout(saveTimeout);
     }
 
-    // Ustaw nowy timeout
-    saveTimeout = setTimeout(async () => {
-        try {
-            // Zbieranie danych z checkboxów dla trybu dziennego
-            const dayFront = document.getElementById('day-front').checked;
-            const dayDRL = document.getElementById('day-drl').checked;
-            const dayRear = document.getElementById('day-rear').checked;
-            debug(`Stan checkboxów dziennych: dayFront=${dayFront}, dayDRL=${dayDRL}, dayRear=${dayRear}`);
-            
-            let dayLightsConfig = 'NONE';
-            
-            // Budowanie konfiguracji dla trybu dziennego
-            const dayParts = [];
-            if (dayFront) dayParts.push('FRONT');
-            if (dayDRL) dayParts.push('DRL');
-            if (dayRear) dayParts.push('REAR');
-            if (dayParts.length > 0) {
-                dayLightsConfig = dayParts.join('+');
-            }
-            debug(`Konfiguracja dzienna: ${dayLightsConfig}`);
-            
-            // Zbieranie danych z checkboxów dla trybu nocnego
-            const nightFront = document.getElementById('night-front').checked;
-            const nightDRL = document.getElementById('night-drl').checked;
-            const nightRear = document.getElementById('night-rear').checked;
-            debug(`Stan checkboxów nocnych: nightFront=${nightFront}, nightDRL=${nightDRL}, nightRear=${nightRear}`);
-            
-            let nightLightsConfig = 'NONE';
-            
-            // Budowanie konfiguracji dla trybu nocnego
-            const nightParts = [];
-            if (nightFront) nightParts.push('FRONT');
-            if (nightDRL) nightParts.push('DRL');
-            if (nightRear) nightParts.push('REAR');
-            if (nightParts.length > 0) {
-                nightLightsConfig = nightParts.join('+');
-            }
-            debug(`Konfiguracja nocna: ${nightLightsConfig}`);
-
-            // Zbieranie pozostałych danych
-            const dayBlink = document.getElementById('day-blink').checked;
-            const nightBlink = document.getElementById('night-blink').checked;
-            const blinkFrequency = parseInt(document.getElementById('blink-frequency').value);
-            debug(`Pozostałe ustawienia: dayBlink=${dayBlink}, nightBlink=${nightBlink}, blinkFrequency=${blinkFrequency}`);
-
-            // Tworzenie obiektu konfiguracji
-            const lightConfig = {
-                dayLights: dayLightsConfig,
-                nightLights: nightLightsConfig,
-                dayBlink: dayBlink,
-                nightBlink: nightBlink,
-                blinkFrequency: blinkFrequency
-            };
-
-            debug('Przygotowane dane:', lightConfig);
-            console.log('Wysyłana konfiguracja:', lightConfig);
-            console.log('JSON:', JSON.stringify(lightConfig));
-
-            const formData = new URLSearchParams();
-            formData.append('data', JSON.stringify(lightConfig));
-            debug('Dane do wysłania:', formData.toString());
-
-            debug('Wysyłam żądanie POST do /api/lights/config');
-            const response = await fetch('/api/lights/config', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: formData.toString()
-            });
-
-            debug(`Odpowiedź HTTP: ${response.status}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const result = await response.json();
-            debug('Otrzymana odpowiedź:', result);
-            
-            if (result.status === 'ok') {
-                alert('Zapisano ustawienia świateł');
-                await loadLightConfig(); // Odświeżamy konfigurację
-            } else {
-                throw new Error(result.message || 'Nieznany błąd');
-            }
-        } catch (error) {
-            console.error('Błąd podczas zapisywania:', error);
-            alert('Błąd podczas zapisywania ustawień: ' + error.message);
+    try {
+        // Pobierz stan checkboxów bezpośrednio z elementów DOM
+        const dayFrontEl = document.getElementById('day-front');
+        const dayDRLEl = document.getElementById('day-drl');
+        const dayRearEl = document.getElementById('day-rear');
+        const dayBlinkEl = document.getElementById('day-blink');
+        
+        const nightFrontEl = document.getElementById('night-front');
+        const nightDRLEl = document.getElementById('night-drl');
+        const nightRearEl = document.getElementById('night-rear');
+        const nightBlinkEl = document.getElementById('night-blink');
+        
+        const blinkFrequencyEl = document.getElementById('blink-frequency');
+        
+        // Sprawdź czy wszystkie potrzebne elementy istnieją
+        if (!dayFrontEl || !dayDRLEl || !dayRearEl || !dayBlinkEl || 
+            !nightFrontEl || !nightDRLEl || !nightRearEl || !nightBlinkEl || 
+            !blinkFrequencyEl) {
+            throw new Error("Nie znaleziono wszystkich elementów formularza świateł");
         }
-    }, 500); // Czekaj 500ms przed zapisem
+        
+        const dayFront = dayFrontEl.checked;
+        const dayDRL = dayDRLEl.checked;
+        const dayRear = dayRearEl.checked;
+        const dayBlink = dayBlinkEl.checked;
+        
+        const nightFront = nightFrontEl.checked;
+        const nightDRL = nightDRLEl.checked;
+        const nightRear = nightRearEl.checked;
+        const nightBlink = nightBlinkEl.checked;
+        
+        const blinkFrequency = parseInt(blinkFrequencyEl.value) || 500; // Domyślna wartość 500 gdy nie można odczytać
+        
+        debug(`Stan checkboxów dziennych: dayFront=${dayFront}, dayDRL=${dayDRL}, dayRear=${dayRear}, dayBlink=${dayBlink}`);
+        debug(`Stan checkboxów nocnych: nightFront=${nightFront}, nightDRL=${nightDRL}, nightRear=${nightRear}, nightBlink=${nightBlink}`);
+        debug(`Częstotliwość migania: ${blinkFrequency}`);
+        
+        // Budowanie konfiguracji dla trybów
+        let dayLightsConfig = 'NONE';
+        const dayParts = [];
+        if (dayFront) dayParts.push('FRONT');
+        if (dayDRL) dayParts.push('DRL');
+        if (dayRear) dayParts.push('REAR');
+        if (dayParts.length > 0) {
+            dayLightsConfig = dayParts.join('+');
+        }
+        
+        let nightLightsConfig = 'NONE';
+        const nightParts = [];
+        if (nightFront) nightParts.push('FRONT');
+        if (nightDRL) nightParts.push('DRL');
+        if (nightRear) nightParts.push('REAR');
+        if (nightParts.length > 0) {
+            nightLightsConfig = nightParts.join('+');
+        }
+        
+        // Tworzenie obiektu konfiguracji
+        const lightConfig = {
+            dayLights: dayLightsConfig,
+            nightLights: nightLightsConfig,
+            dayBlink: dayBlink,
+            nightBlink: nightBlink,
+            blinkFrequency: blinkFrequency
+        };
+        
+        debug('Przygotowane dane:', lightConfig);
+        console.log('Wysyłana konfiguracja:', lightConfig);
+        
+        // Przygotuj dane do wysłania
+        const formData = new URLSearchParams();
+        formData.append('data', JSON.stringify(lightConfig));
+        
+        debug('Dane do wysłania:', formData.toString());
+        debug('Wysyłam żądanie POST do /api/lights/config');
+        
+        const response = await fetch('/api/lights/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData.toString()
+        });
+        
+        debug(`Odpowiedź HTTP: ${response.status}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        debug('Otrzymana odpowiedź:', result);
+        
+        if (result.status === 'ok') {
+            alert('Zapisano ustawienia świateł');
+            // Odczekaj chwilę przed odświeżeniem, aby serwer miał czas na aktualizację
+            setTimeout(() => {
+                loadLightConfig();
+            }, 500);
+        } else {
+            throw new Error(result.message || 'Nieznany błąd');
+        }
+    } catch (error) {
+        console.error('Błąd podczas zapisywania:', error);
+        alert('Błąd podczas zapisywania ustawień: ' + error.message);
+    }
 }
 
 // Funkcja aktualizacji formularza na podstawie otrzymanego stanu
