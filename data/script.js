@@ -1,3 +1,150 @@
+// Na początku pliku, zaraz po definicji zmiennych
+// Upewnij się, że funkcja jest dostępna globalnie dla przycisków inline
+window.saveLightConfig = async function() {
+    console.log('Rozpoczynam zapisywanie konfiguracji świateł');
+    
+    try {
+        // Dodajemy dodatkowe logowanie dla każdego kroku
+        console.log('1. Szukam elementów formularza...');
+        
+        // Sprawdź, które elementy istnieją i pokaż wyniki w konsoli
+        const elementIds = [
+            'day-front', 'day-drl', 'day-rear', 'day-blink',
+            'night-front', 'night-drl', 'night-rear', 'night-blink',
+            'blink-frequency'
+        ];
+        
+        for (const id of elementIds) {
+            const element = document.getElementById(id);
+            console.log(`Sprawdzam element ${id}: ${element ? 'ISTNIEJE' : 'NIE ISTNIEJE'}`);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    console.log(`${id}.checked = ${element.checked}`);
+                } else {
+                    console.log(`${id}.value = ${element.value}`);
+                }
+            }
+        }
+        
+        console.log('2. Zbieranie danych formularza...');
+        
+        // Znajdź wszystkie potrzebne elementy formularza
+        const elements = {
+            dayFront: document.getElementById('day-front'),
+            dayDRL: document.getElementById('day-drl'),
+            dayRear: document.getElementById('day-rear'),
+            dayBlink: document.getElementById('day-blink'),
+            nightFront: document.getElementById('night-front'), 
+            nightDRL: document.getElementById('night-drl'),
+            nightRear: document.getElementById('night-rear'),
+            nightBlink: document.getElementById('night-blink'),
+            blinkFrequency: document.getElementById('blink-frequency')
+        };
+        
+        // Sprawdź czy wszystkie elementy istnieją
+        const missing = [];
+        for (const [key, element] of Object.entries(elements)) {
+            if (!element) {
+                missing.push(key);
+            }
+        }
+        
+        if (missing.length > 0) {
+            throw new Error(`Brak elementów formularza: ${missing.join(', ')}`);
+        }
+        
+        // Pobierz wartości
+        const dayFront = elements.dayFront.checked;
+        const dayDRL = elements.dayDRL.checked;
+        const dayRear = elements.dayRear.checked;
+        const dayBlink = elements.dayBlink.checked;
+        
+        const nightFront = elements.nightFront.checked;
+        const nightDRL = elements.nightDRL.checked;
+        const nightRear = elements.nightRear.checked;
+        const nightBlink = elements.nightBlink.checked;
+        
+        const blinkFrequency = parseInt(elements.blinkFrequency.value) || 500;
+        
+        console.log('3. Budowanie konfiguracji...');
+        
+        // Budowanie konfiguracji
+        let dayLightsConfig = 'NONE';
+        const dayParts = [];
+        if (dayFront) dayParts.push('FRONT');
+        if (dayDRL) dayParts.push('DRL');
+        if (dayRear) dayParts.push('REAR');
+        if (dayParts.length > 0) {
+            dayLightsConfig = dayParts.join('+');
+        }
+        
+        let nightLightsConfig = 'NONE';
+        const nightParts = [];
+        if (nightFront) nightParts.push('FRONT');
+        if (nightDRL) nightParts.push('DRL');
+        if (nightRear) nightParts.push('REAR');
+        if (nightParts.length > 0) {
+            nightLightsConfig = nightParts.join('+');
+        }
+        
+        // Tworzenie obiektu konfiguracji
+        const lightConfig = {
+            dayLights: dayLightsConfig,
+            nightLights: nightLightsConfig,
+            dayBlink: dayBlink,
+            nightBlink: nightBlink,
+            blinkFrequency: blinkFrequency
+        };
+        
+        console.log('4. Przygotowana konfiguracja:', lightConfig);
+        
+        // Przygotuj dane do wysłania
+        const formData = new URLSearchParams();
+        formData.append('data', JSON.stringify(lightConfig));
+        
+        console.log('5. Dane do wysłania:', formData.toString());
+        console.log('6. Wysyłam żądanie POST do /api/lights/config');
+        
+        // Wykonaj zapytanie z opcją cache: 'no-store'
+        const response = await fetch('/api/lights/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData.toString(),
+            cache: 'no-store'  // Dodane aby zapobiec cachowaniu
+        });
+        
+        console.log('7. Otrzymano odpowiedź:', response.status);
+        if (!response.ok) {
+            throw new Error(`Błąd HTTP: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('8. Zdekodowana odpowiedź JSON:', result);
+        
+        if (result.status === 'ok') {
+            console.log('9. Zapisano ustawienia świateł');
+            alert('Zapisano ustawienia świateł');
+            
+            // Opóźniona aktualizacja UI
+            console.log('10. Odczekanie 1 sekundy przed odświeżeniem...');
+            setTimeout(() => {
+                console.log('11. Wczytywanie aktualnej konfiguracji...');
+                loadLightConfig();
+            }, 1000);
+        } else {
+            throw new Error(result.message || 'Nieznany błąd');
+        }
+    } catch (error) {
+        console.error('Błąd podczas zapisywania:', error);
+        alert('Błąd podczas zapisywania ustawień: ' + error.message);
+    }
+};
+
+// Zachowaj oryginalną funkcję jako referencję
+const originalSaveLightConfig = window.saveLightConfig;
+
 // Dodaj zmienną do kontroli debounce
 let saveTimeout = null;
 
@@ -105,7 +252,24 @@ async function saveLightConfig() {
     debug('Rozpoczynam zapisywanie konfiguracji świateł');
     
     try {
-        // Znajdź wszystkie potrzebne elementy formularza
+        // Definicja wszystkich ID, które powinniśmy znaleźć
+        const requiredElementIds = [
+            'day-front', 'day-drl', 'day-rear', 'day-blink',
+            'night-front', 'night-drl', 'night-rear', 'night-blink',
+            'blink-frequency'
+        ];
+        
+        // Sprawdź każdy element i wyświetl jego status
+        for (const id of requiredElementIds) {
+            const element = document.getElementById(id);
+            if (!element) {
+                console.error(`Nie znaleziono elementu o id: ${id}`);
+            } else {
+                console.log(`Element ${id} znaleziony, typ: ${element.tagName}, value: ${element.value}, checked: ${element.checked}`);
+            }
+        }
+
+        // Teraz sprawdzamy, czy wszystkie elementy istnieją
         const elements = {
             dayFront: document.getElementById('day-front'),
             dayDRL: document.getElementById('day-drl'),
@@ -119,11 +283,18 @@ async function saveLightConfig() {
         };
         
         // Sprawdź czy wszystkie elementy istnieją
+        const missingElements = [];
         for (const [key, element] of Object.entries(elements)) {
             if (!element) {
-                throw new Error(`Brak elementu: ${key}`);
+                missingElements.push(key);
             }
         }
+        
+        if (missingElements.length > 0) {
+            throw new Error(`Brak elementów: ${missingElements.join(', ')}`);
+        }
+        
+        // Reszta funkcji pozostaje bez zmian...
         
         // Pobierz wartości
         const dayFront = elements.dayFront.checked;
@@ -138,75 +309,8 @@ async function saveLightConfig() {
         
         const blinkFrequency = parseInt(elements.blinkFrequency.value) || 500;
         
-        debug(`Stan checkboxów dziennych: dayFront=${dayFront}, dayDRL=${dayDRL}, dayRear=${dayRear}, dayBlink=${dayBlink}`);
-        debug(`Stan checkboxów nocnych: nightFront=${nightFront}, nightDRL=${nightDRL}, nightRear=${nightRear}, nightBlink=${nightBlink}`);
-        debug(`Częstotliwość migania: ${blinkFrequency}`);
+        // Reszta kodu funkcji bez zmian...
         
-        // Budowanie konfiguracji
-        let dayLightsConfig = 'NONE';
-        const dayParts = [];
-        if (dayFront) dayParts.push('FRONT');
-        if (dayDRL) dayParts.push('DRL');
-        if (dayRear) dayParts.push('REAR');
-        if (dayParts.length > 0) {
-            dayLightsConfig = dayParts.join('+');
-        }
-        
-        let nightLightsConfig = 'NONE';
-        const nightParts = [];
-        if (nightFront) nightParts.push('FRONT');
-        if (nightDRL) nightParts.push('DRL');
-        if (nightRear) nightParts.push('REAR');
-        if (nightParts.length > 0) {
-            nightLightsConfig = nightParts.join('+');
-        }
-        
-        // Tworzenie obiektu konfiguracji
-        const lightConfig = {
-            dayLights: dayLightsConfig,
-            nightLights: nightLightsConfig,
-            dayBlink: dayBlink,
-            nightBlink: nightBlink,
-            blinkFrequency: blinkFrequency
-        };
-        
-        debug('Przygotowane dane:', lightConfig);
-        console.log('Wysyłana konfiguracja:', lightConfig);
-        
-        // Przygotuj dane do wysłania
-        const formData = new URLSearchParams();
-        formData.append('data', JSON.stringify(lightConfig));
-        
-        debug('Dane do wysłania:', formData.toString());
-        debug('Wysyłam żądanie POST do /api/lights/config');
-        
-        // Wykonaj zapytanie z opcją cache: 'no-store'
-        const response = await fetch('/api/lights/config', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: formData.toString(),
-            cache: 'no-store'  // Dodane aby zapobiec cachowaniu
-        });
-        
-        debug(`Odpowiedź HTTP: ${response.status}`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        debug('Otrzymana odpowiedź:', result);
-        
-        if (result.status === 'ok') {
-            alert('Zapisano ustawienia świateł');
-            // Odczekaj 1 sekundę przed odświeżeniem, aby serwer miał czas na aktualizację
-            setTimeout(() => {
-                loadLightConfig();
-            }, 1000); // Zwiększone opóźnienie do 1 sekundy
-        } else {
-            throw new Error(result.message || 'Nieznany błąd');
-        }
     } catch (error) {
         console.error('Błąd podczas zapisywania:', error);
         alert('Błąd podczas zapisywania ustawień: ' + error.message);
@@ -265,7 +369,21 @@ function updateLightStatus(lights) {
 
 // Upewnij się, że listeners dla formularza świateł są dodane
 document.addEventListener('DOMContentLoaded', function() {
-    debug('Inicjalizacja nasłuchiwacza dla przycisku "Zapisz" w formularzu świateł');
+    console.log('Inicjalizacja przycisków...');
+    
+    // Szukaj przycisku zapisu w sekcji świateł
+    const saveButton = document.querySelector('.light-config .btn-save');
+    if (saveButton) {
+        console.log('Znaleziono przycisk zapisu świateł');
+        
+        // Dodaj nasłuchiwacz dla pewności, nawet jeśli jest już zdefiniowany w HTML
+        saveButton.addEventListener('click', function(event) {
+            console.log('Kliknięto przycisk zapisu świateł');
+            window.saveLightConfig();
+        });
+    } else {
+        console.error('Nie znaleziono przycisku zapisu świateł');
+    }
 });
 
 // Funkcja pomocnicza do debugowania
@@ -385,12 +503,15 @@ async function fetchRTCTime() {
             return;
         }
 
+        console.log('Pobieranie czasu RTC...');
         const response = await fetch('/api/time');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const data = await response.json();
+        console.log('Otrzymane dane czasu:', data);
+
         if (data && data.time) {
             const { hours, minutes, seconds, year, month, day } = data.time;
             
@@ -401,6 +522,8 @@ async function fetchRTCTime() {
             dateElement.value = dateStr;
             
             debug('Zaktualizowano czas:', { time: timeStr, date: dateStr });
+        } else {
+            console.error('Nieprawidłowe dane czasu:', data);
         }
     } catch (error) {
         console.error('Błąd podczas pobierania czasu RTC:', error);
