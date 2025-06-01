@@ -3121,15 +3121,13 @@ void setupWebServer() {
     server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
         StaticJsonDocument<512> doc;
         
-        // Inne dane w obiekcie doc
-        
-        // Dodaj sekcję lights
         JsonObject lights = doc.createNestedObject("lights");
         lights["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
         lights["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
         lights["dayBlink"] = lightManager.getDayBlink();
         lights["nightBlink"] = lightManager.getNightBlink();
         lights["blinkFrequency"] = lightManager.getBlinkFrequency();
+        lights["mode"] = lightManager.getModeString();
         
         String response;
         serializeJson(doc, response);
@@ -3751,7 +3749,7 @@ void setup() {
     pinMode(FrontPin, OUTPUT);
     pinMode(RearPin, OUTPUT);
 
-    lightManager.begin(FRONT_LIGHT_PIN, DRL_LIGHT_PIN, REAR_LIGHT_PIN);
+    lightManager.begin(FrontPin, FrontDayPin, RearPin);
 
     // hamulec
     pinMode(BRAKE_SENSOR_PIN, INPUT_PULLUP);
@@ -3893,7 +3891,7 @@ void loop() {
 
     unsigned long currentTime = millis();
 
-    lightManager.process();
+    //lightManager.process();
 
     if (configModeActive) {      
         display.clearBuffer();
