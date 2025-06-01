@@ -104,49 +104,45 @@ async function loadLightConfig() {
 async function saveLightConfig() {
     debug('Rozpoczynam zapisywanie konfiguracji świateł');
     
-    // Anuluj poprzedni timeout jeśli istnieje
-    if (typeof saveTimeout !== 'undefined' && saveTimeout) {
-        clearTimeout(saveTimeout);
-    }
-
     try {
-        // Pobierz stan checkboxów bezpośrednio z elementów DOM
-        const dayFrontEl = document.getElementById('day-front');
-        const dayDRLEl = document.getElementById('day-drl');
-        const dayRearEl = document.getElementById('day-rear');
-        const dayBlinkEl = document.getElementById('day-blink');
+        // Znajdź wszystkie potrzebne elementy formularza
+        const elements = {
+            dayFront: document.getElementById('day-front'),
+            dayDRL: document.getElementById('day-drl'),
+            dayRear: document.getElementById('day-rear'),
+            dayBlink: document.getElementById('day-blink'),
+            nightFront: document.getElementById('night-front'), 
+            nightDRL: document.getElementById('night-drl'),
+            nightRear: document.getElementById('night-rear'),
+            nightBlink: document.getElementById('night-blink'),
+            blinkFrequency: document.getElementById('blink-frequency')
+        };
         
-        const nightFrontEl = document.getElementById('night-front');
-        const nightDRLEl = document.getElementById('night-drl');
-        const nightRearEl = document.getElementById('night-rear');
-        const nightBlinkEl = document.getElementById('night-blink');
-        
-        const blinkFrequencyEl = document.getElementById('blink-frequency');
-        
-        // Sprawdź czy wszystkie potrzebne elementy istnieją
-        if (!dayFrontEl || !dayDRLEl || !dayRearEl || !dayBlinkEl || 
-            !nightFrontEl || !nightDRLEl || !nightRearEl || !nightBlinkEl || 
-            !blinkFrequencyEl) {
-            throw new Error("Nie znaleziono wszystkich elementów formularza świateł");
+        // Sprawdź czy wszystkie elementy istnieją
+        for (const [key, element] of Object.entries(elements)) {
+            if (!element) {
+                throw new Error(`Brak elementu: ${key}`);
+            }
         }
         
-        const dayFront = dayFrontEl.checked;
-        const dayDRL = dayDRLEl.checked;
-        const dayRear = dayRearEl.checked;
-        const dayBlink = dayBlinkEl.checked;
+        // Pobierz wartości
+        const dayFront = elements.dayFront.checked;
+        const dayDRL = elements.dayDRL.checked;
+        const dayRear = elements.dayRear.checked;
+        const dayBlink = elements.dayBlink.checked;
         
-        const nightFront = nightFrontEl.checked;
-        const nightDRL = nightDRLEl.checked;
-        const nightRear = nightRearEl.checked;
-        const nightBlink = nightBlinkEl.checked;
+        const nightFront = elements.nightFront.checked;
+        const nightDRL = elements.nightDRL.checked;
+        const nightRear = elements.nightRear.checked;
+        const nightBlink = elements.nightBlink.checked;
         
-        const blinkFrequency = parseInt(blinkFrequencyEl.value) || 500; // Domyślna wartość 500 gdy nie można odczytać
+        const blinkFrequency = parseInt(elements.blinkFrequency.value) || 500;
         
         debug(`Stan checkboxów dziennych: dayFront=${dayFront}, dayDRL=${dayDRL}, dayRear=${dayRear}, dayBlink=${dayBlink}`);
         debug(`Stan checkboxów nocnych: nightFront=${nightFront}, nightDRL=${nightDRL}, nightRear=${nightRear}, nightBlink=${nightBlink}`);
         debug(`Częstotliwość migania: ${blinkFrequency}`);
         
-        // Budowanie konfiguracji dla trybów
+        // Budowanie konfiguracji
         let dayLightsConfig = 'NONE';
         const dayParts = [];
         if (dayFront) dayParts.push('FRONT');
@@ -184,12 +180,14 @@ async function saveLightConfig() {
         debug('Dane do wysłania:', formData.toString());
         debug('Wysyłam żądanie POST do /api/lights/config');
         
+        // Wykonaj zapytanie z opcją cache: 'no-store'
         const response = await fetch('/api/lights/config', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: formData.toString()
+            body: formData.toString(),
+            cache: 'no-store'  // Dodane aby zapobiec cachowaniu
         });
         
         debug(`Odpowiedź HTTP: ${response.status}`);
@@ -202,10 +200,10 @@ async function saveLightConfig() {
         
         if (result.status === 'ok') {
             alert('Zapisano ustawienia świateł');
-            // Odczekaj chwilę przed odświeżeniem, aby serwer miał czas na aktualizację
+            // Odczekaj 1 sekundę przed odświeżeniem, aby serwer miał czas na aktualizację
             setTimeout(() => {
                 loadLightConfig();
-            }, 500);
+            }, 1000); // Zwiększone opóźnienie do 1 sekundy
         } else {
             throw new Error(result.message || 'Nieznany błąd');
         }
@@ -267,40 +265,7 @@ function updateLightStatus(lights) {
 
 // Upewnij się, że listeners dla formularza świateł są dodane
 document.addEventListener('DOMContentLoaded', function() {
-    // Dodaj listenery do przycisków Zapisz
-    const saveButtons = document.querySelectorAll('.save-lights-btn');
-    if (saveButtons) {
-        saveButtons.forEach(button => {
-            button.addEventListener('click', saveLightConfig);
-        });
-        debug('Przyciski zapisywania ustawień świateł zainicjalizowane');
-    }
-    
-    // Dodaj listenery do checkboxów i slidera
-    const lightCheckboxes = [
-        'day-front', 'day-drl', 'day-rear', 'day-blink', 
-        'night-front', 'night-drl', 'night-rear', 'night-blink'
-    ];
-    
-    lightCheckboxes.forEach(id => {
-        const element = document.getElementById(id);
-        if (element) {
-            element.addEventListener('change', saveLightConfig);
-        }
-    });
-    
-    const blinkFrequency = document.getElementById('blink-frequency');
-    if (blinkFrequency) {
-        blinkFrequency.addEventListener('change', saveLightConfig);
-        blinkFrequency.addEventListener('input', function() {
-            const freqValue = document.getElementById('blink-frequency-value');
-            if (freqValue) {
-                freqValue.textContent = this.value + ' ms';
-            }
-        });
-    }
-    
-    debug('Listenery formularza świateł zainicjalizowane');
+    debug('Inicjalizacja nasłuchiwacza dla przycisku "Zapisz" w formularzu świateł');
 });
 
 // Funkcja pomocnicza do debugowania
