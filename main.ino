@@ -3118,87 +3118,75 @@ void setupWebServer() {
     });
 
     // Światła
-    server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* request) {
+    server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
         StaticJsonDocument<512> doc;
-        JsonObject lightsObj = doc.createNestedObject("lights");
         
-        lightsObj["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
-        lightsObj["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
-        lightsObj["dayBlink"] = lightManager.getDayBlink();
-        lightsObj["nightBlink"] = lightManager.getNightBlink();
-        lightsObj["blinkFrequency"] = lightManager.getBlinkFrequency();
+        // Inne dane w obiekcie doc
+        
+        // Dodaj sekcję lights
+        JsonObject lights = doc.createNestedObject("lights");
+        lights["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
+        lights["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
+        lights["dayBlink"] = lightManager.getDayBlink();
+        lights["nightBlink"] = lightManager.getNightBlink();
+        lights["blinkFrequency"] = lightManager.getBlinkFrequency();
         
         String response;
         serializeJson(doc, response);
         request->send(200, "application/json", response);
     });
 
+    // Endpoint do obsługi konfiguracji świateł
     server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
-        Serial.println("Otrzymano żądanie konfiguracji świateł");
+        Serial.println("[WebServer] Received POST request to /api/lights/config");
         
+        // Sprawdź, czy jest parametr "data"
         if (request->hasParam("data", true)) {
-            String data = request->getParam("data", true)->value();
-            Serial.print("Otrzymane dane: ");
-            Serial.println(data);
+            String jsonData = request->getParam("data", true)->value();
+            Serial.println("[WebServer] Received data: " + jsonData);
             
-            DynamicJsonDocument doc(512);
-            DeserializationError error = deserializeJson(doc, data);
+            // Parsuj JSON
+            StaticJsonDocument<256> doc;
+            DeserializationError error = deserializeJson(doc, jsonData);
             
             if (error) {
-                Serial.print("Błąd parsowania JSON: ");
-                Serial.println(error.c_str());
+                Serial.printf("[WebServer] deserializeJson() failed: %s\n", error.c_str());
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON\"}");
                 return;
             }
-
-            // Dodaj więcej logowania, aby zobaczyć dokładnie co przychodzi
-            Serial.print("Analizuję JSON: ");
-            serializeJsonPretty(doc, Serial);
-            Serial.println();
             
-            const char* dayLightsStr = doc["dayLights"].as<const char*>();
-            const char* nightLightsStr = doc["nightLights"].as<const char*>();
+            // Pobierz wartości z JSON
+            String dayLights = doc["dayLights"] | "NONE";
+            String nightLights = doc["nightLights"] | "NONE";
             bool dayBlink = doc["dayBlink"] | false;
             bool nightBlink = doc["nightBlink"] | false;
             uint16_t blinkFrequency = doc["blinkFrequency"] | 500;
             
-            Serial.print("Dzienne światła string: ");
-            Serial.println(dayLightsStr ? dayLightsStr : "NULL");
-            Serial.print("Nocne światła string: ");
-            Serial.println(nightLightsStr ? nightLightsStr : "NULL");
+            Serial.printf("[WebServer] Parsed values: dayLights=%s, nightLights=%s, dayBlink=%d, nightBlink=%d, blinkFrequency=%d\n", 
+                        dayLights.c_str(), nightLights.c_str(), dayBlink, nightBlink, blinkFrequency);
             
-            uint8_t dayConfig = LightManager::parseConfigString(dayLightsStr ? dayLightsStr : "FRONT+REAR");
-            uint8_t nightConfig = LightManager::parseConfigString(nightLightsStr ? nightLightsStr : "FRONT+REAR");
+            // Konwersja string na uint8_t config
+            uint8_t dayConfig = lightManager.parseConfigString(dayLights.c_str());
+            uint8_t nightConfig = lightManager.parseConfigString(nightLights.c_str());
             
-            Serial.printf("Wartości konfiguracji po parsowaniu: dayConfig=%d, nightConfig=%d, dayBlink=%d, nightBlink=%d\n",
-                        dayConfig, nightConfig, dayBlink, nightBlink);
-                        
-            // Pobierz aktualną konfigurację przed zmianą
-            Serial.print("Aktualna konfiguracja przed zmianą: dayConfig=");
-            Serial.print(lightManager.getDayConfig());
-            Serial.print(", nightConfig=");
-            Serial.println(lightManager.getNightConfig());
-                        
+            Serial.printf("[WebServer] Parsed configs: dayConfig=%d, nightConfig=%d\n", dayConfig, nightConfig);
+            
             // Zastosuj konfigurację
             lightManager.setDayConfig(dayConfig, dayBlink);
             lightManager.setNightConfig(nightConfig, nightBlink);
             lightManager.setBlinkFrequency(blinkFrequency);
             
-            // Sprawdź czy konfiguracja została zastosowana
-            Serial.print("Konfiguracja po zmianie: dayConfig=");
-            Serial.print(lightManager.getDayConfig());
-            Serial.print(", nightConfig=");
-            Serial.println(lightManager.getNightConfig());
-            
-            // Wywołaj saveConfig() bez przypisywania wyniku
-            Serial.println("Zapisuję konfigurację...");
-            lightManager.saveConfig();
-            Serial.println("Konfiguracja zapisana");
-            
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
+            // Zapisz konfigurację
+            if (lightManager.saveConfig()) {
+                Serial.println("[WebServer] Configuration saved successfully");
+                request->send(200, "application/json", "{\"status\":\"ok\"}");
+            } else {
+                Serial.println("[WebServer] Failed to save configuration");
+                request->send(500, "application/json", "{\"status\":\"error\",\"message\":\"Failed to save configuration\"}");
+            }
         } else {
-            Serial.println("Brak parametru data");
-            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"No data parameter\"}");
+            Serial.println("[WebServer] No 'data' parameter received");
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing data\"}");
         }
     });
 
@@ -3763,7 +3751,7 @@ void setup() {
     pinMode(FrontPin, OUTPUT);
     pinMode(RearPin, OUTPUT);
 
-    lightManager.begin();
+    lightManager.begin(FRONT_LIGHT_PIN, DRL_LIGHT_PIN, REAR_LIGHT_PIN);
 
     // hamulec
     pinMode(BRAKE_SENSOR_PIN, INPUT_PULLUP);
@@ -3905,6 +3893,8 @@ void loop() {
 
     unsigned long currentTime = millis();
 
+    lightManager.process();
+
     if (configModeActive) {      
         display.clearBuffer();
 
@@ -3969,13 +3959,6 @@ void loop() {
 
     // Sprawdź, czy miganie jest włączone
     lightManager.update();
-
-    // Jeśli miganie jest włączone, sprawdź czy czas na zmianę stanu
-    // if (useBlink && (currentTime - lastBlinkToggle >= blinkFrequency)) {
-    //     blinkState = !blinkState; // Przełącz stan migania
-    //     lastBlinkToggle = currentTime;
-    //     setLights(); // Zastosuj nowe ustawienia
-    // }
 
     unsigned long lastAutoSaveTime = 0;
     const unsigned long AUTO_SAVE_INTERVAL = 60000; // Co minutę
