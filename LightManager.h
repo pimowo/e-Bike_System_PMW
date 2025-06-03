@@ -32,10 +32,10 @@ public:
     
     // Ustawianie trybu
     void setMode(LightMode mode);
-    
-    // 
-    void cycleMode(); // Przełącza między trybami OFF -> DAY -> NIGHT -> OFF
 
+    //
+    void cycleMode(); // Przełącza między trybami OFF -> DAY -> NIGHT -> OFF
+    
     // Gettery
     LightMode getMode() const { return currentMode; }
     uint8_t getDayConfig() const { return dayConfig; }
@@ -64,7 +64,6 @@ public:
     String getConfigString(uint8_t config) const;
     static uint8_t parseConfigString(const char* configStr);
 
-    // 
     String getModeString() const; // Zwraca nazwę aktualnego trybu jako string
     
 private:
