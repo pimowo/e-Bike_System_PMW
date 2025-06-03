@@ -235,7 +235,7 @@ void LightManager::updateLights() {
     digitalWrite(frontPin, frontState ? HIGH : LOW);
     digitalWrite(drlPin, drlState ? HIGH : LOW);
     
-    // Dla tylnego światła, jeśli ma migać, stan będzie aktualizowany w process()
+    // Dla tylnego światła, jeśli ma migać, stan będzie aktualizowany w update()
     if (!shouldBlink) {
         digitalWrite(rearPin, rearState ? HIGH : LOW);
     }
