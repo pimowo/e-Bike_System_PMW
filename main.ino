@@ -3968,7 +3968,6 @@ void loop() {
 
     // Sprawdź, czy miganie jest włączone
     lightManager.update();
-    lightManager.process();
 
     unsigned long lastAutoSaveTime = 0;
     const unsigned long AUTO_SAVE_INTERVAL = 60000; // Co minutę
