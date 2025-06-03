@@ -75,7 +75,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "1.6.25";
+const char* VERSION = "30.5.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -3118,16 +3118,28 @@ void setupWebServer() {
     });
 
     // Światła
-    server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* request) {
         StaticJsonDocument<512> doc;
+
+        Serial.println("[DEBUG] Generating API /api/status response");
+
+        JsonObject lightsObj = doc.createNestedObject("lights");
         
-        JsonObject lights = doc.createNestedObject("lights");
+        // Pobierz konfigurację i zapisz jako zmienne lokalne dla debugowania
+        uint8_t dayConfig = lightManager.getDayConfig();
+        uint8_t nightConfig = lightManager.getNightConfig();
+        String dayConfigStr = lightManager.getConfigString(dayConfig);
+        String nightConfigStr = lightManager.getConfigString(nightConfig);
+        
+        // Dodaj debugowanie
+        Serial.printf("[DEBUG] dayConfig: %d, nightConfig: %d\n", dayConfig, nightConfig);
+        Serial.printf("[DEBUG] dayConfigStr: %s, nightConfigStr: %s\n", dayConfigStr.c_str(), nightConfigStr.c_str());
+    
         lights["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
         lights["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
         lights["dayBlink"] = lightManager.getDayBlink();
         lights["nightBlink"] = lightManager.getNightBlink();
         lights["blinkFrequency"] = lightManager.getBlinkFrequency();
-        lights["mode"] = lightManager.getModeString();
         
         String response;
         serializeJson(doc, response);
@@ -3748,7 +3760,8 @@ void setup() {
     pinMode(FrontDayPin, OUTPUT);
     pinMode(FrontPin, OUTPUT);
     pinMode(RearPin, OUTPUT);
-
+    
+    // Inicjalizacja menedżera świateł
     lightManager.begin(FrontPin, FrontDayPin, RearPin);
 
     // hamulec
@@ -3891,8 +3904,6 @@ void loop() {
 
     unsigned long currentTime = millis();
 
-    //lightManager.process();
-
     if (configModeActive) {      
         display.clearBuffer();
 
@@ -3957,6 +3968,7 @@ void loop() {
 
     // Sprawdź, czy miganie jest włączone
     lightManager.update();
+    lightManager.process();
 
     unsigned long lastAutoSaveTime = 0;
     const unsigned long AUTO_SAVE_INTERVAL = 60000; // Co minutę
