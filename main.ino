@@ -3123,7 +3123,8 @@ void setupWebServer() {
 
         Serial.println("[DEBUG] Generating API /api/status response");
 
-        JsonObject lightsObj = doc.createNestedObject("lights");
+        //JsonObject lightsObj = doc.createNestedObject("lights");
+        JsonObject lights = doc.createNestedObject("lights");
         
         // Pobierz konfigurację i zapisz jako zmienne lokalne dla debugowania
         uint8_t dayConfig = lightManager.getDayConfig();
