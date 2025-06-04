@@ -1,4 +1,4 @@
-F<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pl">
 	<head>
 		<meta charset="UTF-8">
@@ -13,7 +13,7 @@ F<!DOCTYPE html>
 				<h1>e-Bike System PMW</h1>
 			</header>
 
-			<main>
+			<main>f
 			
 				<section class="dashboard">          
 
@@ -56,7 +56,7 @@ F<!DOCTYPE html>
 						</div>
 						<div class="card-content">                   
 							<form id="lights-form">
-
+							
 								<!-- Światła dzienne -->
 								<div class="light-section">
 									<h4>Światła dzienne</h4>
@@ -65,19 +65,15 @@ F<!DOCTYPE html>
 											Wybór świateł
 											<button type="button" class="info-icon" data-info="day-lights-info">ℹ</button>
 										</label>
-										<div class="checkbox-group">
-											<div class="checkbox-item">
-												<input type="checkbox" id="day-front" name="day-front">
-												<label for="day-front">Przód zwykłe</label>
-											</div>
-											<div class="checkbox-item">
-												<input type="checkbox" id="day-drl" name="day-drl">
-												<label for="day-drl">Przód DRL</label>
-											</div>
-											<div class="checkbox-item">
-												<input type="checkbox" id="day-rear" name="day-rear">
-												<label for="day-rear">Tył</label>
-											</div>
+										<div class="select-wrapper">
+											<select id="day-lights" name="day-lights">
+												<option value="NONE">Wyłączone</option>
+												<option value="DRL">DRL</option>
+												<option value="FRONT">Przód</option>
+												<option value="REAR">Tył</option>
+												<option value="DRL+REAR">DRL+Tył</option>
+												<option value="FRONT+REAR">Przód+Tył</option>
+											</select>
 										</div>
 									</div>
 
@@ -99,19 +95,15 @@ F<!DOCTYPE html>
 											Wybór świateł
 											<button type="button" class="info-icon" data-info="night-lights-info">ℹ</button>
 										</label>
-										<div class="checkbox-group">
-											<div class="checkbox-item">
-												<input type="checkbox" id="night-front" name="night-front">
-												<label for="night-front">Przód zwykłe</label>
-											</div>
-											<div class="checkbox-item">
-												<input type="checkbox" id="night-drl" name="night-drl">
-												<label for="night-drl">Przód DRL</label>
-											</div>
-											<div class="checkbox-item">
-												<input type="checkbox" id="night-rear" name="night-rear">
-												<label for="night-rear">Tył</label>
-											</div>
+										<div class="select-wrapper">
+											<select id="night-lights" name="night-lights">
+												<option value="NONE">Wyłączone</option>
+												<option value="DRL">DRL</option>
+												<option value="FRONT">Przód</option>
+												<option value="REAR">Tył</option>
+												<option value="DRL+REAR">DRL+Tył</option>
+												<option value="FRONT+REAR">Przód+Tył</option>
+											</select>
 										</div>
 									</div>
 
@@ -139,7 +131,7 @@ F<!DOCTYPE html>
 								</div>
 
 								<button type="button" class="save-lights-btn" id="save-light-config">Zapisz</button>
-
+									
 							</form>
 						</div>
 					</div>	
