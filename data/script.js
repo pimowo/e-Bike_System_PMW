@@ -149,13 +149,13 @@ async function loadLightConfig() {
     
     try {
         // Najpierw ustaw domyślne wartości
-        const defaultValues = {
-            dayLights: 'DRL+REAR',
-            nightLights: 'FRONT+REAR',
-            dayBlink: true,
-            nightBlink: false,
-            blinkFrequency: 500
-        };
+		const defaultValues = {
+			dayLights: 'DRL+REAR',
+			nightLights: 'FRONT+REAR',
+			dayBlink: true,
+			nightBlink: false,
+			blinkFrequency: 500
+		};
 
         document.getElementById('day-lights').value = defaultValues.dayLights;
         document.getElementById('night-lights').value = defaultValues.nightLights;
