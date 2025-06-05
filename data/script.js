@@ -128,21 +128,18 @@ async function saveLightConfig() {
         const result = await response.json();
         console.log('Wynik zapisu:', result);
         
-		if (result.status === 'ok') {
-			alert('Zapisano ustawienia świateł');
-			
-			// Jeśli przyszły zaktualizowane dane świateł, zaktualizuj formularz
-			if (result.lights) {
-				document.getElementById('day-lights').value = result.lights.dayLights;
-				document.getElementById('night-lights').value = result.lights.nightLights;
-				document.getElementById('day-blink').checked = result.lights.dayBlink;
-				document.getElementById('night-blink').checked = result.lights.nightBlink;
-				document.getElementById('blink-frequency').value = result.lights.blinkFrequency;
-			} else {
-				// Jeśli nie ma danych w odpowiedzi, pobierz aktualne ustawienia
-				await loadLightConfig();
-			}
-		} else {
+        if (result.status === 'ok') {
+            alert('Zapisano ustawienia świateł');
+            
+            // Jeśli przyszły zaktualizowane dane świateł, zaktualizuj formularz
+            if (result.lights) {
+                document.getElementById('day-lights').value = result.lights.dayLights;
+                document.getElementById('night-lights').value = result.lights.nightLights;
+                document.getElementById('day-blink').checked = result.lights.dayBlink;
+                document.getElementById('night-blink').checked = result.lights.nightBlink;
+                document.getElementById('blink-frequency').value = result.lights.blinkFrequency;
+            }
+        } else {
             throw new Error(result.message || 'Nieznany błąd');
         }
     } catch (error) {
