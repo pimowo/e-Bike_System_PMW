@@ -93,6 +93,9 @@ async function saveLightConfig() {
         const nightBlink = document.getElementById('night-blink').checked;
         const blinkFrequency = parseInt(document.getElementById('blink-frequency').value);
         
+        console.log(`Zapisuję konfigurację świateł - Dzienne: ${dayLights}, Nocne: ${nightLights}`); 
+        console.log(`Mruganie dzienne: ${dayBlink}, nocne: ${nightBlink}, częstotliwość: ${blinkFrequency}`);
+        
         const lightConfig = {
             dayLights: dayLights,
             nightLights: nightLights,
@@ -102,8 +105,10 @@ async function saveLightConfig() {
         };
 
         debug('Przygotowane dane:', lightConfig);
-        
-        // Zmień sposób wysyłania - używaj bezpośrednio JSON
+
+        console.log('Wysyłam żądanie do /api/lights/config z danymi:', JSON.stringify(lightConfig));
+
+        // ZMIANA: Wysyłamy jako JSON bezpośrednio, bez form-urlencoded
         const response = await fetch('/api/lights/config', {
             method: 'POST',
             headers: {
