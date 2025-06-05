@@ -3137,58 +3137,83 @@ void setupWebServer() {
 
     // Endpoint do obsługi konfiguracji świateł
     server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
-        // Ten handler jest pominięty, logika jest w drugim handlerze
+        // Ten handler zostanie wywołany po zakończeniu przetwarzania danych
+        // Odpowiedź zostanie wysłana przez drugi handler
     }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
         if (index + len != total) {
             return; // Czekamy na wszystkie dane
         }
+        
+        #ifdef DEBUG
+        Serial.println("[LightsConfig] Processing request");
+        #endif
 
-        // Pobieramy parametr 'data' z formularza
+        // Sprawdź czy mamy parametr 'data'
         String jsonString;
         if (request->hasParam("data", true)) {
             jsonString = request->getParam("data", true)->value();
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] Data param received: %s\n", jsonString.c_str());
+            #endif
         } else {
-            // Alternatywnie, jeśli dane przesłane bez parametru data
+            #ifdef DEBUG
+            Serial.println("[LightsConfig] No data parameter found");
+            #endif
             data[len] = '\0'; // dodaj null terminator
-            jsonString = String((char*)data); 
+            jsonString = String((char*)data);
         }
-
-        #ifdef DEBUG
-        Serial.println("Otrzymane dane świateł: " + jsonString);
-        #endif
-
-        // Parsuj JSON
+        
+        // Parsowanie JSON
         StaticJsonDocument<512> doc;
         DeserializationError error = deserializeJson(doc, jsonString);
-
+        
         if (error) {
             #ifdef DEBUG
-            Serial.printf("Błąd parsowania JSON: %s\n", error.c_str());
+            Serial.printf("[LightsConfig] JSON parsing error: %s\n", error.c_str());
             #endif
-            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Nieprawidłowy format JSON\"}");
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON format\"}");
             return;
         }
-
-        // Ustaw konfigurację świateł
+        
+        // Przetwarzanie danych
+        bool success = false;
+        
         if (doc.containsKey("dayLights")) {
-            uint8_t dayConfig = LightManager::parseConfigString(doc["dayLights"]);
-            lightManager.setDayConfig(dayConfig, doc["dayBlink"] | true);
+            uint8_t dayConfig = lightManager.parseConfigString(doc["dayLights"]);
+            bool dayBlink = doc["dayBlink"] | false;
+            lightManager.setDayConfig(dayConfig, dayBlink);
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] Set day config: %s, blink: %d\n", 
+                        doc["dayLights"].as<String>().c_str(), dayBlink);
+            #endif
         }
         
         if (doc.containsKey("nightLights")) {
-            uint8_t nightConfig = LightManager::parseConfigString(doc["nightLights"]);
-            lightManager.setNightConfig(nightConfig, doc["nightBlink"] | false);
+            uint8_t nightConfig = lightManager.parseConfigString(doc["nightLights"]);
+            bool nightBlink = doc["nightBlink"] | false;
+            lightManager.setNightConfig(nightConfig, nightBlink);
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] Set night config: %s, blink: %d\n", 
+                        doc["nightLights"].as<String>().c_str(), nightBlink);
+            #endif
         }
         
         if (doc.containsKey("blinkFrequency")) {
             lightManager.setBlinkFrequency(doc["blinkFrequency"] | 500);
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] Set blink frequency: %d\n", 
+                        (int)doc["blinkFrequency"]);
+            #endif
         }
         
         // Zapisz konfigurację
-        bool success = lightManager.saveConfig();
+        success = lightManager.saveConfig();
+        #ifdef DEBUG
+        Serial.printf("[LightsConfig] Config save %s\n", success ? "succeeded" : "failed");
+        #endif
         
         // Przygotuj odpowiedź
-        DynamicJsonDocument responseDoc(512);
+        StaticJsonDocument<512> responseDoc;
         
         if (success) {
             responseDoc["status"] = "ok";
@@ -3202,11 +3227,15 @@ void setupWebServer() {
             lights["blinkFrequency"] = lightManager.getBlinkFrequency();
         } else {
             responseDoc["status"] = "error";
-            responseDoc["message"] = "Nie udało się zapisać konfiguracji";
+            responseDoc["message"] = "Failed to save light configuration";
         }
-
+        
         String responseStr;
         serializeJson(responseDoc, responseStr);
+        #ifdef DEBUG
+        Serial.printf("[LightsConfig] Sending response: %s\n", responseStr.c_str());
+        #endif
+        
         request->send(200, "application/json", responseStr);
     });
 
