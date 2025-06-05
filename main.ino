@@ -75,7 +75,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "4.6.25";
+const char* VERSION = "5.6.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -3119,23 +3119,11 @@ void setupWebServer() {
 
     // Światła
     server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* request) {
-        StaticJsonDocument<512> doc;
-
-        Serial.println("[DEBUG] Generating API /api/status response");
-
-        //JsonObject lightsObj = doc.createNestedObject("lights");
-        JsonObject lights = doc.createNestedObject("lights");
+        DynamicJsonDocument doc(1024);
+        JsonObject root = doc.to<JsonObject>();
         
-        // Pobierz konfigurację i zapisz jako zmienne lokalne dla debugowania
-        uint8_t dayConfig = lightManager.getDayConfig();
-        uint8_t nightConfig = lightManager.getNightConfig();
-        String dayConfigStr = lightManager.getConfigString(dayConfig);
-        String nightConfigStr = lightManager.getConfigString(nightConfig);
-        
-        // Dodaj debugowanie
-        Serial.printf("[DEBUG] dayConfig: %d, nightConfig: %d\n", dayConfig, nightConfig);
-        Serial.printf("[DEBUG] dayConfigStr: %s, nightConfigStr: %s\n", dayConfigStr.c_str(), nightConfigStr.c_str());
-    
+        // Dodaj obiekt lights z konfiguracją
+        JsonObject lights = root.createNestedObject("lights");
         lights["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
         lights["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
         lights["dayBlink"] = lightManager.getDayBlink();
@@ -3151,6 +3139,26 @@ void setupWebServer() {
     server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         Serial.println("[WebServer] Received POST request to /api/lights/config");
         
+        bool success = lightManager.saveConfig();
+        JsonObject response = doc.to<JsonObject>();
+
+        if (success) {
+            // Pobierz aktualną konfigurację i dołącz ją do odpowiedzi
+            response["status"] = "ok";
+            response["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
+            response["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
+            response["dayBlink"] = lightManager.getDayBlink();
+            response["nightBlink"] = lightManager.getNightBlink();
+            response["blinkFrequency"] = lightManager.getBlinkFrequency();
+        } else {
+            response["status"] = "error";
+            response["message"] = "Nie udało się zapisać konfiguracji";
+        }
+
+        String responseStr;
+        serializeJson(doc, responseStr);
+        request->send(200, "application/json", responseStr);
+
         // Sprawdź, czy jest parametr "data"
         if (request->hasParam("data", true)) {
             String jsonData = request->getParam("data", true)->value();
@@ -3763,7 +3771,11 @@ void setup() {
     pinMode(RearPin, OUTPUT);
     
     // Inicjalizacja menedżera świateł
-    lightManager.begin(FrontPin, FrontDayPin, RearPin);
+    //lightManager.begin(FrontPin, FrontDayPin, RearPin);
+    lightManager.begin(FRONT_PIN, DRL_PIN, REAR_PIN);
+
+    // Ustawienie trybu OFF (wyłącz światła po włączeniu ESP)
+    lightManager.setMode(LightManager::OFF)
 
     // hamulec
     pinMode(BRAKE_SENSOR_PIN, INPUT_PULLUP);
