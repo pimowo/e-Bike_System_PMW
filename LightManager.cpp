@@ -58,10 +58,10 @@ LightManager::LightManager(uint8_t frontPin, uint8_t drlPin, uint8_t rearPin) :
     if (!loadConfig()) {
         // Domyślna konfiguracja jeśli nie udało się wczytać
         dayConfig = DRL | REAR;
-		nightConfig = FRONT | REAR;
-		dayBlink = true;
-		nightBlink = false;
-		blinkFrequency = 500;
+        nightConfig = FRONT | REAR;
+        dayBlink = true;
+        nightBlink = false;
+        blinkFrequency = 500;
         saveConfig();  // Zapisz domyślną konfigurację
     }
     
@@ -92,10 +92,10 @@ void LightManager::begin(uint8_t frontPin, uint8_t drlPin, uint8_t rearPin) {
     if (!loadConfig()) {
         // Domyślna konfiguracja jeśli nie udało się wczytać
         dayConfig = DRL | REAR;
-		nightConfig = FRONT | REAR;
-		dayBlink = true;
-		nightBlink = false;
-		blinkFrequency = 500;
+        nightConfig = FRONT | REAR;
+        dayBlink = true;
+        nightBlink = false;
+        blinkFrequency = 500;
         saveConfig();  // Zapisz domyślną konfigurację
     }
     
@@ -372,10 +372,10 @@ bool LightManager::loadConfig() {
     
     // Wczytaj konfigurację
     dayConfig = doc["dayConfig"] | (DRL | REAR);
-	nightConfig = doc["nightConfig"] | (FRONT | REAR);
-	dayBlink = doc["dayBlink"] | true;
-	nightBlink = doc["nightBlink"] | false;
-	blinkFrequency = doc["blinkFrequency"] | 500;
+    nightConfig = doc["nightConfig"] | (FRONT | REAR);
+    dayBlink = doc["dayBlink"] | true;
+    nightBlink = doc["nightBlink"] | false;
+    blinkFrequency = doc["blinkFrequency"] | 500;
     
     #ifdef DEBUG
     Serial.println("[LightManager] Config loaded successfully");
