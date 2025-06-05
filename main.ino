@@ -3137,12 +3137,57 @@ void setupWebServer() {
 
     // Endpoint do obsługi konfiguracji świateł
     server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
-        // pobranie danych...
+        // Ten handler jest pominięty, logika jest w drugim handlerze
+    }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        if (index + len != total) {
+            return; // Czekamy na wszystkie dane
+        }
+
+        // Pobieramy parametr 'data' z formularza
+        String jsonString;
+        if (request->hasParam("data", true)) {
+            jsonString = request->getParam("data", true)->value();
+        } else {
+            // Alternatywnie, jeśli dane przesłane bez parametru data
+            data[len] = '\0'; // dodaj null terminator
+            jsonString = String((char*)data); 
+        }
+
+        #ifdef DEBUG
+        Serial.println("Otrzymane dane świateł: " + jsonString);
+        #endif
+
+        // Parsuj JSON
+        StaticJsonDocument<512> doc;
+        DeserializationError error = deserializeJson(doc, jsonString);
+
+        if (error) {
+            #ifdef DEBUG
+            Serial.printf("Błąd parsowania JSON: %s\n", error.c_str());
+            #endif
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Nieprawidłowy format JSON\"}");
+            return;
+        }
+
+        // Ustaw konfigurację świateł
+        if (doc.containsKey("dayLights")) {
+            uint8_t dayConfig = LightManager::parseConfigString(doc["dayLights"]);
+            lightManager.setDayConfig(dayConfig, doc["dayBlink"] | true);
+        }
         
-        // Po zapisaniu konfiguracji, przed wysłaniem odpowiedzi:
+        if (doc.containsKey("nightLights")) {
+            uint8_t nightConfig = LightManager::parseConfigString(doc["nightLights"]);
+            lightManager.setNightConfig(nightConfig, doc["nightBlink"] | false);
+        }
+        
+        if (doc.containsKey("blinkFrequency")) {
+            lightManager.setBlinkFrequency(doc["blinkFrequency"] | 500);
+        }
+        
+        // Zapisz konfigurację
         bool success = lightManager.saveConfig();
         
-        // Utwórz nowy dokument JSON do odpowiedzi
+        // Przygotuj odpowiedź
         DynamicJsonDocument responseDoc(512);
         
         if (success) {
