@@ -37,12 +37,12 @@ public:
     void cycleMode(); // Przełącza między trybami OFF -> DAY -> NIGHT -> OFF
     
     // Gettery
-    LightMode getMode() const { return currentMode; }
     uint8_t getDayConfig() const { return dayConfig; }
     uint8_t getNightConfig() const { return nightConfig; }
     bool getDayBlink() const { return dayBlink; }
     bool getNightBlink() const { return nightBlink; }
     uint16_t getBlinkFrequency() const { return blinkFrequency; }
+    LightMode getMode() const { return currentMode; }
     
     // Settery
     void setDayConfig(uint8_t config, bool blink);
