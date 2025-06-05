@@ -3727,7 +3727,7 @@ void setup() {
     pinMode(RearPin, OUTPUT);
     
     // Inicjalizacja menedżera świateł
-    lightManager.begin(frontLightPin, drlPin, rearLightPin);
+    lightManager.begin(FrontPin, FrontDayPin, RearPin);
 
     // Ustawienie trybu OFF (wyłącz światła po włączeniu ESP)
     lightManager.setMode(LightManager::OFF);
