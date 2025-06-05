@@ -452,11 +452,54 @@ uint8_t LightManager::parseConfigString(const char* configStr) {
     String config(configStr);
     uint8_t result = NONE;
     
+    #ifdef DEBUG
+    Serial.printf("[LightManager] Parsing config string: '%s'\n", configStr);
+    #endif
+    
     if (config == "NONE") return NONE;
     
-    if (config.indexOf("FRONT") >= 0) result |= FRONT;
-    if (config.indexOf("DRL") >= 0) result |= DRL;
-    if (config.indexOf("REAR") >= 0) result |= REAR;
+    // Sprawdź czy config zawiera kombinację światełef (z '+')
+    if (config.indexOf('+') > 0) {
+        // Rozdzielamy wartości według znaku '+'
+        int start = 0;
+        int end = config.indexOf('+');
+        while (end >= 0) {
+            String part = config.substring(start, end);
+            part.trim(); // Usuń spacje
+            
+            #ifdef DEBUG
+            Serial.printf("[LightManager] Processing part: '%s'\n", part.c_str());
+            #endif
+            
+            if (part == "FRONT") result |= FRONT;
+            else if (part == "DRL") result |= DRL;
+            else if (part == "REAR") result |= REAR;
+            
+            start = end + 1;
+            end = config.indexOf('+', start);
+        }
+        
+        // Przetworz ostatnią część
+        String lastPart = config.substring(start);
+        lastPart.trim();
+        
+        #ifdef DEBUG
+        Serial.printf("[LightManager] Processing last part: '%s'\n", lastPart.c_str());
+        #endif
+        
+        if (lastPart == "FRONT") result |= FRONT;
+        else if (lastPart == "DRL") result |= DRL;
+        else if (lastPart == "REAR") result |= REAR;
+    } else {
+        // Pojedyncza wartość (bez '+')
+        if (config.indexOf("FRONT") >= 0) result |= FRONT;
+        if (config.indexOf("DRL") >= 0) result |= DRL;
+        if (config.indexOf("REAR") >= 0) result |= REAR;
+    }
+    
+    #ifdef DEBUG
+    Serial.printf("[LightManager] Parsed result: 0x%02X\n", result);
+    #endif
     
     return result;
 }
