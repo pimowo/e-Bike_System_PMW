@@ -292,21 +292,45 @@ bool LightManager::saveConfig() {
     Serial.println("[LightManager] Saving config...");
     #endif
     
+    // Sprawdź czy system plików jest dostępny
     if (!LittleFS.begin(false)) {
         #ifdef DEBUG
-        Serial.println("[LightManager] Error mounting LittleFS");
+        Serial.println("[LightManager] Error mounting LittleFS - trying to format");
         #endif
-        return false;
+        
+        // Spróbuj sformatować system plików, jeśli jest problem
+        if (!LittleFS.format()) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Failed to format filesystem");
+            #endif
+            return false;
+        }
+        
+        // Spróbuj ponownie zamontować po formatowaniu
+        if (!LittleFS.begin(false)) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Still cannot mount filesystem after format");
+            #endif
+            return false;
+        }
+        
+        #ifdef DEBUG
+        Serial.println("[LightManager] Filesystem formatted and mounted successfully");
+        #endif
     }
     
+    // Otwórz plik w trybie zapisu z utworzeniem
     File configFile = LittleFS.open("/lights.json", "w");
     if (!configFile) {
         #ifdef DEBUG
         Serial.println("[LightManager] Failed to open config file for writing");
+        // Sprawdź dodatkowe informacje o błędzie
+        Serial.printf("[LightManager] Free space: %d bytes\n", LittleFS.totalBytes() - LittleFS.usedBytes());
         #endif
         return false;
     }
     
+    // Utwórz dokument JSON
     StaticJsonDocument<256> doc;
     doc["dayConfig"] = dayConfig;
     doc["nightConfig"] = nightConfig;
@@ -314,18 +338,21 @@ bool LightManager::saveConfig() {
     doc["nightBlink"] = nightBlink;
     doc["blinkFrequency"] = blinkFrequency;
     
-    if (serializeJson(doc, configFile) == 0) {
+    // Serializuj do pliku
+    size_t bytesWritten = serializeJson(doc, configFile);
+    configFile.close();
+    
+    if (bytesWritten == 0) {
         #ifdef DEBUG
         Serial.println("[LightManager] Failed to write config to file");
         #endif
-        configFile.close();
         return false;
     }
     
-    configFile.close();
-    
     #ifdef DEBUG
     Serial.println("[LightManager] Config saved successfully");
+    Serial.printf("[LightManager] Day config: %s, blink: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
+    Serial.printf("[LightManager] Night config: %s, blink: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
     #endif
     
     return true;
