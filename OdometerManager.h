@@ -1,137 +1,74 @@
 class OdometerManager {
 private:
-    const char* filename = "/odometer.json";
-    float currentTotal = 0;
-    bool fileSystemMounted = false;
-
-    bool ensureFilesystem() {
-        if (fileSystemMounted) return true;
-        
-        if (!LittleFS.begin(false)) {
-            #ifdef DEBUG
-            Serial.println("[OdometerManager] Błąd montowania LittleFS");
-            #endif
-            return false;
-        }
-        
-        fileSystemMounted = true;
-        return true;
-    }
-
-    void saveToFile() {
-        #ifdef DEBUG
-        Serial.println("[OdometerManager] Zapisywanie licznika do pliku...");
-        #endif
-
-        // Upewnij się, że system plików jest zamontowany
-        if (!ensureFilesystem()) {
-            #ifdef DEBUG
-            Serial.println("[OdometerManager] System plików niedostępny - nie można zapisać licznika");
-            #endif
-            return;
-        }
-
-        // Sprawdź czy plik licznika jest dostępny
-        if (LittleFS.exists(filename)) {
-            // Usuń istniejący plik, aby uniknąć problemów z zapisem
-            if (!LittleFS.remove(filename)) {
-                #ifdef DEBUG
-                Serial.println("[OdometerManager] Nie można usunąć istniejącego pliku licznika");
-                #endif
-                // Kontynuujemy mimo to
-            }
-        }
-
-        // Spróbuj otworzyć plik do zapisu
-        File file = LittleFS.open(filename, "w");
-        if (!file) {
-            #ifdef DEBUG
-            Serial.println("[OdometerManager] Błąd otwarcia pliku licznika do zapisu");
-            
-            // Sprawdź dostępność systemu plików
-            if (!LittleFS.exists("/")) {
-                Serial.println("[OdometerManager] Katalog główny nie istnieje - poważny problem z systemem plików");
-            }
-            
-            Serial.printf("[OdometerManager] Wolne miejsce: %d bajtów\n", 
-                       LittleFS.totalBytes() - LittleFS.usedBytes());
-            #endif
-            return;
-        }
-
-        // Przygotuj dane w formacie JSON i zapisz
-        StaticJsonDocument<128> doc;
-        doc["total"] = currentTotal;
-        
-        if (serializeJson(doc, file) == 0) {
-            #ifdef DEBUG
-            Serial.println("[OdometerManager] Błąd serializacji JSON do pliku licznika");
-            #endif
-        } else {
-            #ifdef DEBUG
-            Serial.printf("[OdometerManager] Zapisano licznik: %.2f\n", currentTotal);
-            #endif
-        }
-        
-        file.close();
-    }
-
-    void loadFromFile() {
-        #ifdef DEBUG
-        Serial.println("[OdometerManager] Wczytywanie licznika z pliku...");
-        #endif
-
-        // Upewnij się, że system plików jest zamontowany
-        if (!ensureFilesystem()) {
-            #ifdef DEBUG
-            Serial.println("[OdometerManager] System plików niedostępny - używam domyślnej wartości 0");
-            #endif
-            currentTotal = 0;
-            saveToFile();  // Spróbuj zapisać domyślną wartość
-            return;
-        }
-
-        // Sprawdź czy plik istnieje
-        if (!LittleFS.exists(filename)) {
-            #ifdef DEBUG
-            Serial.println("[OdometerManager] Brak pliku licznika - tworzę nowy z wartością 0");
-            #endif
-            currentTotal = 0;
-            saveToFile();
-            return;
-        }
-
-        // Otwórz plik do odczytu
-        File file = LittleFS.open(filename, "r");
-        if (!file) {
-            #ifdef DEBUG
-            Serial.println("[OdometerManager] Błąd otwarcia pliku licznika do odczytu");
-            #endif
-            currentTotal = 0;
-            return;
-        }
-
-        // Wczytaj i sparsuj JSON
-        StaticJsonDocument<128> doc;
-        DeserializationError error = deserializeJson(doc, file);
-        file.close();
-        
-        if (!error) {
-            currentTotal = doc["total"] | 0.0f;
-            #ifdef DEBUG
-            Serial.printf("[OdometerManager] Wczytano licznik: %.2f\n", currentTotal);
-            #endif
-        } else {
-            #ifdef DEBUG
-            Serial.printf("[OdometerManager] Błąd odczytu pliku licznika: %s\n", error.c_str());
-            #endif
-            currentTotal = 0;
-        }
-    }
+    Preferences preferences;
+    const char* NAMESPACE = "odometer";
+    const char* TOTAL_KEY = "total";
+    float currentTotal = 0.0f;
+    bool initialized = false;
 
 public:
     OdometerManager() {
-        loadFromFile();
+        loadFromPreferences();
+    }
+
+    ~OdometerManager() {
+        // Upewnij się, że Preferences są zamknięte
+        if (preferences.isOpen()) {
+            preferences.end();
+        }
+    }
+
+    void loadFromPreferences() {
+        #ifdef DEBUG
+        Serial.println("[OdometerManager] Wczytywanie licznika z preferencji...");
+        #endif
+
+        if (!preferences.begin(NAMESPACE, false)) {
+            #ifdef DEBUG
+            Serial.println("[OdometerManager] Nie można otworzyć przestrzeni nazw Preferences");
+            #endif
+            currentTotal = 0.0f;
+            initialized = false;
+            return;
+        }
+
+        currentTotal = preferences.getFloat(TOTAL_KEY, 0.0f);
+        initialized = true;
+        preferences.end();
+
+        #ifdef DEBUG
+        Serial.printf("[OdometerManager] Wczytano licznik: %.2f\n", currentTotal);
+        #endif
+    }
+
+    bool saveToPreferences() {
+        #ifdef DEBUG
+        Serial.println("[OdometerManager] Zapisywanie licznika do preferencji...");
+        #endif
+
+        if (!preferences.begin(NAMESPACE, false)) {
+            #ifdef DEBUG
+            Serial.println("[OdometerManager] Nie można otworzyć przestrzeni nazw Preferences");
+            #endif
+            return false;
+        }
+
+        preferences.putFloat(TOTAL_KEY, currentTotal);
+        bool success = preferences.isKey(TOTAL_KEY); // Sprawdź czy zapis się powiódł
+        preferences.end();
+
+        if (success) {
+            #ifdef DEBUG
+            Serial.printf("[OdometerManager] Zapisano licznik: %.2f\n", currentTotal);
+            #endif
+            initialized = true;
+        } else {
+            #ifdef DEBUG
+            Serial.println("[OdometerManager] Błąd zapisu licznika");
+            #endif
+        }
+
+        return success;
     }
 
     float getRawTotal() const {
@@ -139,20 +76,19 @@ public:
     }
 
     bool setInitialValue(float value) {
-        if (value < 0) {
+        if (value < 0.0f) {
             #ifdef DEBUG
-            Serial.println("[OdometerManager] Błędna wartość początkowa (ujemna)");
+            Serial.println("[OdometerManager] Błąd: ujemna wartość licznika");
             #endif
             return false;
         }
-        
+
         #ifdef DEBUG
         Serial.printf("[OdometerManager] Ustawianie początkowej wartości licznika: %.2f\n", value);
         #endif
 
         currentTotal = value;
-        saveToFile();
-        return true;
+        return saveToPreferences();
     }
 
     void updateTotal(float newValue) {
@@ -160,13 +96,43 @@ public:
             #ifdef DEBUG
             Serial.printf("[OdometerManager] Aktualizacja licznika z %.2f na %.2f\n", currentTotal, newValue);
             #endif
-
+            
             currentTotal = newValue;
-            saveToFile();
+            saveToPreferences();
         }
     }
 
     bool isValid() const {
-        return true; // Zawsze zwraca true, bo nie ma już inicjalizacji Preferences
+        return initialized;
+    }
+
+    // Metoda do ręcznej inicjalizacji (jeśli konstruktor nie zadziała)
+    bool initialize() {
+        loadFromPreferences();
+        return initialized;
+    }
+
+    // Metoda do resetowania licznika
+    bool resetOdometer() {
+        currentTotal = 0.0f;
+        return saveToPreferences();
+    }
+
+    // Metoda do debugowania stanu Preferences
+    void debugPreferences() {
+        #ifdef DEBUG
+        Serial.println("\n--- Diagnostyka OdometerManager ---");
+        
+        if (!preferences.begin(NAMESPACE, true)) { // Tryb tylko do odczytu
+            Serial.println("Nie można otworzyć przestrzeni nazw Preferences");
+            return;
+        }
+        
+        Serial.printf("Klucze w przestrzeni nazw %s:\n", NAMESPACE);
+        Serial.printf("- Licznik (total): %.2f\n", preferences.getFloat(TOTAL_KEY, -1.0f));
+        
+        preferences.end();
+        Serial.println("-----------------------------\n");
+        #endif
     }
 };
