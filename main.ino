@@ -3138,7 +3138,6 @@ void setupWebServer() {
     // Endpoint do obsługi konfiguracji świateł
     server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         // Ten handler zostanie wywołany po zakończeniu przetwarzania danych
-        // Odpowiedź zostanie wysłana przez drugi handler
     }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
         if (index + len != total) {
             return; // Czekamy na wszystkie dane
@@ -3147,47 +3146,30 @@ void setupWebServer() {
         #ifdef DEBUG
         Serial.println("[LightsConfig] Processing request");
         Serial.printf("[LightsConfig] Content-Type: %s\n", request->contentType().c_str());
-        Serial.printf("[LightsConfig] Data length: %d bytes\n", len);
-        if (len > 0 && len < 200) {
-            data[len] = '\0';
-            Serial.printf("[LightsConfig] Raw data: %s\n", (char*)data);
-        }
+        Serial.printf("[LightsConfig] Data length: %d\n", len);
         #endif
 
-        // Zmienna na dane JSON
+        // Sprawdź czy mamy parametr 'data' lub bezpośrednie dane JSON
         String jsonString;
-        
-        // Sprawdź czy mamy format form-urlencoded czy czysty JSON
         if (request->hasParam("data", true)) {
-            // Format form-urlencoded z parametrem "data"
             jsonString = request->getParam("data", true)->value();
             #ifdef DEBUG
-            Serial.printf("[LightsConfig] Data from form param: %s\n", jsonString.c_str());
+            Serial.printf("[LightsConfig] Data param: %s\n", jsonString.c_str());
             #endif
         } else {
-            // Prawdopodobnie czysty JSON lub inny format
             if (len > 0) {
                 data[len] = '\0'; // Dodaj null terminator
                 jsonString = String((char*)data);
                 #ifdef DEBUG
-                Serial.printf("[LightsConfig] Data from request body: %s\n", jsonString.c_str());
+                Serial.printf("[LightsConfig] Raw data: %s\n", jsonString.c_str());
                 #endif
             } else {
                 #ifdef DEBUG
-                Serial.println("[LightsConfig] Brak danych w żądaniu");
+                Serial.println("[LightsConfig] No data received");
                 #endif
                 request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"No data received\"}");
                 return;
             }
-        }
-        
-        // Próba parsowania JSON - dodaj zabezpieczenie w przypadku pustego ciągu
-        if (jsonString.length() == 0) {
-            #ifdef DEBUG
-            Serial.println("[LightsConfig] Empty JSON string");
-            #endif
-            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Empty data\"}");
-            return;
         }
         
         // Parsowanie JSON
@@ -3196,81 +3178,67 @@ void setupWebServer() {
         
         if (error) {
             #ifdef DEBUG
-            Serial.printf("[LightsConfig] JSON parsing error: %s for data: %s\n", 
-                        error.c_str(), jsonString.c_str());
+            Serial.printf("[LightsConfig] JSON parsing error: %s\n", error.c_str());
             #endif
             request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON format\"}");
             return;
         }
         
-        // Weryfikacja otrzymanych danych
-        #ifdef DEBUG
-        if (doc.containsKey("dayLights")) 
-            Serial.printf("[LightsConfig] dayLights: %s\n", doc["dayLights"].as<String>().c_str());
-        if (doc.containsKey("nightLights")) 
-            Serial.printf("[LightsConfig] nightLights: %s\n", doc["nightLights"].as<String>().c_str());
-        if (doc.containsKey("dayBlink")) 
-            Serial.printf("[LightsConfig] dayBlink: %d\n", doc["dayBlink"].as<bool>());
-        if (doc.containsKey("nightBlink")) 
-            Serial.printf("[LightsConfig] nightBlink: %d\n", doc["nightBlink"].as<bool>());
-        if (doc.containsKey("blinkFrequency")) 
-            Serial.printf("[LightsConfig] blinkFrequency: %d\n", doc["blinkFrequency"].as<int>());
-        #endif
-        
         // Przetwarzanie danych
         bool success = false;
         
-        // Zastosuj domyślne wartości, jeśli nie podano w żądaniu
-        uint8_t dayConfig = lightManager.getDayConfig();
-        uint8_t nightConfig = lightManager.getNightConfig();
-        bool dayBlink = lightManager.getDayBlink();
-        bool nightBlink = lightManager.getNightBlink();
-        uint16_t blinkFrequency = lightManager.getBlinkFrequency();
-        
-        // Aktualizuj tylko te pola, które są w żądaniu
-        if (doc.containsKey("dayLights")) {
-            dayConfig = lightManager.parseConfigString(doc["dayLights"]);
-        }
-        if (doc.containsKey("dayBlink")) {
-            dayBlink = doc["dayBlink"].as<bool>();
-        }
-        if (doc.containsKey("nightLights")) {
-            nightConfig = lightManager.parseConfigString(doc["nightLights"]);
-        }
-        if (doc.containsKey("nightBlink")) {
-            nightBlink = doc["nightBlink"].as<bool>();
-        }
-        if (doc.containsKey("blinkFrequency")) {
-            blinkFrequency = doc["blinkFrequency"].as<int>();
-        }
-        
-        // Zastosuj ustawienia
-        lightManager.setDayConfig(dayConfig, dayBlink);
-        lightManager.setNightConfig(nightConfig, nightBlink);
-        lightManager.setBlinkFrequency(blinkFrequency);
+        // Zapisz poprzednie wartości dla porównania
+        uint8_t oldDayConfig = lightManager.getDayConfig();
+        uint8_t oldNightConfig = lightManager.getNightConfig();
+        bool oldDayBlink = lightManager.getDayBlink();
+        bool oldNightBlink = lightManager.getNightBlink();
+        uint16_t oldBlinkFrequency = lightManager.getBlinkFrequency();
         
         #ifdef DEBUG
-        Serial.printf("[LightsConfig] Current config: day=%s (%d), night=%s (%d), dayBlink=%d, nightBlink=%d, freq=%d\n",
-                    lightManager.getConfigString(dayConfig).c_str(), dayConfig,
-                    lightManager.getConfigString(nightConfig).c_str(), nightConfig,
-                    dayBlink, nightBlink, blinkFrequency);
+        Serial.println("[LightsConfig] Current configuration:");
+        Serial.printf("  dayConfig: %d (%s)\n", oldDayConfig, lightManager.getConfigString(oldDayConfig).c_str());
+        Serial.printf("  nightConfig: %d (%s)\n", oldNightConfig, lightManager.getConfigString(oldNightConfig).c_str());
+        Serial.printf("  dayBlink: %d\n", oldDayBlink);
+        Serial.printf("  nightBlink: %d\n", oldNightBlink);
+        Serial.printf("  blinkFrequency: %d\n", oldBlinkFrequency);
         #endif
+        
+        // Zmień tylko te wartości, które są w żądaniu
+        if (doc.containsKey("dayLights")) {
+            uint8_t dayConfig = lightManager.parseConfigString(doc["dayLights"].as<String>());
+            bool dayBlink = doc["dayBlink"] | oldDayBlink;
+            lightManager.setDayConfig(dayConfig, dayBlink);
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] Set day config: %s, blink: %d\n", 
+                        doc["dayLights"].as<String>().c_str(), dayBlink);
+            #endif
+        }
+        
+        if (doc.containsKey("nightLights")) {
+            uint8_t nightConfig = lightManager.parseConfigString(doc["nightLights"].as<String>());
+            bool nightBlink = doc["nightBlink"] | oldNightBlink;
+            lightManager.setNightConfig(nightConfig, nightBlink);
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] Set night config: %s, blink: %d\n", 
+                        doc["nightLights"].as<String>().c_str(), nightBlink);
+            #endif
+        }
+        
+        if (doc.containsKey("blinkFrequency")) {
+            lightManager.setBlinkFrequency(doc["blinkFrequency"] | oldBlinkFrequency);
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] Set blink frequency: %d\n", 
+                        (int)doc["blinkFrequency"]);
+            #endif
+        }
         
         // Zapisz konfigurację
         success = lightManager.saveConfig();
         #ifdef DEBUG
         Serial.printf("[LightsConfig] Config save %s\n", success ? "succeeded" : "failed");
         
-        // Dodaj dodatkowe informacje diagnostyczne
-        if (!success) {
-            Serial.println("[LightsConfig] Sprawdzanie systemu plików...");
-            if (!LittleFS.begin(false)) {
-                Serial.println("[LightsConfig] Problem z systemem plików LittleFS");
-            } else {
-                Serial.printf("[LightsConfig] LittleFS OK: %d bajtów wolnych z %d\n", 
-                            LittleFS.totalBytes() - LittleFS.usedBytes(), LittleFS.totalBytes());
-            }
-        }
+        // Pokaż zawartość pliku konfiguracyjnego
+        printLightConfigFile();
         #endif
         
         // Przygotuj odpowiedź
