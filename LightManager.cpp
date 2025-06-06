@@ -425,45 +425,42 @@ String LightManager::getModeString() const {
 }
 
 // Konwersja string na config (uint8_t)
-uint8_t LightManager::parseConfigString(const String& configStr) {
+uint8_t LightManager::parseConfigString(const char* configStr) {
+    String configString(configStr); // Konwertujemy const char* na String dla wygody
     uint8_t result = NONE;
     
     #ifdef DEBUG
-    Serial.printf("[LightManager] Parsing config string: '%s'\n", configStr.c_str());
+    Serial.printf("[LightManager] Parsing config string: '%s'\n", configStr);
     #endif
     
-    if (configStr == "NONE") return NONE;
+    if (strcmp(configStr, "NONE") == 0) return NONE;
     
     // Sprawdź czy string zawiera '+'
-    if (configStr.indexOf('+') != -1) {
+    if (strchr(configStr, '+') != NULL) {
         // Podziel string na części
-        int lastIndex = 0;
-        int plusIndex = configStr.indexOf('+');
+        char* copy = strdup(configStr); // Stwórz kopię, bo strtok modyfikuje string
+        char* token = strtok(copy, "+");
         
-        while (plusIndex != -1) {
-            String part = configStr.substring(lastIndex, plusIndex);
-            part.trim();
+        while (token != NULL) {
+            // Usuń białe znaki
+            while (*token == ' ') token++;
+            char* end = token + strlen(token) - 1;
+            while (end > token && *end == ' ') end--;
+            *(end + 1) = '\0';
             
-            if (part == "FRONT") result |= FRONT;
-            else if (part == "DRL") result |= DRL;
-            else if (part == "REAR") result |= REAR;
+            if (strcmp(token, "FRONT") == 0) result |= FRONT;
+            else if (strcmp(token, "DRL") == 0) result |= DRL;
+            else if (strcmp(token, "REAR") == 0) result |= REAR;
             
-            lastIndex = plusIndex + 1;
-            plusIndex = configStr.indexOf('+', lastIndex);
+            token = strtok(NULL, "+");
         }
         
-        // Ostatnia część
-        String lastPart = configStr.substring(lastIndex);
-        lastPart.trim();
-        
-        if (lastPart == "FRONT") result |= FRONT;
-        else if (lastPart == "DRL") result |= DRL;
-        else if (lastPart == "REAR") result |= REAR;
+        free(copy); // Zwolnij pamięć
     } else {
         // Pojedyncza wartość
-        if (configStr == "FRONT") result |= FRONT;
-        else if (configStr == "DRL") result |= DRL;
-        else if (configStr == "REAR") result |= REAR;
+        if (strcmp(configStr, "FRONT") == 0) result |= FRONT;
+        else if (strcmp(configStr, "DRL") == 0) result |= DRL;
+        else if (strcmp(configStr, "REAR") == 0) result |= REAR;
     }
     
     #ifdef DEBUG
