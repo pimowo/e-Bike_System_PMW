@@ -292,45 +292,22 @@ bool LightManager::saveConfig() {
     Serial.println("[LightManager] Saving config...");
     #endif
     
-    // Sprawdź czy system plików jest dostępny
     if (!LittleFS.begin(false)) {
         #ifdef DEBUG
-        Serial.println("[LightManager] Error mounting LittleFS - trying to format");
-        #endif
-        
-        // Spróbuj sformatować system plików, jeśli jest problem
-        if (!LittleFS.format()) {
-            #ifdef DEBUG
-            Serial.println("[LightManager] Failed to format filesystem");
-            #endif
-            return false;
-        }
-        
-        // Spróbuj ponownie zamontować po formatowaniu
-        if (!LittleFS.begin(false)) {
-            #ifdef DEBUG
-            Serial.println("[LightManager] Still cannot mount filesystem after format");
-            #endif
-            return false;
-        }
-        
-        #ifdef DEBUG
-        Serial.println("[LightManager] Filesystem formatted and mounted successfully");
-        #endif
-    }
-    
-    // Otwórz plik w trybie zapisu z utworzeniem
-    File configFile = LittleFS.open("/lights.json", "w");
-    if (!configFile) {
-        #ifdef DEBUG
-        Serial.println("[LightManager] Failed to open config file for writing");
-        // Sprawdź dodatkowe informacje o błędzie
-        Serial.printf("[LightManager] Free space: %d bytes\n", LittleFS.totalBytes() - LittleFS.usedBytes());
+        Serial.println("[LightManager] Error mounting LittleFS");
         #endif
         return false;
     }
     
-    // Utwórz dokument JSON
+    // *** ZMIANA: Używamy stałej z main.ino zamiast hardkodowanej nazwy ***
+    File configFile = LittleFS.open("/light_config.json", "w");
+    if (!configFile) {
+        #ifdef DEBUG
+        Serial.println("[LightManager] Failed to open config file for writing");
+        #endif
+        return false;
+    }
+    
     StaticJsonDocument<256> doc;
     doc["dayConfig"] = dayConfig;
     doc["nightConfig"] = nightConfig;
@@ -338,16 +315,15 @@ bool LightManager::saveConfig() {
     doc["nightBlink"] = nightBlink;
     doc["blinkFrequency"] = blinkFrequency;
     
-    // Serializuj do pliku
-    size_t bytesWritten = serializeJson(doc, configFile);
-    configFile.close();
-    
-    if (bytesWritten == 0) {
+    if (serializeJson(doc, configFile) == 0) {
         #ifdef DEBUG
-        Serial.println("[LightManager] Failed to write config to file");
+        Serial.println("[LightManager] Failed to write to config file");
         #endif
+        configFile.close();
         return false;
     }
+    
+    configFile.close();
     
     #ifdef DEBUG
     Serial.println("[LightManager] Config saved successfully");
@@ -371,14 +347,15 @@ bool LightManager::loadConfig() {
         return false;
     }
     
-    if (!LittleFS.exists("/lights.json")) {
+    // *** ZMIANA: Używamy stałej z main.ino zamiast hardkodowanej nazwy ***
+    if (!LittleFS.exists("/light_config.json")) {
         #ifdef DEBUG
         Serial.println("[LightManager] Config file not found");
         #endif
         return false;
     }
     
-    File configFile = LittleFS.open("/lights.json", "r");
+    File configFile = LittleFS.open("/light_config.json", "r");
     if (!configFile) {
         #ifdef DEBUG
         Serial.println("[LightManager] Failed to open config file for reading");
@@ -398,8 +375,8 @@ bool LightManager::loadConfig() {
     }
     
     // Wczytaj konfigurację
-    dayConfig = doc["dayConfig"] | (DRL | REAR);
-    nightConfig = doc["nightConfig"] | (FRONT | REAR);
+    dayConfig = doc["dayConfig"] | DRL | REAR;
+    nightConfig = doc["nightConfig"] | FRONT | REAR;
     dayBlink = doc["dayBlink"] | true;
     nightBlink = doc["nightBlink"] | false;
     blinkFrequency = doc["blinkFrequency"] | 500;
@@ -448,57 +425,49 @@ String LightManager::getModeString() const {
 }
 
 // Konwersja string na config (uint8_t)
-uint8_t LightManager::parseConfigString(const char* configStr) {
-    String config(configStr);
+uint8_t LightManager::parseConfigString(const String& configStr) {
     uint8_t result = NONE;
     
     #ifdef DEBUG
-    Serial.printf("[LightManager] Parsing config string: '%s'\n", configStr);
+    Serial.printf("[LightManager] Parsing config string: '%s'\n", configStr.c_str());
     #endif
     
-    if (config == "NONE") return NONE;
+    if (configStr == "NONE") return NONE;
     
-    // Sprawdź czy config zawiera kombinację światełef (z '+')
-    if (config.indexOf('+') > 0) {
-        // Rozdzielamy wartości według znaku '+'
-        int start = 0;
-        int end = config.indexOf('+');
-        while (end >= 0) {
-            String part = config.substring(start, end);
-            part.trim(); // Usuń spacje
-            
-            #ifdef DEBUG
-            Serial.printf("[LightManager] Processing part: '%s'\n", part.c_str());
-            #endif
+    // Sprawdź czy string zawiera '+'
+    if (configStr.indexOf('+') != -1) {
+        // Podziel string na części
+        int lastIndex = 0;
+        int plusIndex = configStr.indexOf('+');
+        
+        while (plusIndex != -1) {
+            String part = configStr.substring(lastIndex, plusIndex);
+            part.trim();
             
             if (part == "FRONT") result |= FRONT;
             else if (part == "DRL") result |= DRL;
             else if (part == "REAR") result |= REAR;
             
-            start = end + 1;
-            end = config.indexOf('+', start);
+            lastIndex = plusIndex + 1;
+            plusIndex = configStr.indexOf('+', lastIndex);
         }
         
-        // Przetworz ostatnią część
-        String lastPart = config.substring(start);
+        // Ostatnia część
+        String lastPart = configStr.substring(lastIndex);
         lastPart.trim();
-        
-        #ifdef DEBUG
-        Serial.printf("[LightManager] Processing last part: '%s'\n", lastPart.c_str());
-        #endif
         
         if (lastPart == "FRONT") result |= FRONT;
         else if (lastPart == "DRL") result |= DRL;
         else if (lastPart == "REAR") result |= REAR;
     } else {
-        // Pojedyncza wartość (bez '+')
-        if (config.indexOf("FRONT") >= 0) result |= FRONT;
-        if (config.indexOf("DRL") >= 0) result |= DRL;
-        if (config.indexOf("REAR") >= 0) result |= REAR;
+        // Pojedyncza wartość
+        if (configStr == "FRONT") result |= FRONT;
+        else if (configStr == "DRL") result |= DRL;
+        else if (configStr == "REAR") result |= REAR;
     }
     
     #ifdef DEBUG
-    Serial.printf("[LightManager] Parsed result: 0x%02X\n", result);
+    Serial.printf("[LightManager] Parsed config value: 0x%02X\n", result);
     #endif
     
     return result;
