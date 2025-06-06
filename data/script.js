@@ -84,17 +84,17 @@ async function saveOdometerValue() {
 
 // Funkcja zapisywania konfiguracji z debounce
 async function saveLightConfig() {
-    debug('Rozpoczynam zapisywanie konfiguracji świateł');
+    console.log('Rozpoczynam zapisywanie konfiguracji świateł...');
     
     try {
         const dayLights = document.getElementById('day-lights').value;
         const nightLights = document.getElementById('night-lights').value;
         const dayBlink = document.getElementById('day-blink').checked;
         const nightBlink = document.getElementById('night-blink').checked;
-        const blinkFrequency = parseInt(document.getElementById('blink-frequency').value);
+        const blinkFrequency = parseInt(document.getElementById('blink-frequency').value) || 500;
         
-        console.log(`Zapisuję konfigurację świateł - Dzienne: ${dayLights}, Nocne: ${nightLights}`); 
-        console.log(`Mruganie dzienne: ${dayBlink}, nocne: ${nightBlink}, częstotliwość: ${blinkFrequency}`);
+        console.log(`Konfiguracja do zapisu: dzienne=${dayLights}, nocne=${nightLights}, `+
+                    `dzienBlink=${dayBlink}, nocBlink=${nightBlink}, częst.=${blinkFrequency}`);
         
         const lightConfig = {
             dayLights: dayLights,
@@ -103,12 +103,14 @@ async function saveLightConfig() {
             nightBlink: nightBlink,
             blinkFrequency: blinkFrequency
         };
+        
+        // Dodaj wskaźnik ładowania
+        const saveBtn = document.getElementById('save-lights-btn');
+        const originalText = saveBtn.textContent;
+        saveBtn.textContent = 'Zapisywanie...';
+        saveBtn.disabled = true;
 
-        debug('Przygotowane dane:', lightConfig);
-
-        console.log('Wysyłam żądanie do /api/lights/config z danymi:', JSON.stringify(lightConfig));
-
-        // ZMIANA: Wysyłamy jako JSON bezpośrednio, bez form-urlencoded
+        // Wyślij dane jako czysty JSON (ważne!)
         const response = await fetch('/api/lights/config', {
             method: 'POST',
             headers: {
@@ -116,18 +118,27 @@ async function saveLightConfig() {
             },
             body: JSON.stringify(lightConfig)
         });
-
-        console.log(`Status odpowiedzi: ${response.status}`);
         
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        console.log(`Status odpowiedzi: ${response.status}`);
+        const responseText = await response.text();
+        console.log(`Odpowiedź serwera: ${responseText}`);
+        
+        // Parsuj odpowiedź JSON
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (e) {
+            console.error('Błąd parsowania odpowiedzi JSON:', e);
+            throw new Error('Nieprawidłowy format odpowiedzi serwera');
         }
-
-        const result = await response.json();
-        console.log('Wynik zapisu:', result);
+        
+        // Przywróć przycisk
+        saveBtn.textContent = originalText;
+        saveBtn.disabled = false;
         
         if (result.status === 'ok') {
-            alert('Zapisano ustawienia świateł');
+            // Pokaż wyraźne potwierdzenie
+            showNotification('Zapisano ustawienia świateł!', 'success');
             
             // Jeśli przyszły zaktualizowane dane świateł, zaktualizuj formularz
             if (result.lights) {
@@ -136,69 +147,122 @@ async function saveLightConfig() {
                 document.getElementById('day-blink').checked = result.lights.dayBlink;
                 document.getElementById('night-blink').checked = result.lights.nightBlink;
                 document.getElementById('blink-frequency').value = result.lights.blinkFrequency;
+                console.log('Zaktualizowano formularz z odpowiedzi serwera');
             }
         } else {
-            throw new Error(result.message || 'Nieznany błąd');
+            throw new Error(result.message || 'Nieznany błąd podczas zapisu');
         }
     } catch (error) {
         console.error('Błąd podczas zapisywania:', error);
-        alert('Błąd podczas zapisywania ustawień: ' + error.message);
+        showNotification('Błąd: ' + error.message, 'error');
     }
+}
+
+// Funkcja do pokazywania powiadomień
+function showNotification(message, type = 'info') {
+    // Sprawdź czy kontener na powiadomienia istnieje
+    let notifContainer = document.getElementById('notification-container');
+    if (!notifContainer) {
+        // Utwórz kontener jeśli nie istnieje
+        notifContainer = document.createElement('div');
+        notifContainer.id = 'notification-container';
+        notifContainer.style.position = 'fixed';
+        notifContainer.style.top = '20px';
+        notifContainer.style.right = '20px';
+        notifContainer.style.zIndex = '9999';
+        document.body.appendChild(notifContainer);
+    }
+    
+    // Utwórz element powiadomienia
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.style.padding = '10px 20px';
+    notification.style.marginBottom = '10px';
+    notification.style.borderRadius = '5px';
+    notification.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+    notification.style.transition = 'all 0.3s ease';
+    notification.style.minWidth = '200px';
+    
+    // Ustaw kolor tła w zależności od typu
+    if (type === 'success') {
+        notification.style.backgroundColor = '#4CAF50';
+        notification.style.color = 'white';
+    } else if (type === 'error') {
+        notification.style.backgroundColor = '#F44336';
+        notification.style.color = 'white';
+    } else {
+        notification.style.backgroundColor = '#2196F3';
+        notification.style.color = 'white';
+    }
+    
+    notification.textContent = message;
+    
+    // Dodaj powiadomienie do kontenera
+    notifContainer.appendChild(notification);
+    
+    // Usuń powiadomienie po 3 sekundach
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            notifContainer.removeChild(notification);
+        }, 300);
+    }, 3000);
 }
 
 // Dodaj debounce dla loadLightConfig
 let loadTimeout = null;
 
 // Funkcja wczytywania konfiguracji z debounce
+// Dodaj tę funkcję w script.js
+
+// Funkcja do ładowania konfiguracji świateł przy starcie
 async function loadLightConfig() {
-    debug('Rozpoczynam wczytywanie konfiguracji świateł...');
+    console.log('Ładowanie konfiguracji świateł...');
     
     try {
-        // Najpierw ustaw domyślne wartości
-		const defaultValues = {
-			dayLights: 'DRL+REAR',
-			nightLights: 'FRONT+REAR',
-			dayBlink: true,
-			nightBlink: false,
-			blinkFrequency: 500
-		};
-
-        document.getElementById('day-lights').value = defaultValues.dayLights;
-        document.getElementById('night-lights').value = defaultValues.nightLights;
-        document.getElementById('day-blink').checked = defaultValues.dayBlink;
-        document.getElementById('night-blink').checked = defaultValues.nightBlink;
-        document.getElementById('blink-frequency').value = defaultValues.blinkFrequency;
-        
-        // Następnie próbuj pobrać zapisane ustawienia
-        const response = await fetch('/api/status');
+        const response = await fetch('/api/lights/config');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
-        debug('Otrzymane dane:', data);
-
-        if (data.lights) {
-            // Zastosuj otrzymane wartości jeśli są dostępne
-            document.getElementById('day-lights').value = data.lights.dayLights || defaultValues.dayLights;
-            document.getElementById('night-lights').value = data.lights.nightLights || defaultValues.nightLights;
-            document.getElementById('day-blink').checked = data.lights.dayBlink !== undefined ? data.lights.dayBlink : defaultValues.dayBlink;
-            document.getElementById('night-blink').checked = data.lights.nightBlink !== undefined ? data.lights.nightBlink : defaultValues.nightBlink;
-            document.getElementById('blink-frequency').value = data.lights.blinkFrequency || defaultValues.blinkFrequency;
+        console.log('Pobrana konfiguracja świateł:', data);
+        
+        if (data.status === 'ok' && data.lights) {
+            // Aktualizacja interfejsu
+            document.getElementById('day-lights').value = data.lights.dayLights || 'NONE';
+            document.getElementById('night-lights').value = data.lights.nightLights || 'NONE';
+            document.getElementById('day-blink').checked = !!data.lights.dayBlink;
+            document.getElementById('night-blink').checked = !!data.lights.nightBlink;
+            document.getElementById('blink-frequency').value = data.lights.blinkFrequency || 500;
             
-            debug('Formularz zaktualizowany pomyślnie');
+            console.log('Zaktualizowano formularz z konfiguracji z serwera');
         } else {
-            // Przypadek gdy nie ma danych o światłach (pierwsza konfiguracja)
-            debug('Brak danych o światłach, używam wartości domyślnych');
-            
-            // Opcjonalnie, możesz od razu zapisać te ustawienia domyślne
-            // await saveLightConfig(); // Odkomentuj jeśli chcesz zapisać domyślne wartości automatycznie
+            console.warn('Nieprawidłowa odpowiedź serwera:', data);
         }
     } catch (error) {
-        console.error('Błąd podczas wczytywania konfiguracji świateł:', error);
-        // W przypadku błędu, wartości domyślne są już ustawione
+        console.error('Błąd podczas ładowania konfiguracji świateł:', error);
     }
 }
+
+// Wywołaj funkcję przy ładowaniu strony
+document.addEventListener('DOMContentLoaded', function() {
+    // Istniejący kod inicjalizacji...
+    
+    // Dodaj ładowanie konfiguracji świateł
+    loadLightConfig();
+    
+    // Dodaj nasłuchiwanie zmian zakładek
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', function(event) {
+            const targetTab = this.getAttribute('data-bs-target');
+            if (targetTab === '#lights-tab') {
+                // Odśwież konfigurację świateł gdy przechodzimy do zakładki świateł
+                loadLightConfig();
+            }
+        });
+    });
+});
 
 function verifyLightElements() {
     const requiredElements = [
