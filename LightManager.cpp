@@ -299,7 +299,16 @@ bool LightManager::saveConfig() {
         return false;
     }
     
-    // *** ZMIANA: Używamy stałej z main.ino zamiast hardkodowanej nazwy ***
+    // Najpierw usuń istniejący plik, aby uniknąć problemów z zapisem
+    if (LittleFS.exists("/light_config.json")) {
+        if (!LittleFS.remove("/light_config.json")) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Failed to remove existing config file");
+            #endif
+            // Kontynuujemy mimo to
+        }
+    }
+    
     File configFile = LittleFS.open("/light_config.json", "w");
     if (!configFile) {
         #ifdef DEBUG
@@ -315,20 +324,22 @@ bool LightManager::saveConfig() {
     doc["nightBlink"] = nightBlink;
     doc["blinkFrequency"] = blinkFrequency;
     
-    if (serializeJson(doc, configFile) == 0) {
+    size_t bytes = serializeJson(doc, configFile);
+    configFile.close();
+    
+    if (bytes == 0) {
         #ifdef DEBUG
-        Serial.println("[LightManager] Failed to write to config file");
+        Serial.println("[LightManager] Failed to write config to file");
         #endif
-        configFile.close();
         return false;
     }
     
-    configFile.close();
-    
     #ifdef DEBUG
-    Serial.println("[LightManager] Config saved successfully");
-    Serial.printf("[LightManager] Day config: %s, blink: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
-    Serial.printf("[LightManager] Night config: %s, blink: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
+    Serial.printf("[LightManager] Config saved successfully (%d bytes)\n", bytes);
+    Serial.printf("[LightManager] Day config: 0x%02X (%s), blink: %d\n", 
+               dayConfig, getConfigString(dayConfig).c_str(), dayBlink);
+    Serial.printf("[LightManager] Night config: 0x%02X (%s), blink: %d\n", 
+               nightConfig, getConfigString(nightConfig).c_str(), nightBlink);
     #endif
     
     return true;
