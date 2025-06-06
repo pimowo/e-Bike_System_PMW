@@ -1,159 +1,99 @@
-#ifndef ODOMETER_H
-#define ODOMETER_H
+#ifndef LIGHT_MANAGER_H
+#define LIGHT_MANAGER_H
 
-#include <FS.h>
-#include <LittleFS.h>
+#include <Arduino.h>
 #include <ArduinoJson.h>
+#include <LittleFS.h>
 
-class OdometerManager {
-private:
-    const char* filename = "/odometer.json";
-    float currentTotal = 0;
+// Odkomentuj, aby włączyć debugowanie
+#define DEBUG
 
-    void saveToFile() {
-        #ifdef DEBUG
-        Serial.println("Zapisywanie licznika do pliku...");
-        #endif
-
-        // Sprawdź czy system plików jest zamontowany
-        if (!LittleFS.begin(false)) {
-            #ifdef DEBUG
-            Serial.println("Błąd montowania LittleFS podczas zapisu licznika");
-            #endif
-            
-            // Próba formatowania
-            if (LittleFS.format()) {
-                #ifdef DEBUG
-                Serial.println("LittleFS sformatowany - próba ponownego montowania");
-                #endif
-                if (!LittleFS.begin(false)) {
-                    #ifdef DEBUG
-                    Serial.println("Nadal nie można zamontować LittleFS po formatowaniu");
-                    #endif
-                    return;
-                }
-            } else {
-                #ifdef DEBUG
-                Serial.println("Błąd formatowania LittleFS");
-                #endif
-                return;
-            }
-        }
-
-        File file = LittleFS.open(filename, "w");
-        if (!file) {
-            #ifdef DEBUG
-            Serial.println("Błąd otwarcia pliku licznika do zapisu");
-            Serial.printf("Próba zapisu do pliku: %s\n", filename);
-            
-            // Sprawdź dostępne miejsce
-            Serial.printf("Dostępne miejsce: %d / %d bajtów\n", 
-                         LittleFS.totalBytes() - LittleFS.usedBytes(), LittleFS.totalBytes());
-            
-            // Lista plików w katalogu głównym
-            File root = LittleFS.open("/", "r");
-            if (root && root.isDirectory()) {
-                Serial.println("Zawartość katalogu root:");
-                File entry = root.openNextFile();
-                while (entry) {
-                    Serial.printf("  %s (%d bajtów)\n", entry.name(), entry.size());
-                    entry = root.openNextFile();
-                }
-                root.close();
-            }
-            #endif
-            return;
-        }
-
-        StaticJsonDocument<128> doc;
-        doc["total"] = currentTotal;
-        
-        if (serializeJson(doc, file) == 0) {
-            #ifdef DEBUG
-            Serial.println("Błąd zapisu do pliku licznika");
-            #endif
-        } else {
-            #ifdef DEBUG
-            Serial.printf("Zapisano licznik: %.2f\n", currentTotal);
-            #endif
-        }
-        
-        file.close();
-    }
-
-    void loadFromFile() {
-        #ifdef DEBUG
-        Serial.println("Wczytywanie licznika z pliku...");
-        #endif
-
-        File file = LittleFS.open(filename, "r");
-        if (!file) {
-            #ifdef DEBUG
-            Serial.println("Brak pliku licznika - tworzę nowy");
-            #endif
-            currentTotal = 0;
-            saveToFile();
-            return;
-        }
-
-        StaticJsonDocument<128> doc;
-        DeserializationError error = deserializeJson(doc, file);
-        
-        if (!error) {
-            currentTotal = doc["total"] | 0.0f;
-            #ifdef DEBUG
-            Serial.printf("Wczytano licznik: %.2f\n", currentTotal);
-            #endif
-        } else {
-            #ifdef DEBUG
-            Serial.println("Błąd odczytu pliku licznika");
-            #endif
-            currentTotal = 0;
-        }
-        
-        file.close();
-    }
-
+class LightManager {
 public:
-    OdometerManager() {
-        loadFromFile();
-    }
+    // Stałe dla konfiguracji świateł
+    static const uint8_t NONE = 0;
+    static const uint8_t FRONT = 1;
+    static const uint8_t DRL = 2;
+    static const uint8_t REAR = 4;
+    
+    // Tryby działania
+    enum LightMode {
+        OFF = 0,  // Światła wyłączone
+        DAY = 1,  // Tryb dzienny
+        NIGHT = 2 // Tryb nocny
+    };
+    
+    // Konstruktor i inicjalizacja
+    LightManager();
+    LightManager(uint8_t frontPin, uint8_t drlPin, uint8_t rearPin); // Nowy konstruktor z parametrami
+    
+    // Inicjalizacja - przypisanie pinów GPIO
+    void begin(uint8_t frontPin, uint8_t drlPin, uint8_t rearPin);
+    
+    // Ustawianie trybu
+    void setMode(LightMode mode);
 
-    float getRawTotal() const {
-        return currentTotal;
-    }
+    //
+    void cycleMode(); // Przełącza między trybami OFF -> DAY -> NIGHT -> OFF
+    
+    // Gettery
+    uint8_t getDayConfig() const { return dayConfig; }
+    uint8_t getNightConfig() const { return nightConfig; }
+    bool getDayBlink() const { return dayBlink; }
+    bool getNightBlink() const { return nightBlink; }
+    uint16_t getBlinkFrequency() const { return blinkFrequency; }
+    LightMode getMode() const { return currentMode; }
+    
+    // Settery
+    void setDayConfig(uint8_t config, bool blink);
+    void setNightConfig(uint8_t config, bool blink);
+    void setBlinkFrequency(uint16_t frequency);
+    
+    // Aktywacja/Deaktywacja trybu konfiguracji
+    void activateConfigMode();
+    void deactivateConfigMode();
+    
+    // Przetworzyć stan - wywołaj w pętli loop
+    void update();
+    
+    // Zapisz i wczytaj konfigurację
+    bool saveConfig();
+    bool loadConfig();
+    
+    // Konwersja między uint8_t i string
+    String getConfigString(uint8_t config) const;
+    static uint8_t parseConfigString(const char* configStr);
 
-    bool setInitialValue(float value) {
-        if (value < 0) {
-            #ifdef DEBUG
-            Serial.println("Błędna wartość początkowa (ujemna)");
-            #endif
-            return false;
-        }
-        
-        #ifdef DEBUG
-        Serial.printf("Ustawianie początkowej wartości licznika: %.2f\n", value);
-        #endif
-
-        currentTotal = value;
-        saveToFile();
-        return true;
-    }
-
-    void updateTotal(float newValue) {
-        if (newValue > currentTotal) {
-            #ifdef DEBUG
-            Serial.printf("Aktualizacja licznika z %.2f na %.2f\n", currentTotal, newValue);
-            #endif
-
-            currentTotal = newValue;
-            saveToFile();
-        }
-    }
-
-    bool isValid() const {
-        return true; // Zawsze zwraca true, bo nie ma już inicjalizacji Preferences
-    }
+    String getModeString() const; // Zwraca nazwę aktualnego trybu jako string
+    
+private:
+    // Piny GPIO
+    uint8_t frontPin;
+    uint8_t drlPin;
+    uint8_t rearPin;
+    
+    // Stan świateł
+    bool frontState;
+    bool drlState;
+    bool rearState;
+    
+    // Tryb działania
+    LightMode currentMode;
+    
+    // Konfiguracja dla różnych trybów
+    uint8_t dayConfig;   // Kombinacja flag dla trybu dziennego
+    uint8_t nightConfig; // Kombinacja flag dla trybu nocnego
+    bool dayBlink;       // Czy tylne światło ma migać w trybie dziennym
+    bool nightBlink;     // Czy tylne światło ma migać w trybie nocnym
+    uint16_t blinkFrequency; // Częstotliwość migania w ms
+    
+    // Zmienne do migania
+    bool blinkState;
+    unsigned long lastBlinkTime;
+    bool configMode; // Tryb konfiguracji - wszystkie światła włączone
+    
+    // Aktualizacja stanu świateł
+    void updateLights();
 };
 
-#endif
+#endif // LIGHT_MANAGER_H
