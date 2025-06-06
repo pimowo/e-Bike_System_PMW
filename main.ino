@@ -75,7 +75,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "5.6.25";
+const char* VERSION = "6.6.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -639,6 +639,7 @@ void setLights();
 void saveLightSettings();
 void loadLightSettings();
 void applyBacklightSettings();
+void printLightConfigFile();
 
 // --- Deklaracje funkcji obsługi ekranu ---
 void drawHorizontalLine();
@@ -2750,6 +2751,42 @@ void applyBacklightSettings() {
     #endif
 }
 
+void printLightConfigFile() {
+    if (!LittleFS.begin(false)) {
+        Serial.println("Błąd montowania systemu plików");
+        return;
+    }
+    
+    if (LittleFS.exists("/light_config.json")) {
+        File file = LittleFS.open("/light_config.json", "r");
+        if (file) {
+            Serial.println("------------ ZAWARTOŚĆ PLIKU KONFIGURACYJNEGO ŚWIATEŁ -----------");
+            while (file.available()) {
+                Serial.write(file.read());
+            }
+            Serial.println("\n------------------------------------------------------------------");
+            file.close();
+        } else {
+            Serial.println("Nie można otworzyć pliku konfiguracyjnego");
+        }
+    } else {
+        Serial.println("Plik konfiguracyjny /light_config.json nie istnieje");
+    }
+    
+    // Sprawdź też stary plik
+    if (LittleFS.exists("/lights.json")) {
+        File file = LittleFS.open("/lights.json", "r");
+        if (file) {
+            Serial.println("------------ ZAWARTOŚĆ STAREGO PLIKU KONFIGURACYJNEGO -----------");
+            while (file.available()) {
+                Serial.write(file.read());
+            }
+            Serial.println("\n------------------------------------------------------------------");
+            file.close();
+        }
+    }
+}
+
 // sprawdzanie poprawności temperatury
 bool isValidTemperature(float temp) {
     return (temp >= -50.0 && temp <= 100.0);
@@ -3205,7 +3242,7 @@ void setupWebServer() {
         
         // Zmień tylko te wartości, które są w żądaniu
         if (doc.containsKey("dayLights")) {
-            uint8_t dayConfig = lightManager.parseConfigString(doc["dayLights"].as<String>());
+            uint8_t dayConfig = lightManager.parseConfigString(doc["dayLights"].as<String>().c_str());
             bool dayBlink = doc["dayBlink"] | oldDayBlink;
             lightManager.setDayConfig(dayConfig, dayBlink);
             #ifdef DEBUG
@@ -3215,7 +3252,7 @@ void setupWebServer() {
         }
         
         if (doc.containsKey("nightLights")) {
-            uint8_t nightConfig = lightManager.parseConfigString(doc["nightLights"].as<String>());
+            uint8_t nightConfig = lightManager.parseConfigString(doc["nightLights"].as<String>().c_str());
             bool nightBlink = doc["nightBlink"] | oldNightBlink;
             lightManager.setNightConfig(nightConfig, nightBlink);
             #ifdef DEBUG
