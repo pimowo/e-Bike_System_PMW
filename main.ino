@@ -2396,6 +2396,39 @@ void activateConfigMode() {
         request->send(LittleFS, "/script.js", "application/javascript");
     });
 
+    server.on("/api/reset-filesystem", HTTP_GET, [](AsyncWebServerRequest *request) {
+        bool success = false;
+        
+        #ifdef DEBUG
+        Serial.println("Próba resetowania systemu plików");
+        #endif
+        
+        if (LittleFS.format()) {
+            if (LittleFS.begin(false)) {
+                success = true;
+                #ifdef DEBUG
+                Serial.println("System plików zresetowany pomyślnie");
+                #endif
+            } else {
+                #ifdef DEBUG
+                Serial.println("Nie udało się zamontować systemu plików po formatowaniu");
+                #endif
+            }
+        } else {
+            #ifdef DEBUG
+            Serial.println("Formatowanie systemu plików nie powiodło się");
+            #endif
+        }
+        
+        StaticJsonDocument<128> doc;
+        doc["success"] = success;
+        doc["message"] = success ? "System plików zresetowany pomyślnie" : "Błąd resetowania systemu plików";
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+
     server.on("/api/version", HTTP_GET, [](AsyncWebServerRequest *request) {
         StaticJsonDocument<200> doc;
         doc["version"] = VERSION;
@@ -3618,6 +3651,89 @@ void setupWebServer() {
 
 // --- Funkcje systemu plików ---
 
+bool testFileSystem() {
+    Serial.println("\n--- Diagnostyka systemu plików ---");
+    
+    if (!LittleFS.begin(false)) {
+        Serial.println("Błąd montowania LittleFS - próba formatowania");
+        
+        if (LittleFS.format()) {
+            Serial.println("LittleFS sformatowany pomyślnie");
+            
+            if (!LittleFS.begin(false)) {
+                Serial.println("Nadal nie można zamontować LittleFS");
+                return false;
+            }
+        } else {
+            Serial.println("Błąd formatowania LittleFS");
+            return false;
+        }
+    }
+    
+    Serial.printf("Całkowita przestrzeń: %d bajtów\n", LittleFS.totalBytes());
+    Serial.printf("Użyta przestrzeń: %d bajtów\n", LittleFS.usedBytes());
+    Serial.printf("Wolna przestrzeń: %d bajtów\n", LittleFS.totalBytes() - LittleFS.usedBytes());
+    
+    // Test zapisu
+    Serial.println("Test zapisu pliku...");
+    File testFile = LittleFS.open("/test_fs.txt", "w");
+    if (!testFile) {
+        Serial.println("Nie można utworzyć pliku testowego");
+        return false;
+    }
+    
+    if (testFile.print("Test zapisu") == 0) {
+        Serial.println("Błąd zapisu do pliku testowego");
+        testFile.close();
+        return false;
+    }
+    
+    testFile.close();
+    
+    // Test odczytu
+    Serial.println("Test odczytu pliku...");
+    testFile = LittleFS.open("/test_fs.txt", "r");
+    if (!testFile) {
+        Serial.println("Nie można otworzyć pliku testowego do odczytu");
+        return false;
+    }
+    
+    String content = testFile.readString();
+    testFile.close();
+    
+    if (content != "Test zapisu") {
+        Serial.println("Błąd odczytu - zawartość nie zgadza się z zapisaną");
+        return false;
+    }
+    
+    // Usuń plik testowy
+    if (!LittleFS.remove("/test_fs.txt")) {
+        Serial.println("Nie udało się usunąć pliku testowego");
+    }
+    
+    // Lista plików
+    File root = LittleFS.open("/", "r");
+    if (!root) {
+        Serial.println("Błąd otwarcia katalogu głównego");
+        return false;
+    }
+    
+    if (!root.isDirectory()) {
+        Serial.println("Katalog główny nie jest katalogiem!");
+        return false;
+    }
+    
+    Serial.println("\nLista plików:");
+    File entry = root.openNextFile();
+    while (entry) {
+        Serial.printf("  %s (%d bajtów)\n", entry.name(), entry.size());
+        entry = root.openNextFile();
+    }
+    
+    Serial.println("\nTest systemu plików zakończony pomyślnie");
+    return true;
+}
+
 // Sprawdzenie i formatowanie systemu plików przy starcie
 // Lepsza obsługa błędów w funkcji initLittleFS
 bool initLittleFS() {
@@ -3893,6 +4009,9 @@ void setup() {
     // Ładowarka USB
     pinMode(UsbPin, OUTPUT);
     digitalWrite(UsbPin, LOW);
+
+    // Sprawdź system plików
+    testFileSystem();
 
     // Inicjalizacja LittleFS i wczytanie ustawień
     if (!LittleFS.begin(true)) {
