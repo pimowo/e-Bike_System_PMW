@@ -140,15 +140,6 @@ async function saveLightConfig() {
             // Pokaż wyraźne potwierdzenie
             showToast('Zapisano ustawienia świateł!', 'success');
             
-            // Zastosuj nowe ustawienia natychmiast - wysyłamy żądanie
-            await fetch('/api/lights/apply', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ applyNow: true })
-            });
-            
             // Jeśli przyszły zaktualizowane dane świateł, zaktualizuj formularz
             if (result.lights) {
                 document.getElementById('day-lights').value = result.lights.dayLights;
@@ -167,6 +158,7 @@ async function saveLightConfig() {
     }
 }
 
+// Funkcja do wyświetlania powiadomień toast
 // Funkcja do wyświetlania powiadomień toast
 function showToast(message, type = 'info') {
     // Sprawdź czy kontener na toasty istnieje
