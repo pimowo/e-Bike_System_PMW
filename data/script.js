@@ -138,7 +138,16 @@ async function saveLightConfig() {
         
         if (result.status === 'ok') {
             // Pokaż wyraźne potwierdzenie
-            showNotification('Zapisano ustawienia świateł!', 'success');
+            showToast('Zapisano ustawienia świateł!', 'success');
+            
+            // Zastosuj nowe ustawienia natychmiast - wysyłamy żądanie
+            await fetch('/api/lights/apply', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ applyNow: true })
+            });
             
             // Jeśli przyszły zaktualizowane dane świateł, zaktualizuj formularz
             if (result.lights) {
@@ -154,8 +163,68 @@ async function saveLightConfig() {
         }
     } catch (error) {
         console.error('Błąd podczas zapisywania:', error);
-        showNotification('Błąd: ' + error.message, 'error');
+        showToast('Błąd: ' + error.message, 'error');
     }
+}
+
+// Funkcja do wyświetlania powiadomień toast
+function showToast(message, type = 'info') {
+    // Sprawdź czy kontener na toasty istnieje
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        // Utwórz kontener jeśli nie istnieje
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(toastContainer);
+    }
+    
+    // Utwórz element toast
+    const toastId = 'toast-' + Date.now();
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.className = 'toast';
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    // Ustaw różne kolory w zależności od typu
+    let bgClass = 'bg-primary text-white';
+    if (type === 'success') {
+        bgClass = 'bg-success text-white';
+    } else if (type === 'error') {
+        bgClass = 'bg-danger text-white';
+    } else if (type === 'warning') {
+        bgClass = 'bg-warning text-dark';
+    }
+    
+    // Struktura toast
+    toast.innerHTML = `
+        <div class="toast-header ${bgClass}">
+            <strong class="me-auto">eBike System</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            ${message}
+        </div>
+    `;
+    
+    // Dodaj toast do kontenera
+    toastContainer.appendChild(toast);
+    
+    // Inicjalizuj toast za pomocą Bootstrap
+    const bsToast = new bootstrap.Toast(toast, {
+        autohide: true,
+        delay: 3000
+    });
+    
+    // Pokaż toast
+    bsToast.show();
+    
+    // Usuń element po ukryciu
+    toast.addEventListener('hidden.bs.toast', function () {
+        toast.remove();
+    });
 }
 
 // Funkcja do pokazywania powiadomień
