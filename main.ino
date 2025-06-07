@@ -3287,6 +3287,29 @@ void setupWebServer() {
         request->send(200, "application/json", response);
     });
 
+    server.on("/api/lights/apply", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Endpoint do obsługi zapytania POST
+    }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        // Stosuje aktualne ustawienia świateł
+        uint8_t currentMode = lightManager.getCurrentMode();
+        lightManager.setMode(currentMode); // To spowoduje ponowne zastosowanie ustawień dla aktualnego trybu
+        
+        #ifdef DEBUG
+        Serial.println("[LightsConfig] Zastosowanie aktualnych ustawień");
+        Serial.printf("[LightsConfig] Aktualny tryb: %d\n", currentMode);
+        #endif
+        
+        // Wyślij odpowiedź
+        StaticJsonDocument<128> responseDoc;
+        responseDoc["status"] = "ok";
+        responseDoc["message"] = "Ustawienia zastosowane";
+        responseDoc["currentMode"] = currentMode;
+        
+        String response;
+        serializeJson(responseDoc, response);
+        request->send(200, "application/json", response);
+    });
+
     server.on("/api/lights/debug", HTTP_GET, [](AsyncWebServerRequest* request) {
         StaticJsonDocument<512> doc;
         
