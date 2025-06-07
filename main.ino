@@ -75,7 +75,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "6.6.25";
+const char* VERSION = "7.6.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -3143,36 +3143,36 @@ void setupWebServer() {
     });
 
     // Dodaj ten endpoint w funkcji setupWebServer()
-    server.on("/api/reset-odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
-        bool success = false;
+    // server.on("/api/reset-odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
+    //     bool success = false;
         
-        // Utwórz nową instancję OdometerManager
-        OdometerManager tempOdometer;
-        success = tempOdometer.resetOdometer();
+    //     // Utwórz nową instancję OdometerManager
+    //     OdometerManager tempOdometer;
+    //     success = tempOdometer.resetOdometer();
         
-        // Odśwież główną instancję licznika (jeśli to konieczne)
-        odometer.initialize();
+    //     // Odśwież główną instancję licznika (jeśli to konieczne)
+    //     odometer.initialize();
         
-        #ifdef DEBUG
-        Serial.printf("Resetowanie licznika: %s\n", success ? "POWODZENIE" : "BŁĄD");
-        tempOdometer.debugPreferences();
-        #endif
+    //     #ifdef DEBUG
+    //     Serial.printf("Resetowanie licznika: %s\n", success ? "POWODZENIE" : "BŁĄD");
+    //     tempOdometer.debugPreferences();
+    //     #endif
         
-        // Przygotuj odpowiedź JSON
-        StaticJsonDocument<128> doc;
-        doc["success"] = success;
-        doc["message"] = success ? "Licznik zresetowany" : "Błąd resetowania licznika";
-        doc["newValue"] = odometer.getRawTotal();
+    //     // Przygotuj odpowiedź JSON
+    //     StaticJsonDocument<128> doc;
+    //     doc["success"] = success;
+    //     doc["message"] = success ? "Licznik zresetowany" : "Błąd resetowania licznika";
+    //     doc["newValue"] = odometer.getRawTotal();
         
-        String response;
-        serializeJson(doc, response);
-        request->send(200, "application/json", response);
-    });
+    //     String response;
+    //     serializeJson(doc, response);
+    //     request->send(200, "application/json", response);
+    // });
 
     // Dodaj endpoint do otrzymania informacji diagnostycznych
     server.on("/api/debug-odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
         #ifdef DEBUG
-        odometer.debugPreferences();
+        //odometer.debugPreferences();
         #endif
         
         StaticJsonDocument<256> doc;
@@ -4004,7 +4004,7 @@ void setup() {
     // Inicjalizacja licznika kilometrów z użyciem Preferences
     if (!odometer.isValid()) {
         Serial.println("Inicjalizacja licznika...");
-        odometer.initialize();
+        //odometer.initialize();
         if (!odometer.isValid()) {
             Serial.println("Błąd inicjalizacji licznika!");
         } else {
