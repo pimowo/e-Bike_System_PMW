@@ -3444,21 +3444,39 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
     request->send(200, "application/json", responseStr);
 });
 
-    server.on("/api/lights/debug", HTTP_GET, [](AsyncWebServerRequest* request) {
+    // Dodaj endpoint do testowania konfiguracji
+    server.on("/api/lights/debug", HTTP_GET, [](AsyncWebServerRequest *request) {
         StaticJsonDocument<512> doc;
         
-        doc["currentMode"] = (int)lightManager.getMode();
         doc["dayConfig"] = lightManager.getDayConfig();
+        doc["dayConfigString"] = lightManager.getConfigString(lightManager.getDayConfig());
         doc["nightConfig"] = lightManager.getNightConfig();
+        doc["nightConfigString"] = lightManager.getConfigString(lightManager.getNightConfig());
         doc["dayBlink"] = lightManager.getDayBlink();
         doc["nightBlink"] = lightManager.getNightBlink();
         doc["blinkFrequency"] = lightManager.getBlinkFrequency();
+        doc["currentMode"] = (int)lightManager.getMode();
         
-        doc["dayConfigString"] = lightManager.getConfigString(lightManager.getDayConfig());
-        doc["nightConfigString"] = lightManager.getConfigString(lightManager.getNightConfig());
+        // Dodaj binarne reprezentacje
+        doc["dayConfig_binary"] = String(lightManager.getDayConfig(), BIN);
+        doc["nightConfig_binary"] = String(lightManager.getNightConfig(), BIN);
+        
+        // Sprawdź poszczególne bity (flagi)
+        doc["dayConfig_FRONT"] = (lightManager.getDayConfig() & LightManager::FRONT) != 0;
+        doc["dayConfig_DRL"] = (lightManager.getDayConfig() & LightManager::DRL) != 0;
+        doc["dayConfig_REAR"] = (lightManager.getDayConfig() & LightManager::REAR) != 0;
+        
+        doc["nightConfig_FRONT"] = (lightManager.getNightConfig() & LightManager::FRONT) != 0;
+        doc["nightConfig_DRL"] = (lightManager.getNightConfig() & LightManager::DRL) != 0;
+        doc["nightConfig_REAR"] = (lightManager.getNightConfig() & LightManager::REAR) != 0;
         
         String response;
         serializeJson(doc, response);
+        
+        #ifdef DEBUG
+        Serial.printf("[DEBUG] Konfiguracja świateł: %s\n", response.c_str());
+        #endif
+        
         request->send(200, "application/json", response);
     });
 
