@@ -212,9 +212,6 @@ function showNotification(message, type = 'info') {
 // Dodaj debounce dla loadLightConfig
 let loadTimeout = null;
 
-// Funkcja wczytywania konfiguracji z debounce
-// Dodaj tę funkcję w script.js
-
 // Funkcja do ładowania konfiguracji świateł przy starcie
 async function loadLightConfig() {
     console.log('Ładowanie konfiguracji świateł...');
@@ -230,18 +227,30 @@ async function loadLightConfig() {
         
         if (data.status === 'ok' && data.lights) {
             // Aktualizacja interfejsu
-            document.getElementById('day-lights').value = data.lights.dayLights || 'NONE';
-            document.getElementById('night-lights').value = data.lights.nightLights || 'NONE';
-            document.getElementById('day-blink').checked = !!data.lights.dayBlink;
-            document.getElementById('night-blink').checked = !!data.lights.nightBlink;
+            document.getElementById('day-lights').value = data.lights.dayLights || 'DRL+REAR';
+            document.getElementById('night-lights').value = data.lights.nightLights || 'FRONT+REAR';
+            document.getElementById('day-blink').checked = data.lights.dayBlink !== undefined ? data.lights.dayBlink : true;
+            document.getElementById('night-blink').checked = data.lights.nightBlink !== undefined ? data.lights.nightBlink : false;
             document.getElementById('blink-frequency').value = data.lights.blinkFrequency || 500;
             
             console.log('Zaktualizowano formularz z konfiguracji z serwera');
         } else {
-            console.warn('Nieprawidłowa odpowiedź serwera:', data);
+            console.warn('Odpowiedź serwera nie zawiera danych o światłach, używam domyślnych wartości');
+            // Ustawienia domyślne
+            document.getElementById('day-lights').value = 'DRL+REAR';
+            document.getElementById('night-lights').value = 'FRONT+REAR';
+            document.getElementById('day-blink').checked = true;
+            document.getElementById('night-blink').checked = false;
+            document.getElementById('blink-frequency').value = 500;
         }
     } catch (error) {
         console.error('Błąd podczas ładowania konfiguracji świateł:', error);
+        // Ustawienia domyślne w przypadku błędu
+        document.getElementById('day-lights').value = 'DRL+REAR';
+        document.getElementById('night-lights').value = 'FRONT+REAR';
+        document.getElementById('day-blink').checked = true;
+        document.getElementById('night-blink').checked = false;
+        document.getElementById('blink-frequency').value = 500;
     }
 }
 
