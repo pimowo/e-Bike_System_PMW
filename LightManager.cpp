@@ -433,8 +433,6 @@ String LightManager::getModeString() const {
         default:
             return "UNKNOWN";
     }
-
-    return currentMode;  // Używaj istniejącego pola currentMode
 }
 
 // Konwersja string na config (uint8_t)
