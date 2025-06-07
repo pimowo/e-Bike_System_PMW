@@ -42,8 +42,7 @@ public:
     bool getDayBlink() const { return dayBlink; }
     bool getNightBlink() const { return nightBlink; }
     uint16_t getBlinkFrequency() const { return blinkFrequency; }
-    LightMode getMode() const { return currentMode; }
-    LightMode getMode() const;  // Metoda do pobrania aktualnego trybu
+    LightMode getMode() const { return currentMode; }  // Metoda do pobrania aktualnego trybu
     
     // Settery
     void setDayConfig(uint8_t config, bool blink);
