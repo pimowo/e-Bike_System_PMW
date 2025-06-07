@@ -433,17 +433,8 @@ String LightManager::getModeString() const {
         default:
             return "UNKNOWN";
     }
-}
 
-void setMode(uint8_t mode) {
-    //currentMode = mode; // Zapisz aktualny tryb
-    
-    // Pozostały kod funkcji...
-}
-
-// Dodaj implementację metody w pliku LightManager.cpp:
-LightManager::LightMode LightManager::getMode() const {
-    return currentLightMode;  // Zakładając, że masz już zmienną przechowującą aktualny tryb
+    return currentMode;  // Używaj istniejącego pola currentMode
 }
 
 // Konwersja string na config (uint8_t)
