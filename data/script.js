@@ -1,994 +1,1957 @@
-<!DOCTYPE html>
-<html lang="pl">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>e-Bike System PMW</title>
-		<link rel="stylesheet" href="style.css">
-	</head>
-
-	<body>
-		<div class="container">
-			<header>
-				<h1>e-Bike System PMW</h1>
-			</header>
-
-			<main>
-			
-				<section class="dashboard">          
-
-					<div class="card clock-config collapsible">
-						<div class="card-header">
-							<button class="info-icon" data-info="rtc-info">ℹ️</button>
-							<h2>Zegar</h2>
-							<button class="collapse-btn">⚙️</button>
-						</div>
-						<div class="card-content">
-
-							<!-- czas -->
-							<div class="rtc-row">
-								<label>
-									Czas
-								</label>
-								<input type="text" id="rtc-time" readonly>
-							</div>
-							
-							<!-- data -->
-							<div class="rtc-row">
-								<label>
-									Data
-								</label>
-								<input type="text" id="rtc-date" readonly>
-							</div>
-							
-							<div class="button-container">
-								<button class="btn-save" onclick="saveRTCConfig()">Ustaw aktualny czas</button>
-							</div>
-						</div>
-					</div>
-
-					<!-- sekcja świateł -->
-					<div class="card light-config collapsible">
-						<div class="card-header">
-							<button class="info-icon" data-info="light-config-info">ℹ️</button>
-							<h2>Światła</h2>
-							<button class="collapse-btn">⚙️</button>
-						</div>
-						<div class="card-content">                   
-							<form id="lights-form">
-							
-								<!-- Światła dzienne -->
-								<div class="light-section">
-									<h4>Światła dzienne</h4>
-									<div class="light-row">
-										<label>
-											Wybór świateł
-											<button type="button" class="info-icon" data-info="day-lights-info">ℹ</button>
-										</label>
-										<div class="select-wrapper">
-											<select id="day-lights" name="day-lights">
-												<option value="NONE">Wyłączone</option>
-												<option value="DRL">DRL</option>
-												<option value="FRONT">Przód</option>
-												<option value="REAR">Tył</option>
-												<option value="DRL+REAR">DRL+Tył</option>
-												<option value="FRONT+REAR">Przód+Tył</option>
-											</select>
-										</div>
-									</div>
-
-									<!-- Mruganie tylnego światła w dzień -->
-									<div class="light-row">
-										<label for="day-blink">
-											Mruganie tylnego światła
-											<button type="button" class="info-icon" data-info="day-blink-info">ℹ</button>
-										</label>
-										<input type="checkbox" id="day-blink" name="day-blink">
-									</div>
-								</div>
-
-								<!-- Światła nocne -->
-								<div class="light-section">
-									<h4>Światła nocne</h4>
-									<div class="light-row">
-										<label>
-											Wybór świateł
-											<button type="button" class="info-icon" data-info="night-lights-info">ℹ</button>
-										</label>
-										<div class="select-wrapper">
-											<select id="night-lights" name="night-lights">
-												<option value="NONE">Wyłączone</option>
-												<option value="DRL">DRL</option>
-												<option value="FRONT">Przód</option>
-												<option value="REAR">Tył</option>
-												<option value="DRL+REAR">DRL+Tył</option>
-												<option value="FRONT+REAR">Przód+Tył</option>
-											</select>
-										</div>
-									</div>
-
-									<!-- Mruganie tylnego światła w nocy -->
-									<div class="light-row">
-										<label for="night-blink">
-											Mruganie tylnego światła
-											<button type="button" class="info-icon" data-info="night-blink-info">ℹ</button>
-										</label>
-										<input type="checkbox" id="night-blink" name="night-blink">
-									</div>
-								</div>
-
-								<!-- Częstotliwość mrugania -->
-								<div class="light-row">
-									<label for="blink-frequency">
-										Częstotliwość mrugania
-										<button type="button" class="info-icon" data-info="blink-frequency-info">ℹ</button>
-									</label>
-									<div class="input-with-unit">
-										<input type="number" id="blink-frequency" name="blink-frequency" 
-												min="100" max="2000" step="100" value="500">
-										<span class="unit">ms</span>
-									</div>
-								</div>
-
-								<button type="button" class="btn-save" id="save-light-config">Zapisz</button>
-									
-							</form>
-						</div>
-					</div>	
-
-					<!-- sekcja wyświetlacza -->
-					<div class="card display-config collapsible">
-						<div class="card-header">
-							<button class="info-icon" data-info="display-config-info">ℹ️</button>
-							<h2>Wyświetlacz</h2>
-							<button class="collapse-btn">⚙️</button>
-						</div>
-						<div class="card-content"> 
-
-							<!-- Tryb automatycznego przełączania -->
-							<div class="display-row">
-								<label>
-									Tryb AUTO
-									<button class="info-icon" data-info="auto-mode-info">ℹ</button>
-								</label>
-								<div class="toggle-switch">
-									<select id="display-auto" onchange="toggleAutoBrightness()">
-										<option value="false">Nie</option>
-										<option value="true">Tak</option>
-									</select>
-								</div>
-							</div>                
-
-							<!-- Podświetlenie -->
-							<div class="display-row">
-								<label>
-									Podświetlenie
-									<button class="info-icon" data-info="brightness-info">ℹ</button>
-								</label>
-								<div class="input-with-unit">
-									<input type="number" id="brightness" min="0" max="100" value="100">
-									<span class="unit">%</span>
-								</div>
-							</div>
-
-							<!-- Podświetlenie -->
-							<div id="auto-brightness-section" style="display: none;">
-							
-								<!-- Podświetlenie dzień -->
-								<div class="display-row">
-									<label>
-										Podświetlenie dzień
-										<button class="info-icon" data-info="day-brightness-info">ℹ</button>
-									</label>
-									<div class="input-with-unit">
-										<input type="number" id="day-brightness" min="0" max="100" value="100">
-										<span class="unit">%</span>
-									</div>
-								</div>
-
-								<!-- Podświetlenie noc -->
-								<div class="display-row">
-									<label>
-										Podświetlenie noc
-										<button class="info-icon" data-info="night-brightness-info">ℹ</button>
-									</label>
-									<div class="input-with-unit">
-										<input type="number" id="night-brightness" min="0" max="100" value="50">
-										<span class="unit">%</span>
-									</div>
-								</div>
-								
-							</div>
-
-							<!-- Automatyczne wyłączenie sterownika -->
-							<div class="display-row">
-								<label>
-									Czas automatycznego wyłączenia
-									<button class="info-icon" data-info="auto-off-time-info">ℹ</button>
-								</label>
-								<div class="input-with-unit">
-									<input type="number" id="auto-off-time" min="0" max="60" value="5">
-									<span class="unit">min</span>
-								</div>
-							</div>
-
-							<button class="btn-save" onclick="saveDisplayConfig()">Zapisz</button>
-							
-						</div>
-					</div>
-
-					<!-- sekcja sterownika -->
-					<div class="card controller-config collapsible">
-						<div class="card-header">
-							<button class="info-icon" data-info="controller-config-info">ℹ️</button>
-							<h2>Sterownik</h2>
-							<button class="collapse-btn">⚙️</button>
-						</div>		
-						
-						<div class="card-content" style="display: none;">
-							
-							<div class="setting-row">
-								<label>
-									Typ wyświetlacza
-									<button class="info-icon" data-info="display-type-info">ℹ</button>
-								</label>
-
-								<!-- Wybór wyświetlacza -->
-								<select id="controller-type" onchange="toggleControllerParams()">
-									<option value="kt-lcd">KT-LCD</option>
-									<option value="s866">S866</option>
-								</select>
-							</div>
-
-							<!-- Parametry KT-LCD -->
-							<div id="kt-lcd-params">
-						
-								<!-- Parametry P -->
-								<h3>Parametry P</h3>
-								<div class="settings-group">
-
-									<!-- P1 -->
-									<div class="setting-row">
-										<label>
-											P1 - Ilość magnesów w silniku
-											<button class="info-icon" data-info="kt-p1-info">ℹ</button>
-										</label>
-										<select id="kt-p3" name="kt-p3" class="param-input">
-										</select>
-									</div>
-								  
-									<script>
-										const select = document.getElementById('kt-p3');
-										for (let i = 1; i <= 128; i++) {
-											const option = document.createElement('option');
-											option.value = i;
-											option.textContent = i;
-											select.appendChild(option);
-										}
-									</script>
-						
-									<!-- P2 -->
-									<div class="setting-row">
-										<label>
-											P2 - Sposób odczytu prędkości
-											<button class="info-icon" data-info="kt-p2-info">ℹ</button>
-										</label>
-										<select id="kt-p2" name="kt-p2" class="param-input">
-											<option value="0">0: Pomiar z silnika</option>
-											<option value="1">1: Pomiar z koła</option>
-											<option value="1">2: Pomiar z koła 2x magnes</option>
-											<option value="1">3: Pomiar z koła 3x magnes</option>
-											<option value="1">4: Pomiar z koła 4x magnes</option>
-											<option value="1">5: Pomiar z koła 5x magnes</option>
-											<option value="1">6: Pomiar z koła 6x magnes</option>
-										</select>
-									</div>
-						
-									<!-- P3 -->
-									<div class="setting-row">
-										<label>
-											P3 - Tryb działania czujnika PAS
-											<button class="info-icon" data-info="kt-p3-info">ℹ</button>
-										</label>
-										<select id="kt-p3" name="kt-p3" class="param-input">
-											<option value="0">0: Prędkość</option>
-											<option value="1">1: Moment obrotowy</option>
-										</select>
-									</div>
-						
-									<!-- P4 -->						
-									<div class="setting-row">
-										<label>
-											P4 - Ruszanie z manetki
-											<button class="info-icon" data-info="kt-p4-info">ℹ</button>
-										</label>
-										<select id="kt-p4" name="kt-p4" class="param-input">
-											<option value="0">0: Można ruszyć od zera z manetki</option>
-											<option value="1">1: Manetka działa dopiero po ruszeniu</option>
-										</select>
-									</div>
-						
-									<!-- P5 -->				
-									<div class="setting-row">
-										<label>
-											P5 - Sposób obliczania poziomu naładowania akumulatora
-											<button class="info-icon" data-info="kt-p5-info">ℹ</button>
-										</label>
-										<select id="kt-p5" name="kt-p5" class="param-input">
-											<option value="0">0: Automatycznie</option>
-											<option value="4">4: 24V/---/---/---</option>
-											<option value="5">5: 24V/36V/---/---</option>
-											<option value="6">6: 24V/36V/48V/---</option>
-											<option value="7">7: 24V/36V/48V/60V</option>
-											<option value="8">8: 24V/36V/48V/60V</option>
-											<option value="9">9: 24V/36V/48V/60V</option>
-											<option value="10">10: 24V/36V/48V/60V</option>
-											<option value="11">11: 24V/36V/48V/60V</option>
-											<option value="12">12: ---/36V/48V/60V</option>
-											<option value="13">13: ---/36V/48V/60V</option>
-											<option value="14">14: ---/36V/48V/60V</option>
-											<option value="15">15: ---/36V/48V/60V</option>
-											<option value="16">16: ---/---/48V/60V</option>
-											<option value="17">17: ---/---/48V/60V</option>
-											<option value="18">18: ---/---/48V/60V</option>
-											<option value="19">19: ---/---/48V/60V</option>
-											<option value="20">20: ---/---/48V/60V</option>
-											<option value="21">21: ---/---/---/60V</option>
-											<option value="22">22: ---/---/---/60V</option>
-											<option value="23">23: ---/---/---/60V</option>
-											<option value="24">24: ---/---/---/60V</option>
-											<option value="25">25: ---/---/---/60V</option>
-											<option value="26">26: ---/---/---/60V</option>
-											<option value="27">27: ---/---/---/60V</option>
-											<option value="28">28: ---/---/---/60V</option>
-											<option value="29">29: ---/---/---/60V</option>
-											<option value="30">30: ---/---/---/60V</option>
-										</select>
-									</div>
-									
-								</div>	
-
-								<!-- Parametry C -->			    
-								<h3>Parametry C</h3>
-								<div class="settings-group">
-
-									<!-- C1 -->				
-									<div class="setting-row">
-										<label>
-											C1 - Typ czujnika PAS
-											<button class="info-icon" data-info="kt-c1-info">ℹ</button>
-										</label>
-										<select id="kt-c1" name="kt-c1" class="param-input">
-											<option value="0">0: Czujnik PRAWY</option>
-											<option value="1">1: Czujnik PRAWY</option>
-													<option value="2">2: Czujnik PRAWY</option>
-											<option value="3">3: Czujnik PRAWY</option>
-													<option value="4">4: Czujnik PRAWY</option>
-											<option value="5">5: Czujnik LEWY</option>
-													<option value="6">6: Czujnik LEWY</option>
-											<option value="7">7: Czujnik LEWY</option>
-										</select>
-									</div>
-		  
-									<!-- C2 -->           
-									<div class="setting-row">
-										<label>
-											C2 - Próbkowanie faz silnika
-											<button class="info-icon" data-info="kt-c2-info">ℹ</button>
-										</label>
-										<select id="kt-c3" name="kt-c3" class="param-input">
-											<option value="0">0: Domyślnie</option>
-											<option value="1">1:</option>
-											<option value="2">2:</option>
-											<option value="3">3:</option>
-											<option value="4">4:</option>
-											<option value="5">5:</option>
-											<option value="6">6:</option>
-											<option value="7">7:</option>
-										</select>
-									</div>
-
-									<!-- C3 -->
-									<div class="setting-row">
-										<label>
-											C3 - Ustawienie początkowe PAS
-											<button class="info-icon" data-info="kt-c3-info">ℹ</button>
-										</label>
-										<select id="kt-c3" name="kt-c3" class="param-input">
-											<option value="0">0: Wspomaganie 0</option>
-											<option value="1">1: Wspomaganie 1</option>
-											<option value="2">2: Wspomaganie 2</option>
-											<option value="3">3: Wspomaganie 3</option>
-											<option value="4">4: Wspomaganie 4</option>
-											<option value="5">5: Wspomaganie 5</option>
-											<option value="8">8: Jak przed wyłączeniem</option>
-										</select>
-									</div>
-							
-									<!-- C4 -->				    
-									<div class="setting-row">
-										<label>
-											C4 - Zachowanie manetki i PAS
-											<button class="info-icon" data-info="kt-c4-info">ℹ</button>
-										</label>
-										<select id="kt-c4" name="kt-c4" class="param-input">
-											<option value="0">0:</option>
-											<option value="1">1:</option>
-											<option value="2">2:</option>
-											<option value="3">3:</option>
-											<option value="4">4:</option>
-										</select>
-									</div>
-					
-									<script>
-										// Obiekt zawierający opisy dla różnych kombinacji P4 i C4
-										const descriptions = {
-											'0': { // gdy P4 = 0
-												0: "Manetka: pełna moc od 0km/h",
-												1: "Manetka: ograniczenie do 6km/h od 0km/h",
-												2: "Manetka: bieg 0 wyłączony, bieg 1 ograniczona moc",
-												3: "Manetka: regulacja mocy przez PAS, bieg 0 pełna moc",
-												4: "Manetka: bieg 0 wyłączony, biegi 1-5 regulacja mocy + opcja PAS"
-											},
-											'1': { // gdy P4 = 1
-												0: "Manetka: pełna moc po ruszeniu z PAS/nóg",
-												1: "Manetka: limit 6km/h, pełna prędkość po użyciu PAS",
-												2: "Manetka: działa po ruszeniu, ograniczona moc na biegu 1",
-												3: "Manetka: pełna moc z PAS, spadek do 6km/h bez PAS",
-												4: "Manetka: start z PAS/nóg, bieg 0 wyłączony, biegi 1-5 regulacja"
-											}
-										};
-										
-										// Funkcja aktualizująca opisy w C4
-										function updateC4Options() {
-											const p4Value = document.getElementById('kt-p4').value;
-											const c4Select = document.getElementById('kt-c4');
-											
-											// Aktualizacja opisów dla każdej opcji
-											Array.from(c4Select.options).forEach(option => {
-												const value = option.value;
-												option.textContent = descriptions[p4Value][value];
-											});
-										}
-										
-										// Nasłuchiwanie zmiany wartości P4
-										document.getElementById('kt-p4').addEventListener('change', updateC4Options);
-										
-										// Inicjalne ustawienie opisów przy załadowaniu strony
-										updateC4Options();
-									</script>
-
-									<!-- C5 -->				    
-									<div class="setting-row">
-										<label>
-											C5 - Ograniczanie mocy sterownika i zachowanie podczas ruszania
-											<button class="info-icon" data-info="kt-c5-info">ℹ</button>
-										</label>
-										<select id="kt-c5" name="kt-c5" class="param-input">
-											<option value="0">0: Miękki start (poziom 3) maksymalny prąd</option>
-											<option value="1">1: Miękki start (poziom 2) maksymalny prąd</option>
-											<option value="2">2: Miękki start (poziom 1) maksymalny prąd</option>
-											<option value="3">3: Prąd zmniejszony o 50% (÷2.00)</option>
-											<option value="4">4: Prąd zmniejszony o 33% (÷1.50)</option>
-											<option value="5">5: Prąd zmniejszony o 25% (÷1.33)</option>
-													<option value="6">6: Prąd zmniejszony o 20% (÷1.25)</option>
-											<option value="7">7: Prąd zmniejszony o 17% (÷1.20)</option>
-											<option value="8">8: Prąd zmniejszony o 13% (÷1.15)</option>
-											<option value="9">9: Prąd zmniejszony o 9% (÷1.10)</option>
-											<option value="10">10: Pełny prąd sterownika</option>
-										</select>
-									</div>
-
-									<!-- C6 -->				    
-									<div class="setting-row">
-										<label>
-											C6 - Jasność podświetlenia ekranu
-											<button class="info-icon" data-info="kt-c6-info">ℹ</button>
-										</label>
-										<input type="number" id="kt-c6" class="param-input">
-									</div>
-
-									<!-- C7 -->
-									<div class="setting-row">
-										<label>
-											C7 - Tempomat
-											<button class="info-icon" data-info="kt-c7-info">ℹ</button>
-										</label>
-										<select id="kt-c7" name="kt-c7" class="param-input">
-											<option value="0">0: Wyłączony</option>
-											<option value="1">1: Włączony</option>
-										</select>
-									</div>
-
-									<!-- C8 -->                            
-									<div class="setting-row">
-										<label>
-											C8 - Temperatura silnika
-											<button class="info-icon" data-info="kt-c8-info">ℹ</button>
-										</label>
-										<input type="number" id="kt-c8" class="param-input">
-									</div>
-							
-									<!-- C9 -->                            
-									<div class="setting-row">
-										<label>
-											C9 - Hasło
-											<button class="info-icon" data-info="kt-c9-info">ℹ</button>
-										</label>
-										<input type="number" id="kt-c9" class="param-input">
-									</div>
-
-									<!-- C10 -->				    
-									<div class="setting-row">
-										<label>
-											C10 - Ustawienia fabryczne
-											<button class="info-icon" data-info="kt-c10-info">ℹ</button>
-										</label>
-										<input type="number" id="kt-c10" class="param-input">
-									</div>
-
-									<!-- C11 -->				    
-									<div class="setting-row">
-										<label>
-											C11 - Ustawienie serwisowe
-											<button class="info-icon" data-info="kt-c11-info">ℹ</button>
-										</label>
-										<input type="number" id="kt-c11" class="param-input">
-									</div>
-
-									<!-- C12 -->
-									<div class="setting-row">
-										<label>
-											C12 - Minimalne napięcie wyłączenia sterownika
-											<button class="info-icon" data-info="kt-c12-info">ℹ</button>
-										</label>
-										<select id="kt-c12" name="kt-c12" class="param-input">
-											<option value="0">0: -2.0V</option>
-											<option value="1">1: -1.5V</option>
-											<option value="2">2: -1.0V</option>
-											<option value="3">3: -0.5V</option>
-											<option value="4">4: Domyślnie</option>
-											<option value="5">5: +0.5V</option>
-											<option value="6">6: +1.0V</option>
-											<option value="7">7: +1.5V</option>
-										</select>
-									</div>
-
-									<!-- C13 -->				    
-									<div class="setting-row">
-										<label>
-											C13 - Hamowanie regeneracyjne
-											<button class="info-icon" data-info="kt-c13-info">ℹ</button>
-										</label>
-										<select id="kt-c13" name="kt-c13" class="param-input">
-											<option value="0">0: Wyłączone - brak hamowania i odzysku</option>
-											<option value="1">1: Słabe hamowanie + najwyższy odzysk energii</option>
-											<option value="2">2: Umiarkowane hamowanie + średni odzysk</option>
-											<option value="3">3: Średnie hamowanie + umiarkowany odzysk</option>
-											<option value="4">4: Mocne hamowanie + niski odzysk</option>
-											<option value="5">5: Najmocniejsze hamowanie + minimalny odzysk</option>
-										</select>
-									</div>
-
-									<!-- C14 -->				    
-									<div class="setting-row">
-										<label>
-											C14 - Dodatkowe ustawienia PAS
-											<button class="info-icon" data-info="kt-c14-info">ℹ</button>
-										</label>
-										<select id="kt-c14" name="kt-c14" class="param-input">
-											<option value="1">1: Niski poziom wspomagania przez silnik</option>
-													<option value="2">2: Średni poziom wspomagania przez silnik</option>
-													<option value="3">3: Wysoki poziom wspomagania przez silnik</option>
-										</select>
-									</div>
-
-									<!-- C15 -->				    
-									<div class="setting-row">
-										<label>
-											C15 - Prędkość w trybie prowadzenia
-											<button class="info-icon" data-info="kt-c15-info">ℹ</button>
-										</label>
-										<select id="kt-c15" name="kt-c15" class="param-input">
-											<option value="0">0:</option>
-										</select>
-									</div>
-							
-								</div>
-
-								<!-- Parametry L -->			    
-								<h3>Parametry L</h3>
-								<div class="settings-group">
-
-									<!-- L1 -->				
-									<div class="setting-row">
-										<label>
-											L1 - Napięcie minimalne (LVC)
-											<button class="info-icon" data-info="kt-l1-info">ℹ</button>
-										</label>
-										<select id="kt-l1" name="kt-l1" class="param-input">
-											<option value="0">0:</option>
-											<option value="1">1: Próg wyłączenia 20V</option>
-											<option value="2">2: Próg wyłączenia 30V</option>
-											<option value="3">3: Próg wyłączenia 40V</option>
-										</select>
-									</div>
-
-									<!-- L2 -->				
-									<div class="setting-row">
-										<label>
-											L2 - Silniki wysokoobrotowe
-											<button class="info-icon" data-info="kt-l2-info">ℹ</button>
-										</label>
-										<select id="kt-l2" name="kt-l2" class="param-input">
-											<option value="0">Tryb normalny</option>
-											<option value="1">1: Tryb wysokoobrotowy</option>
-										</select>
-									</div>
-
-									<!-- L3 -->
-									<div class="setting-row">
-										<label>
-											L3 - Tryb DUAL
-											<button class="info-icon" data-info="kt-l3-info">ℹ</button>
-										</label>
-										<select id="kt-l3" name="kt-l3" class="param-input">
-											<option value="0">0: Po awarii czujników halla sterownik sam się przełączy na sprawny komplet</option>
-											<option value="1">1: Po awarii czujników halla sterownik się wyłączy i zasygnalizuje błąd</option>
-										</select>
-									</div>
-								
-								</div> 						
-							</div>
-
-							<!-- Parametry S866 -->
-							<div id="s866-lcd-params">					
-							
-							<!-- Parametry P -->			    
-								<h3>Parametry P</h3>
-								<div class="settings-group">
-
-									<!-- P1 -->				
-									<div class="setting-row">
-										<label>
-											P1 - Limit prądu
-											<button class="info-icon" data-info="s866-p1-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p1" class="param-input">
-									</div>
-
-									<!-- P2 -->				
-									<div class="setting-row">
-										<label>
-											P2 - Jednostka pomiaru
-											<button class="info-icon" data-info="s866-p2-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p2" class="param-input">
-									</div>
-
-									<!-- P3 -->				
-									<div class="setting-row">
-										<label>
-											P3 - Napięcie nominalne
-											<button class="info-icon" data-info="s866-p3-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p3" class="param-input">
-									</div>
-
-									<!-- P4 -->
-									<div class="setting-row">
-										<label>
-											P4 - Czas automatycznego uśpienia
-											<button class="info-icon" data-info="s866-p4-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p4" class="param-input">
-									</div>
-
-									<!-- P5 -->
-									<div class="setting-row">
-										<label>
-											P5 - Tryb wspomagania PAS
-											<button class="info-icon" data-info="s866-p5-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p5" class="param-input">
-									</div>
-
-									<!-- P6 -->
-									<div class="setting-row">
-										<label>
-											P6 - Rozmiar koła
-											<button class="info-icon" data-info="s866-p6-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p6" class="param-input">
-									</div>
-
-									<!-- P7 -->
-									<div class="setting-row">
-										<label>
-											P7 - Liczba magnesów czujnika prędkości
-											<button class="info-icon" data-info="s866-p7-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p7" class="param-input">
-									</div>
-
-									<!-- P8 -->
-									<div class="setting-row">
-										<label>
-											P8 - Limit prędkości
-											<button class="info-icon" data-info="s866-p8-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p8" class="param-input">
-									</div>
-
-									<!-- P9 -->
-									<div class="setting-row">
-										<label>
-											P9 - Tryb startu
-											<button class="info-icon" data-info="s866-p9-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p9" class="param-input">
-									</div>
-
-									<!-- P10 -->
-									<div class="setting-row">
-										<label>
-											P10 - Tryb startu
-											<button class="info-icon" data-info="s866-p10-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p10" class="param-input">
-									</div>
-
-									<!-- P11 -->
-									<div class="setting-row">
-										<label>
-											P11 - Czułość PAS
-											<button class="info-icon" data-info="s866-p11-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p11" class="param-input">
-									</div>
-
-									<!-- P12 -->
-									<div class="setting-row">
-										<label>
-											P12 - Siła startu PAS
-											<button class="info-icon" data-info="s866-p12-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p12" class="param-input">
-									</div>
-
-									<!-- P13 -->
-									<div class="setting-row">
-										<label>
-											P13 - Typ czujnika PAS
-											<button class="info-icon" data-info="s866-p13-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p13" class="param-input">
-									</div>
-
-									<!-- P14 -->
-									<div class="setting-row">
-										<label>
-											P14 - Limit prądu sterownika
-											<button class="info-icon" data-info="s866-p14-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p14" class="param-input">
-									</div>
-
-									<!-- P15 -->
-									<div class="setting-row">
-										<label>
-											P15 - Napięcie odcięcia
-											<button class="info-icon" data-info="s866-p15-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p15" class="param-input">
-									</div>
-
-									<!-- P16 -->
-									<div class="setting-row">
-										<label>
-											P16 - Reset licznika ODO
-											<button class="info-icon" data-info="s866-p16-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p16" class="param-input">
-									</div>
-
-									<!-- P17 -->
-									<div class="setting-row">
-										<label>
-											P17 - Tempomat
-											<button class="info-icon" data-info="s866-p17-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p17" class="param-input">
-									</div>
-
-									<!-- P18 -->
-									<div class="setting-row">
-										<label>
-											P18 - Kalibracja prędkości
-											<button class="info-icon" data-info="s866-p18-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p18" class="param-input">
-									</div>
-
-									<!-- P19 -->
-									<div class="setting-row">
-										<label>
-											P19 - Bieg zerowy PAS
-											<button class="info-icon" data-info="s866-p19-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p19" class="param-input">
-									</div>
-
-									<!-- P20 -->
-									<div class="setting-row">
-										<label>
-											P20 - Protokół komunikacji
-											<button class="info-icon" data-info="s866-p20-info">ℹ</button>
-										</label>
-										<input type="number" id="s866-p20" class="param-input">
-									</div>
-
-								</div>					
-							</div>
-							
-							<button class="btn-save" onclick="saveControllerConfig()">Zapisz</button>
-						</div>
-					</div>
-
-					<!-- sekcja ustawień ogólnych -->		    
-					<div class="card general-settings collapsible">
-						<div class="card-header">
-							<button class="info-icon" data-info="general-settings-info">ℹ️</button>
-							<h2>Ustawienia ogólne</h2>
-							<button class="collapse-btn">⚙️</button>
-						</div>
-						<div class="card-content">
-
-                                                    <!-- Przebieg całkowity -->
-                                                    <div class="setting-row">
-                                                        <label>
-                                                            Całkowity przebieg
-                                                            <button class="info-icon" data-info="total-odometer-info">ℹ</button>
-                                                        </label>
-                                                        <div class="input-with-unit">
-                                                            <input type="number" id="total-odometer" name="total-odometer" class="param-input" step="1" min="0">
-                                                            <span class="unit">km</span>
-                                                        </div>
-                                                    </div>
-
-							<!-- Rozmiar koła -->		    
-							<div class="setting-row">
-								<label>
-									Rozmiar koła
-									<button class="info-icon" data-info="wheel-size-info">ℹ</button>
-								</label>
-								<div class="select-wrapper">
-									<select id="wheel-size">
-										<option value="6">6"</option>
-										<option value="8">8"</option>
-										<option value="10">10"</option>
-										<option value="12">12"</option>
-										<option value="14">14"</option>
-										<option value="16">16"</option>
-										<option value="18">18"</option>
-										<option value="20">20"</option>
-										<option value="22">22"</option>
-										<option value="24">24"</option>
-										<option value="26">26"</option>
-										<option value="28">28"</option>
-										<option value="700C">700C</option>
-									</select>
-								</div>
-							</div>		
-					
-							<button class="btn-save" onclick="saveGeneralSettings()">Zapisz</button>
-							
-						</div>	
-					</div>
-					
-					<!-- sekcja konfiguracji Bluetooth -->
-					<div class="card bluetooth-config collapsible">
-						<div class="card-header">
-							<button class="info-icon" data-info="bluetooth-config-info">ℹ️</button>
-							<h2>Konfiguracja Bluetooth</h2>
-							<button class="collapse-btn">⚙️</button>
-						</div>
-						<div class="card-content">
-
-							<!-- BMS -->
-							<div class="setting-row">
-								<label>
-									BMS
-									<button class="info-icon" data-info="bms-info">ℹ</button>
-								</label>
-								<div class="toggle-switch">
-									<select id="bms-enabled">
-										<option value="false">Nie</option>
-										<option value="true">Tak</option>
-									</select>
-								</div>
-							</div>
-
-							<!-- Adres MAC BMS (prawdopodobnie już istnieje, ale dodaję dla kompletności) -->
-							<div class="setting-row" id="bms-mac-row" style="display:none;">
-								<label>
-									Adres MAC BMS
-									<button class="info-icon" data-info="bms-mac-info">ℹ</button>
-								</label>
-								<div>
-									<input type="text" id="bms-mac" placeholder="XX:XX:XX:XX:XX:XX">
-								</div>
-							</div>
-
-							<!-- TPMS -->
-							<div class="setting-row">
-								<label>
-									TPMS
-									<button class="info-icon" data-info="tpms-info">ℹ</button>
-								</label>
-								<div class="toggle-switch">
-									<select id="tpms-enabled" onchange="toggleTpmsFields()">
-										<option value="false">Nie</option>
-										<option value="true">Tak</option>
-									</select>
-								</div>
-							</div>
-
-							<!-- Pola MAC adresów TPMS - będą pokazywane/ukrywane przez JavaScript -->
-							<div id="tpms-fields" style="display:none;">
-								<!-- Przedni czujnik TPMS -->
-								<div class="setting-row">
-									<label>
-										Przedni czujnik TPMS (MAC)
-										<button class="info-icon" data-info="front-tpms-mac-info">ℹ</button>
-									</label>
-									<div>
-										<input type="text" id="front-tpms-mac" placeholder="XX:XX:XX:XX:XX:XX">
-									</div>
-								</div>
-								
-								<!-- Tylny czujnik TPMS -->
-								<div class="setting-row">
-									<label>
-										Tylny czujnik TPMS (MAC)
-										<button class="info-icon" data-info="rear-tpms-mac-info">ℹ</button>
-									</label>
-									<div>
-										<input type="text" id="rear-tpms-mac" placeholder="XX:XX:XX:XX:XX:XX">
-									</div>
-								</div>
-							</div>
-
-							<button class="btn-save" onclick="saveBluetoothConfig()">Zapisz</button>
-							
-						</div>
-					</div>
-
-					<!-- Stopka z informacją o wersji systemu -->
-					<footer>
-						<span>Project by PMW e-Bike System wer. <span id="system-version">...</span></span>		
-					</footer>
-
-				</section>
-				
-			</main>   
-			
-		</div>
-
-		<!-- Modal -->
-		<div id="info-modal" class="modal">
-			<div class="modal-content">
-				<div class="modal-header">
-					<h3 id="modal-title"></h3>
-					<button class="close-modal">&times;</button>
-				</div>
-				<div class="modal-body">
-					<p id="modal-description"></p>
-				</div>
-			</div>
-		</div>
+// Funkcja do pobierania i aktualizacji czasu
+// Funkcja do pobierania i aktualizacji czasu
+async function updateClock() {
+    try {
+        const response = await fetch('/api/time');
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data && data.time) {
+            const time = data.time;
+            
+            // Format czasu HH:MM:SS
+            const timeString = `${time.hours.toString().padStart(2, '0')}:${time.minutes.toString().padStart(2, '0')}:${time.seconds.toString().padStart(2, '0')}`;
+            
+            // Format daty YYYY-MM-DD
+            const dateString = `${time.year}-${time.month.toString().padStart(2, '0')}-${time.day.toString().padStart(2, '0')}`;
+            
+            // Zaktualizuj pola na stronie
+            document.getElementById('rtc-time').value = timeString;
+            document.getElementById('rtc-date').value = dateString;
+            
+            console.log('Zaktualizowano czas:', timeString, 'datę:', dateString);
+        } else {
+            console.warn('Nieprawidłowa odpowiedź serwera dla czasu:', data);
+        }
+    } catch (error) {
+        console.error('Błąd podczas pobierania czasu:', error);
+    }
+}
+
+// Wywołaj funkcję po załadowaniu strony
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM załadowany, inicjowanie...');
+    
+    // Inicjalizacja strony z opóźnieniem dla pewności
+    setTimeout(() => {
+        // Pobierz aktualny czas
+        updateClock();
+        
+        // Wczytaj konfigurację świateł
+        loadLightConfig();
+        
+        console.log('Inicjalizacja zakończona.');
+    }, 500);
+    
+    // Aktualizuj zegar co minutę
+    setInterval(updateClock, 60000);
+    
+    // Przypisz funkcję zapisu do przycisku ustawiania czasu
+    document.querySelector('.rtc-row .btn-save').addEventListener('click', saveRTCConfig);
+});
+
+
+// Funkcja konwersji wartości formularza na wartości API
+function getLightMode(value) {
+    debug('Konwersja wartości formularza:', value);
+    switch(value) {
+        case 'front-day':
+        case 'front-normal':
+            return "FRONT";
+        case 'rear':
+            return "REAR";
+        case 'front-day-rear':
+        case 'front-normal-rear':
+            return "BOTH";
+        case 'off':
+        default:
+            return "NONE";
+    }
+}
+
+// Funkcja konwersji wartości z API na wartości formularza
+function getFormValue(serverValue, isNightMode = false) {
+    debug('Konwersja wartości z serwera:', serverValue);
+    switch(serverValue) {
+        case 'FRONT':
+            return isNightMode ? 'front-normal' : 'front-day';
+        case 'REAR':
+            return 'rear';
+        case 'BOTH':
+            return isNightMode ? 'front-normal-rear' : 'front-day-rear';
+        case 'NONE':
+        default:
+            return 'off';
+    }
+}
+
+// Dodaj zmienną do kontroli debounce
+let saveTimeout = null;
+
+// Na początku pliku w sekcji funkcji inicjalizujących
+async function loadOdometerValue() {
+    try {
+        const response = await fetch('/api/odometer');
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        const value = await response.text();
+        document.getElementById('total-odometer').value = Math.floor(parseFloat(value));
+    } catch (error) {
+        console.error('Error loading odometer:', error);
+    }
+}
+
+// Dodaj przed saveGeneralSettings()
+async function saveOdometerValue() {
+    const odometerInput = document.getElementById('total-odometer');
+    if (!odometerInput) return;
+
+    const value = odometerInput.value;
+    if (value === '') return;
+
+    try {
+        const response = await fetch('/api/setOdometer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `value=${value}`
+        });
+
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+
+        const result = await response.text();
+        if (result === 'OK') {
+            console.log('Odometer value saved successfully');
+        } else {
+            throw new Error('Failed to save odometer value');
+        }
+    } catch (error) {
+        console.error('Error saving odometer:', error);
+        alert('Error saving odometer value');
+    }
+}
+
+// Funkcja do wyświetlania powiadomień toast
+function showToast(message, type = 'info') {
+    // Sprawdź czy kontener na toasty istnieje
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        // Utwórz kontener jeśli nie istnieje
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(toastContainer);
+    }
+    
+    // Utwórz element toast
+    const toastId = 'toast-' + Date.now();
+    const toast = document.createElement('div');
+    toast.id = toastId;
+    toast.className = 'toast';
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    // Ustaw różne kolory w zależności od typu
+    let bgClass = 'bg-primary text-white';
+    if (type === 'success') {
+        bgClass = 'bg-success text-white';
+    } else if (type === 'error') {
+        bgClass = 'bg-danger text-white';
+    } else if (type === 'warning') {
+        bgClass = 'bg-warning text-dark';
+    }
+    
+    // Struktura toast
+    toast.innerHTML = `
+        <div class="toast-header ${bgClass}">
+            <strong class="me-auto">eBike System</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            ${message}
+        </div>
+    `;
+    
+    // Dodaj toast do kontenera
+    toastContainer.appendChild(toast);
+    
+    // Inicjalizuj toast za pomocą Bootstrap
+    const bsToast = new bootstrap.Toast(toast, {
+        autohide: true,
+        delay: 3000
+    });
+    
+    // Pokaż toast
+    bsToast.show();
+    
+    // Usuń element po ukryciu
+    toast.addEventListener('hidden.bs.toast', function () {
+        toast.remove();
+    });
+}
+
+function verifyLightElements() {
+    const requiredElements = [
+        'day-lights', 'night-lights', 'day-blink', 'night-blink', 'blink-frequency', 'save-light-config'
+    ];
+    
+    const missingElements = [];
+    
+    for (const id of requiredElements) {
+        if (!document.getElementById(id)) {
+            missingElements.push(id);
+        }
+    }
+    
+    if (missingElements.length > 0) {
+        console.error('Brakuje następujących elementów formularza świateł:', missingElements.join(', '));
+        return false;
+    }
+    
+    return true;
+}
+
+// Funkcja pomocnicza do debugowania
+function debug(...args) {
+    if (typeof console !== 'undefined') {
+        console.log('[DEBUG]', ...args);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async function() {
+    debug('Inicjalizacja aplikacji...');
+
+    let clockInterval;
+    
+    try {
+        // Sprawdź czy wszystkie elementy formularza świateł istnieją
+        if (!verifyLightElements()) {
+            console.error('Nie wszystkie wymagane elementy formularza świateł są dostępne');
+        }
+
+        // Inicjalizacja zegara
+        clockInterval = initializeClock();
+
+        // Dodajemy inicjalizację sekcji zwijanych
+        initializeCollapsibleSections();
+        
+        // Poczekaj na załadowanie DOM
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        // Dodaj wczytywanie licznika
+        await loadOdometerValue();
+
+        // Inicjalizacja pozostałych modułów
+        if (document.querySelector('.light-config')) {
+            await loadLightConfig();
+        }
+
+        await Promise.all([
+            fetchDisplayConfig(),
+            fetchControllerConfig(),
+            fetchSystemVersion()
+        ]);
+
+        // Inicjalizacja WebSocket i UI
+        setupWebSocket();
+        setupModal();
+        setupFormListeners(); // Prawidłowa inicjalizacja nasłuchiwania zdarzeń formularza
+
+        debug('Inicjalizacja zakończona pomyślnie');
+    } catch (error) {
+        console.error('Błąd podczas inicjalizacji:', error);
+        // W przypadku błędu, zatrzymaj interval zegara
+        if (clockInterval) clearInterval(clockInterval);
+    }
+});
+
+function checkAPIResponse(response, errorMessage = 'Błąd API') {
+    if (!response.ok) {
+        throw new Error(`${errorMessage}: ${response.status}`);
+    }
+    return response.json();
+}
+
+function showModal(title, description) {
+    const modal = document.getElementById('info-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalDescription = document.getElementById('modal-description');
+    
+    if (modal && modalTitle && modalDescription) {
+        modalTitle.textContent = title;
+        modalDescription.textContent = description;
+        modal.style.display = 'block';
+    }
+}
+
+let ws = null;
+
+function setupWebSocket() {
+    debug('Inicjalizacja WebSocket...');
+    function connect() {
+        ws = new WebSocket('ws://' + window.location.hostname + '/ws');
+        
+        ws.onopen = () => {
+            debug('WebSocket połączony');
+            // Pobierz aktualny stan po połączeniu
+            fetchCurrentState();
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                debug('Otrzymano dane WebSocket:', data);
+                if (data.lights) {
+                    updateLightStatus(data.lights);
+                    updateLightForm(data.lights); // Aktualizuj też formularz
+                }
+            } catch (error) {
+                console.error('Błąd podczas przetwarzania danych WebSocket:', error);
+            }
+        };
+
+        ws.onclose = () => {
+            debug('WebSocket rozłączony, próba ponownego połączenia za 5s');
+            setTimeout(connect, 5000);
+        };
+
+        ws.onerror = (error) => {
+            console.error('Błąd WebSocket:', error);
+        };
+    }
+
+    connect();
+}
+
+async function fetchRTCTime() {
+    try {
+        const timeElement = document.getElementById('rtc-time');
+        const dateElement = document.getElementById('rtc-date');
+
+        if (!timeElement || !dateElement) {
+            debug('Elementy czasu nie są gotowe');
+            return;
+        }
+
+        const response = await fetch('/api/time');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data && data.time) {
+            const { hours, minutes, seconds, year, month, day } = data.time;
+            
+            const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            const dateStr = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+            
+            timeElement.value = timeStr;
+            dateElement.value = dateStr;
+            
+            debug('Zaktualizowano czas:', { time: timeStr, date: dateStr });
+        }
+    } catch (error) {
+        console.error('Błąd podczas pobierania czasu RTC:', error);
+    }
+}
+
+// Funkcja inicjalizacji zegara
+function initializeClock() {
+    debug('Inicjalizacja zegara');
+    fetchRTCTime(); // Pierwsze pobranie
+    return setInterval(fetchRTCTime, 1000); // Aktualizacja co sekundę
+}
+
+function checkElements(...ids) {
+    const missing = [];
+    const elements = {};
+
+    for (const id of ids) {
+        const element = document.getElementById(id);
+        if (!element) {
+            missing.push(id);
+        }
+        elements[id] = element;
+    }
+
+    if (missing.length > 0) {
+        throw new Error(`Brak elementów: ${missing.join(', ')}`);
+    }
+
+    return elements;
+}
+
+// Funkcja do zapisywania aktualnego czasu z przeglądarki
+async function saveRTCConfig() {
+    try {
+        const now = new Date();
+        
+        const timeData = {
+            year: now.getFullYear(),
+            month: now.getMonth() + 1,  // JavaScript miesiące są indeksowane od 0
+            day: now.getDate(),
+            hour: now.getHours(),
+            minute: now.getMinutes(),
+            second: now.getSeconds()
+        };
+        
+        const response = await fetch('/api/time', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(timeData)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.status === 'ok') {
+            showNotification('Czas został zaktualizowany!', 'success');
+            updateClock();  // Odśwież wyświetlany czas
+        } else {
+            throw new Error(result.error || 'Nieznany błąd podczas ustawiania czasu');
+        }
+    } catch (error) {
+        console.error('Błąd podczas zapisywania czasu:', error);
+        showNotification('Błąd: ' + error.message, 'error');
+    }
+}  
+
+// Funkcja do wyświetlania powiadomień
+function showNotification(message, type = 'info') {
+    // Sprawdź czy element powiadomienia istnieje
+    let notification = document.getElementById('notification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'notification';
+        document.body.appendChild(notification);
+    }
+    
+    // Ustaw typ powiadomienia
+    notification.className = 'notification ' + type;
+    notification.textContent = message;
+    notification.style.display = 'block';
+    
+    // Ukryj powiadomienie po 3 sekundach
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            notification.style.display = 'none';
+            notification.style.opacity = '1';
+        }, 500);
+    }, 3000);
+}
+
+// Funkcja pobierająca konfigurację świateł
+async function fetchLightConfig() {
+    try {
+        const response = await fetch('/api/status');
+        const data = await response.json();
+        if (data.lights) {
+            document.getElementById('day-lights').value = data.lights.dayLights;
+            document.getElementById('night-lights').value = data.lights.nightLights;
+            document.getElementById('day-blink').checked = data.lights.dayBlink;
+            document.getElementById('night-blink').checked = data.lights.nightBlink;
+            document.getElementById('blink-frequency').value = data.lights.blinkFrequency;
+        }
+    } catch (error) {
+        console.error('Błąd podczas pobierania konfiguracji świateł:', error);
+    }
+}
+
+function setupFormListeners() {
+    const formElements = [
+        'day-lights',
+        'night-lights',
+        'day-blink',
+        'night-blink',
+        'blink-frequency'
+    ];
+
+    formElements.forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.addEventListener('change', () => {
+                debug(`Zmieniono wartość ${elementId}:`, 
+                    element.type === 'checkbox' ? element.checked : element.value);
+            });
+        }
+    });
+
+    // Dodaj listener do przycisku zapisu
+    const saveButton = document.getElementById('save-light-config'); // Poprawne ID przycisku
+    if (saveButton) {
+        saveButton.addEventListener('click', saveLightConfig);
+        debug('Przycisk zapisywania ustawień świateł zainicjalizowany (setupFormListeners)');
+    } else {
+        console.error('Nie znaleziono przycisku save-light-config w setupFormListeners');
+    }
+}
+
+// Funkcja inicjalizacji formularza świateł
+function initializeLightForm() {
+    debug('Inicjalizacja formularza świateł');
+    const form = document.getElementById('lights-form');
+    if (!form) {
+        console.error('Nie znaleziono formularza świateł');
+        return false;
+    }
+    return true;
+}
+
+// Funkcja sprawdzająca elementy formularza
+function getLightFormElements() {
+    const elements = {
+        dayLights: document.getElementById('day-lights'),
+        nightLights: document.getElementById('night-lights'),
+        dayBlink: document.getElementById('day-blink'),
+        nightBlink: document.getElementById('night-blink'),
+        blinkFrequency: document.getElementById('blink-frequency')
+    };
+
+    const missing = Object.entries(elements)
+        .filter(([_, element]) => !element)
+        .map(([name]) => name);
+
+    if (missing.length > 0) {
+        throw new Error(`Brak elementów formularza: ${missing.join(', ')}`);
+    }
+
+    return elements;
+}
+
+async function fetchCurrentState(retries = 3) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            debug(`Próba pobrania stanu (${i + 1}/${retries})`);
+            const response = await fetch('/api/status');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            debug('Otrzymane dane statusu:', data);
+
+            if (data.lights) {
+                updateLightStatus(data.lights);
+                updateLightForm(data.lights);
+                return true;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error) {
+            console.error(`Błąd podczas próby ${i + 1}:`, error);
+            if (i === retries - 1) throw error;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+    return false;
+}
+
+async function fetchCurrentState() {
+    try {
+        debug('Pobieranie aktualnego stanu...');
+        const response = await fetch('/api/status');
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        debug('Otrzymane dane statusu:', data);
+
+        if (data.lights) {
+            // Aktualizacja interfejsu
+            updateLightStatus(data.lights);
+            // Aktualizacja formularza
+            updateLightForm(data.lights);
+        }
+    } catch (error) {
+        console.error('Błąd podczas pobierania stanu:', error);
+    }
+}
+
+// Funkcja do aktualizacji formularza na podstawie otrzymanego stanu
+function updateLightForm(lights) {
+    debug('Aktualizacja formularza, otrzymane dane:', lights);
+    
+    try {
+        document.getElementById('day-lights').value = lights.dayLights || 'NONE';
+        document.getElementById('night-lights').value = lights.nightLights || 'NONE';
+        document.getElementById('day-blink').checked = Boolean(lights.dayBlink);
+        document.getElementById('night-blink').checked = Boolean(lights.nightBlink);
+        document.getElementById('blink-frequency').value = lights.blinkFrequency || 500;
+        
+        debug('Formularz zaktualizowany pomyślnie');
+    } catch (error) {
+        console.error('Błąd podczas aktualizacji formularza:', error);
+    }
+}
+
+function setupModal() {
+    const modal = document.getElementById('info-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalDescription = document.getElementById('modal-description');
+    
+    // Otwieranie modala przez info-icons
+    document.querySelectorAll('.info-icon').forEach(button => {
+        button.addEventListener('click', function() {
+            const infoId = this.dataset.info;
+            const info = infoContent[infoId];
+            
+            if (info) {
+                modalTitle.textContent = info.title;
+                modalDescription.textContent = info.description;               
+                modal.style.display = 'block';
+            } else {
+                console.error('Nie znaleziono opisu dla:', infoId);
+            }
+        });
+    });
+    
+    // Zamykanie modala
+    document.querySelector('.close-modal').addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+    
+    // Zamykanie po kliknięciu poza modalem
+    window.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+}
+
+// Funkcja aktualizacji statusu świateł
+function updateLightStatus(lights) {
+    try {
+        const elements = getLightFormElements();
+        if (!elements) return;
+
+        // Aktualizacja klas CSS dla wskaźników świateł (jeśli są)
+        const indicators = {
+            frontDay: document.querySelector('.light-indicator.front-day'),
+            front: document.querySelector('.light-indicator.front'),
+            rear: document.querySelector('.light-indicator.rear')
+        };
+
+        for (const [key, indicator] of Object.entries(indicators)) {
+            if (indicator) {
+                indicator.classList.toggle('active', Boolean(lights[key]));
+            }
+        }
+
+        debug('Status świateł zaktualizowany');
+    } catch (error) {
+        console.error('Błąd podczas aktualizacji statusu świateł:', error);
+    }
+}
+
+// Funkcja pobierająca konfigurację wyświetlacza
+async function fetchDisplayConfig() {
+    try {
+        const response = await fetch('/api/status');
+        const data = await response.json();
+        if (data.backlight) {
+            document.getElementById('day-brightness').value = data.backlight.dayBrightness;
+            document.getElementById('night-brightness').value = data.backlight.nightBrightness;
+            document.getElementById('display-auto').value = data.backlight.autoMode.toString();
+            // Ustawienie jasności normalnej na podstawie jasności dziennej w trybie manualnym
+            document.getElementById('brightness').value = data.backlight.dayBrightness;
+            // Wywołaj funkcję przełączania, aby odpowiednio pokazać/ukryć sekcje
+            toggleAutoBrightness();
+        }
+    } catch (error) {
+        console.error('Błąd podczas pobierania konfiguracji wyświetlacza:', error);
+    }
+}
+
+// Funkcja zapisująca konfigurację wyświetlacza
+async function saveDisplayConfig() {
+    try {
+        const autoMode = document.getElementById('display-auto').value === 'true';
+        const data = {
+            dayBrightness: parseInt(autoMode ? 
+                document.getElementById('day-brightness').value : 
+                document.getElementById('brightness').value),
+            nightBrightness: parseInt(document.getElementById('night-brightness').value),
+            autoMode: autoMode
+        };
+
+        console.log('Wysyłane dane:', data); // dla debugowania
+
+        const response = await fetch('/api/display/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+        console.log('Odpowiedź serwera:', result); // dla debugowania
+
+        if (result.status === 'ok') {
+            alert('Zapisano ustawienia wyświetlacza');
+            await fetchDisplayConfig(); // odśwież wyświetlane ustawienia
+        } else {
+            throw new Error(result.message || 'Błąd odpowiedzi serwera');
+        }
+    } catch (error) {
+        console.error('Błąd podczas zapisywania:', error);
+        alert('Błąd podczas zapisywania ustawień: ' + error.message);
+    }
+}
+
+function toggleAutoBrightness() {
+    const autoMode = document.getElementById('display-auto').value === 'true';
+    const autoBrightnessSection = document.getElementById('auto-brightness-section');
+    const normalBrightness = document.getElementById('brightness').parentElement.parentElement;
+    
+    if (autoMode) {
+        autoBrightnessSection.style.display = 'block';
+        normalBrightness.style.display = 'none';
+        // Ustaw jasność dzienną jako domyślną jasność
+        document.getElementById('day-brightness').value = document.getElementById('brightness').value;
+    } else {
+        autoBrightnessSection.style.display = 'none';
+        normalBrightness.style.display = 'flex';
+        // Ustaw normalną jasność na wartość jasności dziennej
+        document.getElementById('brightness').value = document.getElementById('day-brightness').value;
+    }
+}
+
+// Walidacja dla pól numerycznych wyświetlacza
+document.querySelectorAll('#day-brightness, #night-brightness').forEach(input => {
+    input.addEventListener('input', function() {
+        let value = parseInt(this.value);
+        if (value < 0) this.value = 0;
+        if (value > 100) this.value = 100;
+    });
+});
+
+// Funkcja przełączająca widoczność parametrów w zależności od wybranego sterownika
+function toggleControllerParams() {
+    const controllerType = document.getElementById('controller-type').value;
+    const ktLcdParams = document.getElementById('kt-lcd-params');
+    const s866Params = document.getElementById('s866-lcd-params');
+
+    if (controllerType === 'kt-lcd') {
+        ktLcdParams.style.display = 'block';
+        s866Params.style.display = 'none';
+    } else if (controllerType === 's866') {
+        ktLcdParams.style.display = 'none';
+        s866Params.style.display = 'block';
+    }
+}
+
+// Funkcja pobierająca konfigurację sterownika
+async function fetchControllerConfig() {
+    try {
+        const response = await fetch('/api/status');
+        const data = await response.json();
+        if (data.controller) {
+            // Ustaw typ sterownika
+            document.getElementById('controller-type').value = data.controller.type;
+            toggleControllerParams();
+
+            // Wypełnij parametry dla KT-LCD
+            if (data.controller.type === 'kt-lcd') {
+                // Parametry P
+                for (let i = 1; i <= 5; i++) {
+                    document.getElementById(`kt-p${i}`).value = data.controller[`p${i}`] || '';
+                }
+                // Parametry C
+                for (let i = 1; i <= 15; i++) {
+                    document.getElementById(`kt-c${i}`).value = data.controller[`c${i}`] || '';
+                }
+                // Parametry L
+                for (let i = 1; i <= 3; i++) {
+                    document.getElementById(`kt-l${i}`).value = data.controller[`l${i}`] || '';
+                }
+            }
+            // Wypełnij parametry dla S866
+            else if (data.controller.type === 's866') {
+                document.getElementById('controller-type').value = 's866';
+                for (let i = 1; i <= 20; i++) {
+                    const input = document.getElementById(`s866-p${i}`);
+                    if (input) {
+                        input.value = data.controller[`p${i}`] || '';
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Błąd podczas pobierania konfiguracji sterownika:', error);
+    }
+}
+
+// Funkcja zapisująca konfigurację sterownika
+async function saveControllerConfig() {
+    try {
+        const controllerType = document.getElementById('controller-type').value;
+        let data = {
+            type: controllerType,
+        };
+
+        // Zbierz parametry w zależności od typu sterownika
+        if (controllerType === 'kt-lcd') {
+            // Parametry P
+            for (let i = 1; i <= 5; i++) {
+                const value = document.getElementById(`kt-p${i}`).value;
+                if (value !== '') data[`p${i}`] = parseInt(value);
+            }
+            // Parametry C
+            for (let i = 1; i <= 15; i++) {
+                const value = document.getElementById(`kt-c${i}`).value;
+                if (value !== '') data[`c${i}`] = parseInt(value);
+            }
+            // Parametry L
+            for (let i = 1; i <= 3; i++) {
+                const value = document.getElementById(`kt-l${i}`).value;
+                if (value !== '') data[`l${i}`] = parseInt(value);
+            }
+        } else if (controllerType === 's866') {
+            // Zbierz wszystkie parametry S866 (P1-P20)
+            for (let i = 1; i <= 20; i++) {
+                const value = document.getElementById(`s866-p${i}`).value;
+                if (value !== '') {
+                    data.p[i] = parseInt(value);
+                }
+            }
+        }
+
+        const response = await fetch('/api/controller/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+        if (result.status === 'ok') {
+            alert('Zapisano ustawienia sterownika');
+            await fetchControllerConfig(); // Odśwież widok
+            fetchControllerConfig();
+        } else {
+            throw new Error('Błąd odpowiedzi serwera');
+        }
+    } catch (error) {
+        console.error('Błąd podczas zapisywania konfiguracji sterownika:', error);
+        alert('Błąd podczas zapisywania ustawień: ' + error.message);
+    }
+}
+
+// Obiekt z informacjami dla każdego parametru
+const infoContent = {
+
+    // Sekcja zegara //
+
+    'rtc-info': {
+        title: '⏰ Konfiguracja zegara',
+        description: `Panel konfiguracji zegara czasu rzeczywistego (RTC)
+
+    ⌚ Funkcje:
+      - Synchronizacja czasu systemowego
+      - Podtrzymanie bateryjne
+      - Format 24-godzinny
+      - Kalendarz z datą
+
+    🔄 Synchronizacja:
+      1. Sprawdź czas na swoim urządzeniu
+      2. Kliknij "Ustaw aktualny czas"
+      3. System automatycznie:
+          • Pobierze czas z twojego urządzenia
+          • Zaktualizuje zegar systemowy
+          • Potwierdzi synchronizację
+
+    💡 WSKAZÓWKI:
+      - Synchronizuj czas po wymianie baterii
+      - Sprawdzaj dokładność co kilka miesięcy
+      - Używaj dokładnego źródła czasu
+
+    ⚠️ WAŻNE: 
+      - Zegar działa nawet po odłączeniu głównego zasilania
+      - Bateria podtrzymująca wystarcza na około 2-3 lata
+      - Wymień baterię gdy zauważysz rozbieżności w czasie`
+    },
+
+    // Sekcja świateł //
+
+    'light-config-info': {
+        title: '💡 Konfiguracja świateł',
+        description: `Panel konfiguracji systemu oświetlenia.
+
+    🌞 Tryb dzienny:
+      - Światła do jazdy dziennej
+      - Zwiększona widoczność
+
+    🌙 Tryb nocny:
+      - Pełne oświetlenie drogi
+      - Dostosowanie do warunków
+
+    ⚙️ Opcje konfiguracji:
+      - Przód: światła dzienne/zwykłe
+      - Tył: światło pozycyjne
+      - Tryb pulsacyjny (mruganie)
+      - Częstotliwość mrugania
+
+    💡 WSKAZÓWKI:
+      - Używaj świateł nawet w dzień
+      - Dostosuj jasność do warunków
+      - Regularnie sprawdzaj działanie
+
+    ⚠️ WAŻNE:
+      - Sprawdź lokalne przepisy
+      - Utrzymuj światła w czystości
+      - Wymień uszkodzone elementy`
+    },
+
+    'day-lights-info': {
+        title: '☀️ Światła dzienne',
+        description: `Wybór konfiguracji świateł dla jazdy w dzień:
+
+      - Wyłączone: wszystkie światła wyłączone 
+      - Przód dzień: przednie światło w trybie dziennym 
+      - Przód zwykłe: przednie światło w trybie normalnym 
+      - Tył: tylko tylne światło 
+      - Przód dzień + tył: przednie światło dzienne i tylne 
+      - Przód zwykłe + tył: przednie światło normalne i tylne`
+    },
+
+    'day-blink-info': {
+        title: 'Mruganie tylnego światła (dzień)',
+        description: `Włącza lub wyłącza funkcję mrugania tylnego światła podczas jazdy w dzień. 
+
+    Mrugające światło może być bardziej widoczne 
+    dla innych uczestników ruchu.`
+    },
+
+    'night-lights-info': {
+        title: '🌙 Światła nocne',
+        description: `Wybór konfiguracji świateł dla jazdy w nocy:
+ 
+      - Wyłączone: wszystkie światła wyłączone 
+      - Przód dzień: przednie światło w trybie dziennym 
+      - Przód zwykłe: przednie światło w trybie normalnym 
+      - Tył: tylko tylne światło 
+      - Przód dzień + tył: przednie światło dzienne i tylne 
+      - Przód zwykłe + tył: przednie światło normalne i tylne`
+    },
+
+    'night-blink-info': {
+        title: 'Mruganie tylnego światła (noc)',
+        description: `Włącza lub wyłącza funkcję mrugania tylnego światła podczas jazdy w nocy. 
+    
+    Należy rozważnie używać tej funkcji, gdyż w niektórych warunkach migające światło może być bardziej dezorientujące niż pomocne.`
+    },
+
+    'blink-frequency-info': {
+        title: '⚡ Częstotliwość mrugania',
+        description: `Określa częstotliwość mrugania tylnego światła w milisekundach. 
+        
+    Mniejsza wartość oznacza szybsze mruganie, a większa - wolniejsze. Zakres: 100-2000ms.`
+    },
+
+    // Sekcja wyświetlacza //
+
+    'display-config-info': {
+        title: '📱 Konfiguracja wyświetlacza',
+        description: `Panel konfiguracji wyświetlacza LCD.
+
+    Dostępne opcje:
+    🔆 Jasność:
+      - Tryb automatyczny: automatyczne dostosowanie jasności
+      - Jasność dzienna: poziom w trybie dziennym (0-100%)
+      - Jasność nocna: poziom w trybie nocnym (0-100%)
+    
+    💡 WSKAZÓWKI:
+      - W nocy zalecana jasność 30-50%
+      - W dzień zalecana jasność 70-100%
+    
+    ⚠️ UWAGA: 
+    Zbyt niska jasność może utrudnić odczyt w silnym świetle słonecznym`
+    },
+
+    'brightness-info': {
+        title: '🔆 Podświetlenie wyświetlacza',
+        description: `Ustaw jasność podświetlenia wyświetlacza w zakresie od 0% do 100%. 
+        
+    Wyższa wartość oznacza jaśniejszy wyświetlacz. Zalecane ustawienie to 50-70% dla optymalnej widoczności.`
+    },
+
+    'auto-mode-info': {
+        title: '🤖 Tryb automatyczny',
+        description: `Automatycznie przełącza jasność wyświetlacza w zależności od ustawionych świateł dzień/noc. W trybie dziennym używa jaśniejszego podświetlenia, a w nocnym - przyciemnionego. Gdy światła nie są włączone to jasność jest ustawiona jak dla dnia`
+    },
+
+    'day-brightness-info': {
+        title: '☀️ Jasność dzienna',
+        description: `Poziom jasności wyświetlacza używany w ciągu dnia (0-100%). Zalecana wyższa wartość dla lepszej widoczności w świetle słonecznym.`
+    },
+
+    'night-brightness-info': {
+        title: '🌙 Jasność nocna',
+        description: `Poziom jasności wyświetlacza używany w nocy (0-100%). Zalecana niższa wartość dla komfortowego użytkowania w ciemności.`
+    },
+
+    'auto-off-time-info': {
+        title: '⏰ Czas automatycznego wyłączenia',
+        description: `Określa czas bezczynności, po którym system automatycznie się wyłączy.
+
+        Zakres: 0-60 minut
+        0: Funkcja wyłączona (system nie wyłączy się automatycznie)
+        1-60: Czas w minutach do automatycznego wyłączenia
+
+        💡 WSKAZÓWKA:
+          - Krótszy czas oszczędza baterię
+          - Dłuższy czas jest wygodniejszy przy dłuższych postojach
+        
+        ⚠️ UWAGA:
+        System zawsze zapisze wszystkie ustawienia przed wyłączeniem`
+    },
+
+    // Sekcja sterownika //
+
+    'controller-config-info': {
+        title: '🎮 Konfiguracja sterownika',
+        description: `Panel konfiguracji sterownika silnika.
+
+    Obsługiwane sterowniki:
+    🔷 KT-LCD:
+      - Parametry P1-P5: podstawowa konfiguracja
+      - Parametry C1-C15: zaawansowane ustawienia
+      - Parametry L1-L3: specjalne funkcje
+    
+    🔶 S866:
+      - Parametry P1-P20: pełna konfiguracja
+    
+    ⚠️ WAŻNE:
+      - Nieprawidłowa konfiguracja może wpłynąć na:
+        • Działanie silnika
+        • Zużycie energii
+        • Żywotność komponentów
+      - W razie wątpliwości użyj ustawień domyślnych
+    
+    💡 WSKAZÓWKA:
+    Każdy parametr ma szczegółowy opis dostępny
+    pod ikoną informacji (ℹ️)`
+    },
+
+    'display-type-info': {
+        title: '🔍 Wybór typu wyświetlacza',
+        description: `Wybierz odpowiedni model wyświetlacza LCD zainstalowanego w Twoim rowerze.
+
+        🟦 KT-LCD:
+        • Standardowy wyświetlacz z serii KT
+        • Obsługuje parametry P1-P5, C1-C15, L1-L3
+        • Kompatybilny z większością kontrolerów KT
+        
+        🟨 S866:
+        • Wyświetlacz z serii Bigstone/S866
+        • Obsługuje parametry P1-P20
+        • Posiada dodatkowe funkcje konfiguracyjne
+        
+        ⚠️ UWAGA: 
+        Wybór niewłaściwego typu wyświetlacza może 
+        spowodować nieprawidłowe działanie systemu.
+        Upewnij się, że wybrany model odpowiada 
+        fizycznie zainstalowanemu wyświetlaczowi.`
+    },
+
+    // Parametry sterownika KT-LCD //
+
+    // Parametry P sterownika //
+
+    'kt-p1-info': {
+        title: '⚙️ P1 - Przełożenie silnika',
+        description: `Obliczane ze wzoru: ilość magnesów X przełożenie
+
+    Dla silników bez przekładni (np. 30H): przełożenie = 1 (P1 = 46)
+    Dla silników z przekładnią (np. XP07): przełożenie > 1 (P1 = 96)
+
+    Parametr wpływa tylko na wyświetlanie prędkości - nieprawidłowa wartość nie wpłynie na jazdę, jedynie na wskazania prędkościomierza`
+    },
+
+    'kt-p2-info': {
+        title: 'P2 - Sposób odczytu prędkości',
+        description: `Wybierz:
+        
+    0: Dla silnika bez przekładni
+      - Prędkość z czujników halla silnika
+      - Biały przewód do pomiaru temperatury
+
+    1: Dla silnika z przekładnią
+      - Prędkość z dodatkowego czujnika halla
+      - Biały przewód do pomiaru prędkości
+
+    2-6: Dla silników z wieloma magnesami pomiarowymi
+      - Prędkość z dodatkowego czujnika halla
+      - Biały przewód do pomiaru prędkości
+      *używane rzadko, ale gdy pokazuje zaniżoną prędkość spróbuj tej opcji`
+    },
+
+    'kt-p3-info': {
+        title: 'P3 - Tryb działania czujnika PAS',
+        description: `Pozwala ustawić jak ma się zachowywać wspomaganie z czujnikiem PAS podczas używania biegów 1-5
+      – 0: Tryb sterowania poprzez prędkość
+      – 1: Tryb sterowania momentem obrotowym`
+    },
+
+    'kt-p4-info': {
+        title: 'P4 - Ruszanie z manetki',
+        description: `Pozwala ustawić sposób ruszania rowerem:
+
+    0: Można ruszyć od zera używając samej manetki
+    1: Manetka działa dopiero po ruszeniu z PAS/nóg`
+    },
+
+    'kt-p5-info': {
+        title: 'P5 - Sposób obliczania poziomu naładowania akumulatora',
+        description: `Pozwala dostosować czułość wskaźnika naładowania akumulatora
+      - niższa wartość: szybsza reakcja na spadki napięcia
+      - wyższa wartość: wolniejsza reakcja, uśrednianie wskazań
+
+    Zalecane zakresy wartości:
+      - 24V: 4-11
+      - 36V: 5-15
+      - 48V: 6-20
+      - 60V: 7-30
+
+    Uwaga: Zbyt wysokie wartości mogą opóźnić ostrzeżenie o niskim poziomie baterii.
+
+    Jeśli wskaźnik pokazuje stale 100%, wykonaj:
+    1. Reset do ustawień fabrycznych
+    2. Ustaw podstawowe parametry
+    3. Wykonaj pełny cykl ładowania-rozładowania`
+    },
+
+    // Parametry C sterownika //
+
+    'kt-c1-info': {
+        title: 'C1 - Czujnik PAS',
+        description: `Konfiguracja czułości czujnika asysty pedałowania (PAS). Wpływa na to, jak szybko system reaguje na pedałowanie.`
+    },
+
+    'kt-c2-info': {
+        title: 'C2 - Typ silnika',
+        description: `Ustawienia charakterystyki silnika i jego podstawowych parametrów pracy.`
+    },
+
+    'kt-c3-info': {
+        title: 'C3 - Tryb wspomagania',
+        description: `Konfiguracja poziomów wspomagania i ich charakterystyki (eco, normal, power).`
+    },
+
+    'kt-c4-info': {
+        title: 'C4 - Manetka i PAS',
+        description: `Określa sposób współdziałania manetki z czujnikiem PAS i priorytety sterowania.`
+    },
+
+    'kt-c5-info': {
+        title: '⚠️ C5 - Regulacja prądu sterownika',
+        description: `Pozwala dostosować maksymalny prąd sterownika do możliwości akumulatora.
+    
+    Wartości:
+    3:  Prąd zmniejszony o 50% (÷2.0)
+    4:  Prąd zmniejszony o 33% (÷1.5) 
+    5:  Prąd zmniejszony o 25% (÷1.33)
+    6:  Prąd zmniejszony o 20% (÷1.25)
+    7:  Prąd zmniejszony o 17% (÷1.20)
+    8:  Prąd zmniejszony o 13% (÷1.15)
+    9:  Prąd zmniejszony o 9%  (÷1.10)
+    10: Pełny prąd sterownika
+
+    Przykład dla sterownika 25A:
+      - C5=3 → max 12.5A
+      - C5=5 → max 18.8A
+      - C5=10 → max 25A
+
+    ⚠️ WAŻNE
+    Używaj niższych wartości gdy:
+      - Masz słaby akumulator z mocnym silnikiem
+      - Chcesz wydłużyć żywotność akumulatora
+      - Występują spadki napięcia podczas przyśpieszania`
+    },
+
+    'kt-c6-info': {
+        title: 'C6 - Jasność wyświetlacza',
+        description: `Ustawienie domyślnej jasności podświetlenia wyświetlacza LCD.`
+    },
+
+    'kt-c7-info': {
+        title: 'C7 - Tempomat',
+        description: `Konfiguracja tempomatu - utrzymywania stałej prędkości.`
+    },
+
+    'kt-c8-info': {
+        title: 'C8 - Silnik',
+        description: `Dodatkowe parametry silnika, w tym temperatura i zabezpieczenia.`
+    },
+
+    'kt-c9-info': {
+        title: 'C9 - Zabezpieczenia',
+        description: `Ustawienia kodów PIN i innych zabezpieczeń systemowych.`
+    },
+
+    'kt-c10-info': {
+        title: 'C10 - Ustawienia fabryczne',
+        description: `Opcje przywracania ustawień fabrycznych i kalibracji systemu.`
+    },
+
+    'kt-c11-info': {
+        title: 'C11 - Komunikacja',
+        description: `Parametry komunikacji między kontrolerem a wyświetlaczem.`
+    },
+
+    'kt-c12-info': {
+        title: '🔋 C12 - Regulacja minimalnego napięcia wyłączenia (LVC)',
+        description: `Pozwala dostosować próg napięcia, przy którym sterownik się wyłącza (Low Voltage Cutoff).
+
+    Wartości względem napięcia domyślnego:
+    0: -2.0V     
+    1: -1.5V     
+    2: -1.0V     
+    3: -0.5V
+    4: domyślne (40V dla 48V, 30V dla 36V, 20V dla 24V)
+    5: +0.5V
+    6: +1.0V
+    7: +1.5V
+
+    Przykład dla sterownika 48V:
+      - Domyślnie (C12=4): wyłączenie przy 40V
+      - C12=0: wyłączenie przy 38V
+      - C12=7: wyłączenie przy 41.5V
+
+    ⚠️ WAŻNE WSKAZÓWKI:
+    1. Obniżenie progu poniżej 42V w sterowniku 48V może spowodować:
+      - Błędne wykrycie systemu jako 36V
+      - Nieprawidłowe wskazania poziomu naładowania (stałe 100%)
+    2. Przy częstym rozładowywaniu akumulatora:
+      - Zalecane ustawienie C12=7
+      - Zapobiega przełączaniu na tryb 36V
+      - Chroni ostatnie % pojemności akumulatora
+
+    ZASTOSOWANIE:
+      - Dostosowanie do charakterystyki BMS
+      - Optymalizacja wykorzystania pojemności akumulatora
+      - Ochrona przed głębokim rozładowaniem`
+    },
+
+    'kt-c13-info': {
+        title: '🔄 C13 - Hamowanie regeneracyjne',
+        description: `Pozwala ustawić siłę hamowania regeneracyjnego i efektywność odzysku energii.
+
+    USTAWIENIA:
+    0: Wyłączone (brak hamowania i odzysku)
+    1: Słabe hamowanie + Najwyższy odzysk energii
+    2: Umiarkowane hamowanie + Średni odzysk
+    3: Średnie hamowanie + Umiarkowany odzysk
+    4: Mocne hamowanie + Niski odzysk
+    5: Najmocniejsze hamowanie + Minimalny odzysk
+
+    ZASADA DZIAŁANIA:
+      - Niższe wartości = lepszy odzysk energii
+      - Wyższe wartości = silniejsze hamowanie
+      - Hamowanie działa na klamki hamulcowe
+      - W niektórych modelach działa też na manetkę
+
+    ⚠️ WAŻNE OSTRZEŻENIA:
+    1. Hamowanie regeneracyjne może powodować obluzowanie osi silnika
+      - ZAWSZE używaj 2 blokad osi
+      - Regularnie sprawdzaj dokręcenie
+    2. Wybór ustawienia:
+      - Priorytet odzysku energii → ustaw C13=1
+      - Priorytet siły hamowania → ustaw C13=5
+      - Kompromis → ustaw C13=2 lub C13=3
+
+    💡 WSKAZÓWKA: Zacznij od niższych wartości i zwiększaj stopniowo, obserwując zachowanie roweru i efektywność odzysku energii.`
+    },
+
+    'kt-c14-info': {
+        title: 'C14 - Poziomy PAS',
+        description: `Konfiguracja poziomów wspomagania i ich charakterystyk.`
+    },
+
+    'kt-c15-info': {
+        title: 'C15 - Prowadzenie',
+        description: `Ustawienia trybu prowadzenia roweru (walk assist).`
+    },
+
+    // Parametry L sterownika //
+    
+    'kt-l1-info': {
+        title: '🔋 L1 - Napięcie minimalne (LVC)',
+        description: `Ustawienie minimalnego napięcia pracy sterownika (Low Voltage Cutoff).
+
+    Dostępne opcje:
+    0: Automatyczny dobór progu przez sterownik
+      - 24V → wyłączenie przy 20V
+      - 36V → wyłączenie przy 30V      
+      - 48V → wyłączenie przy 40V
+      
+    Wymuszenie progu wyłączenia:
+    1: 20V
+    2: 30V
+    3: 40V
+
+    ⚠️ UWAGA: 
+    Ustawienie zbyt niskiego progu może prowadzić do uszkodzenia akumulatora!`
+    },
+
+    'kt-l2-info': {
+        title: '⚡ L2 - Silniki wysokoobrotowe',
+        description: `Parametr dla silników o wysokich obrotach (>5000 RPM).
+
+    Wartości:
+    0: Tryb normalny
+    1: Tryb wysokoobrotowy - wartość P1 jest mnożona ×2
+
+    📝 UWAGA:
+      - Parametr jest powiązany z ustawieniem P1
+      - Używaj tylko dla silników > 5000 RPM`
+    },
+
+    'kt-l3-info': {
+        title: '🔄 L3 - Tryb DUAL',
+        description: `Konfiguracja zachowania dla sterowników z podwójnym kompletem czujników halla.
+
+    Opcje:
+    0: Tryb automatyczny
+      - Automatyczne przełączenie na sprawny komplet czujników
+      - Kontynuacja pracy po awarii jednego kompletu
+
+    1: Tryb bezpieczny
+      - Wyłączenie przy awarii czujników
+      - Sygnalizacja błędu
+
+    ⚠️ WAŻNE: 
+    Dotyczy tylko sterowników z funkcją DUAL (2 komplety czujników halla)`
+    },
+
+    // Parametry sterownika S866 //
+
+    's866-p1-info': {
+        title: 'P1 - Jasność podświetlenia',
+        description: `Regulacja poziomu podświetlenia wyświetlacza.
+
+    Dostępne poziomy:
+    1: Najciemniejszy
+    2: Średni
+    3: Najjaśniejszy`
+    },
+
+    's866-p2-info': {
+        title: 'P2 - Jednostka pomiaru',
+        description: `Wybór jednostki wyświetlania dystansu i prędkości.
+
+    Opcje:
+    0: Kilometry (km)
+    1: Mile`
+    },
+
+    's866-p3-info': {
+        title: 'P3 - Napięcie nominalne',
+        description: `Wybór napięcia nominalnego systemu.
+
+    Dostępne opcje:
+    - 24V
+    - 36V
+    - 48V
+    - 60V`
+    },
+
+    's866-p4-info': {
+        title: 'P4 - Czas automatycznego uśpienia',
+        description: `Czas bezczynności po którym wyświetlacz przejdzie w stan uśpienia.
+
+    Zakres: 0-60 minut
+    0: Funkcja wyłączona (brak auto-uśpienia)
+    1-60: Czas w minutach do przejścia w stan uśpienia`
+    },
+
+    's866-p5-info': {
+        title: 'P5 - Tryb wspomagania PAS',
+        description: `Wybór liczby poziomów wspomagania.
+
+    Opcje:
+    0: Tryb 3-biegowy
+    1: Tryb 5-biegowy`
+    },
+
+    's866-p6-info': {
+        title: 'P6 - Rozmiar koła',
+        description: `Ustawienie średnicy koła dla prawidłowego obliczania prędkości.
+
+    Zakres: 5.0 - 50.0 cali
+    Dokładność: 0.1 cala
+
+    ⚠️ WAŻNE 
+    Ten parametr jest kluczowy dla prawidłowego wyświetlania prędkości.`
+    },
+
+    's866-p7-info': {
+        title: 'P7 - Liczba magnesów czujnika prędkości',
+        description: `Konfiguracja czujnika prędkości.
+
+    Zakres: 1-100 magnesów
+
+    Dla silnika z przekładnią:
+    Wartość = Liczba magnesów × Przełożenie
+
+    Przykład:
+    - 20 magnesów, przełożenie 4.3
+    - Wartość = 20 × 4.3 = 86`
+    },
+
+    's866-p8-info': {
+        title: 'P8 - Limit prędkości',
+        description: `Ustawienie maksymalnej prędkości pojazdu.
+
+    Zakres: 0-100 km/h
+    100: Brak limitu prędkości
+
+    ⚠️ UWAGA: 
+    - Dokładność: ±1 km/h
+    - Limit dotyczy zarówno mocy jak i skrętu
+    - Wartości są zawsze w km/h, nawet przy wyświetlaniu w milach`
+    },
+
+    's866-p9-info': {
+        title: 'P9 - Tryb startu',
+        description: `Wybór sposobu uruchamiania wspomagania.
+
+    0: Start od zera (zero start)
+    1: Start z rozbiegu (non-zero start)`
+    },
+
+    's866-p10-info': {
+        title: 'P10 - Tryb jazdy',
+        description: `Wybór trybu wspomagania.
+
+    0: Wspomaganie PAS (moc zależna od siły pedałowania)
+    1: Tryb elektryczny (sterowanie manetką)
+    2: Tryb hybrydowy (PAS + manetka)`
+    },
+
+    's866-p11-info': {
+        title: 'P11 - Czułość PAS',
+        description: `Regulacja czułości czujnika wspomagania.
+
+    Zakres: 1-24
+    - Niższe wartości = mniejsza czułość
+    - Wyższe wartości = większa czułość`
+    },
+
+    's866-p12-info': {
+        title: 'P12 - Siła startu PAS',
+        description: `Intensywność wspomagania przy rozpoczęciu pedałowania.
+
+    Zakres: 1-5
+    1: Najsłabszy start
+    5: Najmocniejszy start`
+    },
+
+    's866-p13-info': {
+        title: 'P13 - Typ czujnika PAS',
+        description: `Wybór typu czujnika PAS według liczby magnesów.
+
+    Dostępne opcje:
+    - 5 magnesów
+    - 8 magnesów
+    - 12 magnesów`
+    },
+
+    's866-p14-info': {
+        title: 'P14 - Limit prądu kontrolera',
+        description: `Ustawienie maksymalnego prądu kontrolera.
+
+    Zakres: 1-20A`
+    },
+
+    's866-p15-info': {
+        title: 'P15 - Napięcie odcięcia',
+        description: `Próg napięcia przy którym kontroler wyłączy się.`
+    },
+
+    's866-p16-info': {
+        title: 'P16 - Reset licznika ODO',
+        description: `Resetowanie licznika całkowitego przebiegu.
+
+    Aby zresetować:
+    Przytrzymaj przycisk przez 5 sekund`
+    },
+
+    's866-p17-info': {
+        title: 'P17 - Tempomat',
+        description: `Włączenie/wyłączenie funkcji tempomatu.
+
+    0: Tempomat wyłączony
+    1: Tempomat włączony
+
+    ⚠️ Uwaga
+    Działa tylko z protokołem 2`
+    },
+
+    's866-p18-info': {
+        title: 'P18 - Kalibracja prędkości',
+        description: `Współczynnik korekcji wyświetlanej prędkości.
+
+    Zakres: 50% - 150%`
+    },
+
+    's866-p19-info': {
+        title: 'P19 - Bieg zerowy PAS',
+        description: `Konfiguracja biegu zerowego w systemie PAS.
+
+    0: Z biegiem zerowym
+    1: Bez biegu zerowego`
+    },
+
+    's866-p20-info': {
+        title: 'P20 - Protokół komunikacji',
+        description: `Wybór protokołu komunikacji sterownika.
+
+    0: Protokół 2
+    1: Protokół 5S
+    2: Protokół Standby
+    3: Protokół Standby alternatywny`
+    },
+
+    // Sekcja ustawień ogólnych //
+
+    'general-settings-info': {
+        title: '⚙️ Ustawienia ogólne',
+        description: `Podstawowa konfiguracja systemu.
+
+    🚲 Parametry roweru:
+      - Rozmiar koła: wpływa na pomiar prędkości
+      - Limit prędkości: zgodnie z przepisami
+      - Jednostki: km/h lub mph
+    
+    ⏰ Automatyczne wyłączanie:
+      - Czas do uśpienia: 0-60 minut
+      - 0 = funkcja wyłączona
+        
+    💾 Opcje konfiguracji:
+      - Reset do ustawień fabrycznych
+      - Kopia zapasowa konfiguracji
+    
+    ⚠️ UWAGA:
+    Reset ustawień usuwa wszystkie
+    spersonalizowane konfiguracje!`
+    },
+
+    // Licznik całkowity
+    'total-odometer-info': {
+        title: 'Przebieg całkowity',
+        description: `Całkowity przebieg roweru w kilometrach. Można ustawić wartość początkową, np. przy przeniesieniu z innego licznika.`
+    },
+
+    // Rozmiar koła
+    'wheel-size-info': {
+        title: 'Rozmiar koła',
+        description: `Wybierz rozmiar koła swojego roweru. Jest to ważne dla prawidłowego obliczania prędkości i dystansu.`
+    },
+
+    // Sekcja Bluetooth
+    'bluetooth-config-info': {
+        title: '📶 Konfiguracja Bluetooth',
+        description: `Panel konfiguracji połączeń bezprzewodowych.
+
+	'front-tpms-mac-info': {
+		title: 'Adres MAC przedniego czujnika TPMS',
+		description: `Wprowadź adres MAC przedniego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.    
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.    
+		Przykład: A1:B2:C3:D4:E5:F6`
+	},
+
+	'rear-tpms-mac-info': {
+		title: 'Adres MAC tylnego czujnika TPMS',
+		description: `Wprowadź adres MAC tylnego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.
 		
-		<script src="script.js"></script>
-		<script src="lights.js"></script>
-	</body>
-</html>
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.
+		
+		Przykład: A1:B2:C3:D4:E5:F6`
+	},
+
+    🔋 BMS (Battery Management System):
+      - Monitoring stanu baterii
+      - Pomiar temperatury ogniw
+      - Kontrola napięcia
+      - Statystyki ładowania
+    
+    🌡️ TPMS (Tire Pressure Monitoring):
+      - Ciśnienie w oponach
+      - Temperatura opon
+      - Stan baterii czujników
+    
+    📱 Opcje połączenia:
+      - Auto-łączenie ze znanymi urządzeniami
+      - Skanowanie nowych czujników
+      - Parowanie urządzeń
+    
+    💡 WSKAZÓWKI:
+      - Utrzymuj czujniki w zasięgu 2-3m
+      - Sprawdzaj stan baterii czujników
+      - Regularnie aktualizuj oprogramowanie`
+    },
+
+    'bms-info': {
+        title: 'System zarządzania baterią (BMS)',
+        description: `BMS (Battery Management System) to system monitorujący stan baterii. Po włączeniu tej opcji, urządzenie będzie odbierać dane o stanie baterii przez Bluetooth, takie jak:
+             
+    • Pojemność (Ah)
+    • Energia (Wh)
+    • Temperatura ogniw (°C)
+    • Stan naładowania (SOC)`
+    },
+
+    // Opis dla TPMS
+    'tpms-info': {
+        title: 'System monitorowania ciśnienia w oponach (TPMS)',
+        description: `TPMS (Tire Pressure Monitoring System) to system monitorujący ciśnienie w oponach. Po włączeniu tej opcji, urządzenie będzie odbierać dane z czujników przez Bluetooth, takie jak:
+                
+    • Ciśnienie w oponach (bar)
+    • Temperatura opon (°C)
+    • Stan baterii czujników (V)`
+    },
+	
+	'front-tpms-mac-info': {
+		title: 'Adres MAC przedniego czujnika TPMS',
+		description: `Wprowadź adres MAC przedniego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.    
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.    
+		Przykład: A1:B2:C3:D4:E5:F6`
+	},
+
+	'rear-tpms-mac-info': {
+		title: 'Adres MAC tylnego czujnika TPMS',
+		description: `Wprowadź adres MAC tylnego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.		
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.		
+		Przykład: A1:B2:C3:D4:E5:F6`
+	}
+};
+
+function showRTCInfo() {
+    showModal(infoContent['rtc-info'].title, infoContent['rtc-info'].description);
+}
+
+// Funkcja pobierająca wersję systemu
+async function fetchSystemVersion() {
+    try {
+        const response = await fetch('/api/version');
+        const data = await response.json();
+        if (data.version) {
+            document.getElementById('system-version').textContent = data.version;
+        }
+    } catch (error) {
+        console.error('Błąd podczas pobierania wersji systemu:', error);
+        document.getElementById('system-version').textContent = 'N/A';
+    }
+}
+
+//function saveGeneralSettings() {
+//    const wheelSize = document.getElementById('wheel-size').value;
+//    
+//    fetch('/save-general-settings', {
+//        method: 'POST',
+//        headers: {
+//            'Content-Type': 'application/json',
+//        },
+//        body: JSON.stringify({
+//            wheelSize: wheelSize
+//        })
+//    })
+//    .then(response => response.json())
+//    .then(data => {
+//        if (data.success) {
+//            console.log('Ustawienia ogólne zapisane pomyślnie');
+//        }
+//    })
+//    .catch(error => {
+//        console.error('Błąd podczas zapisywania ustawień ogólnych:', error);
+//    });
+//}
+
+// Zmodyfikuj istniejącą funkcję saveGeneralSettings
+function saveGeneralSettings() {
+    const wheelSize = document.getElementById('wheel-size').value;
+    const odometer = document.getElementById('total-odometer').value;
+    
+    // Najpierw zapisz ustawienia ogólne
+    fetch('/save-general-settings', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            wheelSize: wheelSize
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Ustawienia ogólne zapisane pomyślnie');
+            // Jeśli ustawienia ogólne zostały zapisane, zapisz również licznik
+            return saveOdometerValue();
+        }
+    })
+    .catch(error => {
+        console.error('Błąd podczas zapisywania ustawień ogólnych:', error);
+    });
+}
+
+async function loadBluetoothConfig() {
+    try {
+        console.log("Wczytywanie konfiguracji Bluetooth...");
+        const response = await fetch('/get-bluetooth-config');
+        const data = await response.json();
+        console.log("Otrzymane dane z serwera:", data);
+        
+        if (data) {
+            document.getElementById('bms-enabled').value = data.bmsEnabled.toString();
+            document.getElementById('tpms-enabled').value = data.tpmsEnabled.toString();
+            console.log("Ustawiono tpms-enabled na:", data.tpmsEnabled.toString());
+            
+            // Dodaj obsługę MAC adresów TPMS
+            const tpmsFields = document.getElementById('tpms-fields');
+            if (tpmsFields) {
+                // Pokaż/ukryj pola w zależności od włączenia TPMS
+                tpmsFields.style.display = data.tpmsEnabled ? 'block' : 'none';
+                console.log("Ustawiono widoczność tpms-fields w loadBluetoothConfig na:", tpmsFields.style.display);
+            } else {
+                console.error("Element tpms-fields nie został znaleziony!");
+            }
+            
+            // Ustaw wartości MAC adresów jeśli istnieją
+            if (document.getElementById('front-tpms-mac')) {
+                document.getElementById('front-tpms-mac').value = data.frontTpmsMac || '';
+                console.log("Ustawiono front-tpms-mac na:", data.frontTpmsMac || '');
+            } else {
+                console.error("Element front-tpms-mac nie został znaleziony!");
+            }
+            
+            if (document.getElementById('rear-tpms-mac')) {
+                document.getElementById('rear-tpms-mac').value = data.rearTpmsMac || '';
+                console.log("Ustawiono rear-tpms-mac na:", data.rearTpmsMac || '');
+            } else {
+                console.error("Element rear-tpms-mac nie został znaleziony!");
+            }
+            
+            // Wywołaj funkcję toggleTpmsFields() aby upewnić się, że elementy są widoczne/ukryte
+            toggleTpmsFields();
+        }
+    } catch (error) {
+        console.error('Błąd podczas pobierania konfiguracji Bluetooth:', error);
+    }
+}
+
+window.onload = function() {
+    loadGeneralSettings();
+    loadBluetoothConfig();
+    // ... (pozostałe istniejące wywołania)
+};
+
+// Funkcja do pokazywania/ukrywania pól MAC adresów TPMS
+function toggleTpmsFields() {
+    const tpmsEnabled = document.getElementById('tpms-enabled').value === 'true';
+    const tpmsFields = document.getElementById('tpms-fields');
+    
+    if (tpmsFields) {
+        tpmsFields.style.display = tpmsEnabled ? 'block' : 'none';
+    }
+}
+
+function saveBluetoothConfig() {
+    const bmsEnabled = document.getElementById('bms-enabled').value;
+    const tpmsEnabled = document.getElementById('tpms-enabled').value;
+    
+    // Przygotuj dane do wysłania
+    const configData = {
+        bmsEnabled: bmsEnabled === 'true',
+        tpmsEnabled: tpmsEnabled === 'true'
+    };
+    
+    // Dodaj MAC adresy tylko jeśli TPMS jest włączone
+    if (tpmsEnabled === 'true') {
+        if (document.getElementById('front-tpms-mac')) {
+            configData.frontTpmsMac = document.getElementById('front-tpms-mac').value;
+        }
+        
+        if (document.getElementById('rear-tpms-mac')) {
+            configData.rearTpmsMac = document.getElementById('rear-tpms-mac').value;
+        }
+    }
+    
+    // Wyślij dane do serwera
+    fetch('/save-bluetooth-config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(configData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Konfiguracja Bluetooth zapisana pomyślnie');
+            alert('Zapisano konfigurację Bluetooth');
+        } else {
+            alert('Błąd podczas zapisywania konfiguracji');
+        }
+    })
+    .catch(error => {
+        console.error('Błąd podczas zapisywania konfiguracji Bluetooth:', error);
+        alert('Błąd podczas zapisywania konfiguracji: ' + error.message);
+    });
+}
+
+function initializeCollapsibleSections() {
+    document.querySelectorAll('.collapsible').forEach(section => {
+        const content = section.querySelector('.card-content');
+        const collapseBtn = section.querySelector('.collapse-btn');
+        
+        // Ustaw początkowy stan (zwinięty)
+        content.style.display = 'none';
+        
+        // Nasłuchuj tylko kliknięć w przycisk trybika
+        collapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Zatrzymaj propagację zdarzenia
+            
+            // Przełącz widoczność zawartości
+            const isCollapsed = content.style.display === 'none';
+            content.style.display = isCollapsed ? 'block' : 'none';
+            collapseBtn.classList.toggle('rotated', isCollapsed);
+            
+            // Zapisz stan w localStorage
+            const sectionId = section.classList[1];
+            localStorage.setItem(`section_${sectionId}`, isCollapsed ? 'expanded' : 'collapsed');
+        });
+        
+        // Przywróć poprzedni stan z localStorage
+        const sectionId = section.classList[1];
+        const savedState = localStorage.getItem(`section_${sectionId}`);
+        if (savedState === 'expanded') {
+            content.style.display = 'block';
+            collapseBtn.classList.add('rotated');
+        }
+    });
+}
+
+// Zastąp istniejącą funkcję saveGeneralSettings tą nową wersją
+async function saveGeneralSettings() {
+    try {
+        const wheelSize = document.getElementById('wheel-size').value;
+        const odometer = document.getElementById('total-odometer').value;
+        
+        // Najpierw zapisz ustawienia ogólne
+        const generalResponse = await fetch('/save-general-settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                wheelSize: wheelSize
+            })
+        });
+
+        if (!generalResponse.ok) {
+            throw new Error('Błąd podczas zapisywania ustawień ogólnych');
+        }
+
+        const generalData = await generalResponse.json();
+        
+        // Następnie zapisz stan licznika
+        const odometerResponse = await fetch('/api/setOdometer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `value=${odometer}`
+        });
+
+        if (!odometerResponse.ok) {
+            throw new Error('Błąd podczas zapisywania stanu licznika');
+        }
+
+        const odometerResult = await odometerResponse.text();
+        
+        if (generalData.success && odometerResult === 'OK') {
+            // Wyświetl potwierdzenie tylko jeśli oba zapisy się powiodły
+            alert('Zapisano ustawienia ogólne');
+            // Odśwież wyświetlane wartości
+            await loadGeneralSettings();
+        } else {
+            throw new Error('Nie udało się zapisać wszystkich ustawień');
+        }
+    } catch (error) {
+        console.error('Błąd:', error);
+        alert('Błąd podczas zapisywania ustawień: ' + error.message);
+    }
+}
+
+// Upewnij się, że ta funkcja jest obecna i prawidłowa
+async function loadGeneralSettings() {
+    try {
+        // Pobierz rozmiar koła
+        const response = await fetch('/get-general-settings');
+        const data = await response.json();
+        
+        if (data) {
+            // Ustaw rozmiar koła
+            document.getElementById('wheel-size').value = data.wheelSize;
+        }
+        
+        // Pobierz stan licznika
+        const odometerResponse = await fetch('/api/odometer');
+        if (odometerResponse.ok) {
+            const odometerValue = await odometerResponse.text();
+            document.getElementById('total-odometer').value = Math.floor(parseFloat(odometerValue));
+        }
+    } catch (error) {
+        console.error('Błąd podczas wczytywania ustawień ogólnych:', error);
+    }
+}
+
+/*
+WAŻNE KOMUNIKATY:
+⚠️ - Ważne ostrzeżenia
+💡 - Wskazówka
+📝 - Uwaga
+
+PARAMETRY TECHNICZNE:
+⚡ - Ustawienia mocy/elektryczne
+🔋 - Ustawienia baterii
+🔌 - Ustawienia elektryczne
+🌡️ - Parametry temperatury
+📊 - Parametry pomiarowe
+
+USTAWIENIA MECHANICZNE:
+🚲 - Ogólne ustawienia roweru
+⚙️ - Ustawienia mechaniczne
+🔄 - Funkcje regeneracji
+
+INTERFEJS I CZAS:
+📱 - Ustawienia interfejsu
+⏰ - Ustawienia czasowe
+💾 - Opcje zapisu/resetu
+
+BEZPIECZEŃSTWO I WYDAJNOŚĆ:
+🔒 - Ustawienia zabezpieczeń
+📈 - Parametry wydajności
+🛠️ - Ustawienia serwisowe
+🔧 - KONFIGURACJA
+*/
