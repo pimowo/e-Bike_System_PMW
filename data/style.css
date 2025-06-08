@@ -465,3 +465,18 @@ footer a:hover {
 .notification.hide {
     opacity: 0;
 }
+
+/* Style dla rozwijanej zawartości */
+.card-content {
+    transition: max-height 0.3s ease-out;
+    overflow: hidden;
+}
+
+.collapse-btn {
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.collapse-btn.active {
+    transform: rotate(180deg);
+}
