@@ -724,22 +724,6 @@ const infoContent = {
         title: '📶 Konfiguracja Bluetooth',
         description: `Panel konfiguracji połączeń bezprzewodowych.
 
-	'front-tpms-mac-info': {
-		title: 'Adres MAC przedniego czujnika TPMS',
-		description: `Wprowadź adres MAC przedniego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.    
-		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.    
-		Przykład: A1:B2:C3:D4:E5:F6`
-	},
-
-	'rear-tpms-mac-info': {
-		title: 'Adres MAC tylnego czujnika TPMS',
-		description: `Wprowadź adres MAC tylnego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.
-		
-		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.
-		
-		Przykład: A1:B2:C3:D4:E5:F6`
-	},
-
     🔋 BMS (Battery Management System):
       - Monitoring stanu baterii
       - Pomiar temperatury ogniw
