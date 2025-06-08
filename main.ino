@@ -75,7 +75,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "7.6.25";
+const char* VERSION = "8.6.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -3259,6 +3259,59 @@ void setupWebServer() {
         serializeJson(doc, response);
         request->send(200, "application/json", response);
     });
+
+server.on("/api/lights/file", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (!LittleFS.begin(false)) {
+        request->send(500, "application/json", "{\"error\":\"Failed to mount filesystem\"}");
+        return;
+    }
+    
+    if (LittleFS.exists("/light_config.json")) {
+        File file = LittleFS.open("/light_config.json", "r");
+        if (!file) {
+            request->send(500, "application/json", "{\"error\":\"Failed to open config file\"}");
+            return;
+        }
+        
+        // Odczytaj zawartość pliku
+        String content = file.readString();
+        file.close();
+        
+        // Analizuj JSON, aby wyświetlić go w bardziej czytelnej formie
+        StaticJsonDocument<256> doc;
+        DeserializationError error = deserializeJson(doc, content);
+        
+        if (error) {
+            request->send(200, "text/plain", content); // Pokaż surową zawartość w przypadku błędu parsowania
+        } else {
+            // Dodaj dodatkowe informacje
+            JsonObject debug = doc.createNestedObject("_debug");
+            if (doc.containsKey("dayConfig")) {
+                uint8_t dayConfigValue = doc["dayConfig"];
+                debug["dayConfig_hex"] = "0x" + String(dayConfigValue, HEX);
+                debug["dayConfig_bin"] = "0b" + String(dayConfigValue, BIN);
+                debug["dayConfig_FRONT"] = (dayConfigValue & LightManager::FRONT) != 0;
+                debug["dayConfig_DRL"] = (dayConfigValue & LightManager::DRL) != 0;
+                debug["dayConfig_REAR"] = (dayConfigValue & LightManager::REAR) != 0;
+            }
+            
+            if (doc.containsKey("nightConfig")) {
+                uint8_t nightConfigValue = doc["nightConfig"];
+                debug["nightConfig_hex"] = "0x" + String(nightConfigValue, HEX);
+                debug["nightConfig_bin"] = "0b" + String(nightConfigValue, BIN);
+                debug["nightConfig_FRONT"] = (nightConfigValue & LightManager::FRONT) != 0;
+                debug["nightConfig_DRL"] = (nightConfigValue & LightManager::DRL) != 0;
+                debug["nightConfig_REAR"] = (nightConfigValue & LightManager::REAR) != 0;
+            }
+            
+            String enriched;
+            serializeJsonPretty(doc, enriched);
+            request->send(200, "application/json", enriched);
+        }
+    } else {
+        request->send(404, "application/json", "{\"error\":\"Config file not found\"}");
+    }
+});
 
 // Endpoint GET dla konfiguracji świateł
 server.on("/api/lights/config", HTTP_GET, [](AsyncWebServerRequest *request) {
