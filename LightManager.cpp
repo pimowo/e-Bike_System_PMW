@@ -303,8 +303,16 @@ void LightManager::update() {
 bool LightManager::saveConfig() {
     #ifdef DEBUG
     Serial.println("[LightManager] Zapisywanie konfiguracji...");
-    Serial.printf("[LightManager] Aktualne wartości - dayConfig: 0x%02X, nightConfig: 0x%02X, dayBlink: %d, nightBlink: %d\n",
-                 dayConfig, nightConfig, dayBlink, nightBlink);
+    Serial.printf("[LightManager] dayConfig: 0x%02X (%s)\n", dayConfig, getConfigString(dayConfig).c_str());
+    Serial.printf("[LightManager] nightConfig: 0x%02X (%s)\n", nightConfig, getConfigString(nightConfig).c_str());
+    Serial.printf("[LightManager] dayBlink: %d, nightBlink: %d\n", dayBlink, nightBlink);
+    Serial.printf("[LightManager] blinkFrequency: %d\n", blinkFrequency);
+    
+    // Sprawdź poszczególne bity
+    Serial.printf("[LightManager] dayConfig - FRONT: %d, DRL: %d, REAR: %d\n", 
+                 (dayConfig & FRONT) != 0, (dayConfig & DRL) != 0, (dayConfig & REAR) != 0);
+    Serial.printf("[LightManager] nightConfig - FRONT: %d, DRL: %d, REAR: %d\n", 
+                 (nightConfig & FRONT) != 0, (nightConfig & DRL) != 0, (nightConfig & REAR) != 0);
     #endif
     
     if (!LittleFS.begin(false)) {
@@ -314,16 +322,17 @@ bool LightManager::saveConfig() {
         return false;
     }
     
-    // Najpierw usuń istniejący plik, aby uniknąć problemów z zapisem
+    // Dla bezpieczeństwa usuń istniejący plik
     if (LittleFS.exists("/light_config.json")) {
         if (!LittleFS.remove("/light_config.json")) {
             #ifdef DEBUG
-            Serial.println("[LightManager] Failed to remove existing config file");
+            Serial.println("[LightManager] Nie udało się usunąć istniejącego pliku konfiguracyjnego");
             #endif
             // Kontynuujemy mimo to
         }
     }
     
+    // Otwórz plik do zapisu
     File configFile = LittleFS.open("/light_config.json", "w");
     if (!configFile) {
         #ifdef DEBUG
@@ -332,6 +341,7 @@ bool LightManager::saveConfig() {
         return false;
     }
     
+    // Przygotuj dokument JSON
     StaticJsonDocument<256> doc;
     doc["dayConfig"] = dayConfig;
     doc["nightConfig"] = nightConfig;
@@ -339,24 +349,7 @@ bool LightManager::saveConfig() {
     doc["nightBlink"] = nightBlink;
     doc["blinkFrequency"] = blinkFrequency;
     
-    // Dodaj diagnostyczne pola (nie będą zapisane)
-    #ifdef DEBUG
-    String dayConfigStr = getConfigString(dayConfig);
-    String nightConfigStr = getConfigString(nightConfig);
-    Serial.println("[LightManager] Zapisywana konfiguracja:");
-    Serial.printf("  dayConfig: 0x%02X (%s), blink: %d\n", dayConfig, dayConfigStr.c_str(), dayBlink);
-    Serial.printf("  nightConfig: 0x%02X (%s), blink: %d\n", nightConfig, nightConfigStr.c_str(), nightBlink);
-    
-    // Sprawdź poszczególne bity
-    Serial.printf("  dayConfig_FRONT: %d\n", (dayConfig & FRONT) != 0);
-    Serial.printf("  dayConfig_DRL: %d\n", (dayConfig & DRL) != 0);
-    Serial.printf("  dayConfig_REAR: %d\n", (dayConfig & REAR) != 0);
-    
-    Serial.printf("  nightConfig_FRONT: %d\n", (nightConfig & FRONT) != 0);
-    Serial.printf("  nightConfig_DRL: %d\n", (nightConfig & DRL) != 0);
-    Serial.printf("  nightConfig_REAR: %d\n", (nightConfig & REAR) != 0);
-    #endif
-    
+    // Serializuj do pliku
     size_t bytes = serializeJson(doc, configFile);
     configFile.close();
     
@@ -369,10 +362,14 @@ bool LightManager::saveConfig() {
     
     #ifdef DEBUG
     Serial.printf("[LightManager] Config saved successfully (%d bytes)\n", bytes);
-    Serial.printf("[LightManager] Day config: 0x%02X (%s), blink: %d\n", 
-               dayConfig, getConfigString(dayConfig).c_str(), dayBlink);
-    Serial.printf("[LightManager] Night config: 0x%02X (%s), blink: %d\n", 
-               nightConfig, getConfigString(nightConfig).c_str(), nightBlink);
+    
+    // Dla pewności odczytaj zapisany plik i sprawdź jego zawartość
+    File readFile = LittleFS.open("/light_config.json", "r");
+    if (readFile) {
+        String content = readFile.readString();
+        readFile.close();
+        Serial.printf("[LightManager] Zapisana zawartość pliku: %s\n", content.c_str());
+    }
     #endif
     
     return true;
@@ -391,7 +388,6 @@ bool LightManager::loadConfig() {
         return false;
     }
     
-    // *** ZMIANA: Używamy stałej z main.ino zamiast hardkodowanej nazwy ***
     if (!LittleFS.exists("/light_config.json")) {
         #ifdef DEBUG
         Serial.println("[LightManager] Config file not found");
@@ -418,14 +414,38 @@ bool LightManager::loadConfig() {
         return false;
     }
     
-    // Wczytaj konfigurację
-    dayConfig = doc["dayConfig"] | DRL | REAR;
-    nightConfig = doc["nightConfig"] | FRONT | REAR;
-    dayBlink = doc["dayBlink"] | true;
-    nightBlink = doc["nightBlink"] | false;
-    blinkFrequency = doc["blinkFrequency"] | 500;
+    // UWAGA: Zmienione użycie operatora | na sprawdzenie, czy wartość istnieje
+    // Wczytaj konfigurację tylko jeśli istnieje, w przeciwnym razie użyj wartości domyślnych
+    if (doc.containsKey("dayConfig")) {
+        dayConfig = doc["dayConfig"];
+    } else {
+        dayConfig = DRL | REAR; // Wartość domyślna
+    }
     
-    // Po wczytaniu konfiguracji, dodaj szczegółowe logowanie
+    if (doc.containsKey("nightConfig")) {
+        nightConfig = doc["nightConfig"];
+    } else {
+        nightConfig = FRONT | REAR; // Wartość domyślna
+    }
+    
+    if (doc.containsKey("dayBlink")) {
+        dayBlink = doc["dayBlink"];
+    } else {
+        dayBlink = true; // Wartość domyślna
+    }
+    
+    if (doc.containsKey("nightBlink")) {
+        nightBlink = doc["nightBlink"];
+    } else {
+        nightBlink = false; // Wartość domyślna
+    }
+    
+    if (doc.containsKey("blinkFrequency")) {
+        blinkFrequency = doc["blinkFrequency"];
+    } else {
+        blinkFrequency = 500; // Wartość domyślna
+    }
+    
     #ifdef DEBUG
     Serial.println("[LightManager] Wczytana konfiguracja:");
     Serial.printf("[LightManager] dayConfig: 0x%02X (%s)\n", dayConfig, getConfigString(dayConfig).c_str());
@@ -482,17 +502,18 @@ String LightManager::getModeString() const {
 // Konwersja string na config (uint8_t)
 uint8_t LightManager::parseConfigString(const char* configStr) {
     #ifdef DEBUG
-    Serial.printf("[LightManager] parseConfigString - wejściowy string: %s\n", configStr);
+    Serial.printf("[LightManager] parseConfigString - wejściowy string: '%s'\n", configStr);
     #endif
-
+    
     String configString(configStr); // Konwertujemy const char* na String dla wygody
     uint8_t result = NONE;
     
-    #ifdef DEBUG
-    Serial.printf("[LightManager] Parsing config string: '%s'\n", configStr);
-    #endif
-    
-    if (strcmp(configStr, "NONE") == 0) return NONE;
+    if (strcmp(configStr, "NONE") == 0) {
+        #ifdef DEBUG
+        Serial.println("[LightManager] Wykryto konfigurację NONE (0x00)");
+        #endif
+        return NONE;
+    }
     
     // Sprawdź czy string zawiera '+'
     if (strchr(configStr, '+') != NULL) {
@@ -507,9 +528,28 @@ uint8_t LightManager::parseConfigString(const char* configStr) {
             while (end > token && *end == ' ') end--;
             *(end + 1) = '\0';
             
-            if (strcmp(token, "FRONT") == 0) result |= FRONT;
-            else if (strcmp(token, "DRL") == 0) result |= DRL;
-            else if (strcmp(token, "REAR") == 0) result |= REAR;
+            #ifdef DEBUG
+            Serial.printf("[LightManager] Analizuję token: '%s'\n", token);
+            #endif
+            
+            if (strcmp(token, "FRONT") == 0) {
+                #ifdef DEBUG
+                Serial.println("[LightManager] Dodaję flagę FRONT (0x01)");
+                #endif
+                result |= FRONT;
+            }
+            else if (strcmp(token, "DRL") == 0) {
+                #ifdef DEBUG
+                Serial.println("[LightManager] Dodaję flagę DRL (0x02)");
+                #endif
+                result |= DRL;
+            }
+            else if (strcmp(token, "REAR") == 0) {
+                #ifdef DEBUG
+                Serial.println("[LightManager] Dodaję flagę REAR (0x04)");
+                #endif
+                result |= REAR;
+            }
             
             token = strtok(NULL, "+");
         }
@@ -517,9 +557,28 @@ uint8_t LightManager::parseConfigString(const char* configStr) {
         free(copy); // Zwolnij pamięć
     } else {
         // Pojedyncza wartość
-        if (strcmp(configStr, "FRONT") == 0) result |= FRONT;
-        else if (strcmp(configStr, "DRL") == 0) result |= DRL;
-        else if (strcmp(configStr, "REAR") == 0) result |= REAR;
+        #ifdef DEBUG
+        Serial.printf("[LightManager] Analizuję pojedynczą wartość: '%s'\n", configStr);
+        #endif
+        
+        if (strcmp(configStr, "FRONT") == 0) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Ustawiam flagę FRONT (0x01)");
+            #endif
+            result |= FRONT;
+        }
+        else if (strcmp(configStr, "DRL") == 0) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Ustawiam flagę DRL (0x02)");
+            #endif
+            result |= DRL;
+        }
+        else if (strcmp(configStr, "REAR") == 0) {
+            #ifdef DEBUG
+            Serial.println("[LightManager] Ustawiam flagę REAR (0x04)");
+            #endif
+            result |= REAR;
+        }
     }
     
     #ifdef DEBUG
