@@ -906,8 +906,9 @@ function showToast(message, type = 'info') {
         // Utwórz kontener jeśli nie istnieje
         toastContainer = document.createElement('div');
         toastContainer.id = 'toast-container';
-        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        document.body.appendChild(toastContainer);
+        //toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        toastContainer.className = 'toast-container position-fixed top-0 start-50 translate-middle-x p-3';
+		document.body.appendChild(toastContainer);
     }
     
     // Utwórz element toast
