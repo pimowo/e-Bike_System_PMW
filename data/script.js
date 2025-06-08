@@ -228,21 +228,14 @@ function debug(...args) {
 document.addEventListener('DOMContentLoaded', async function() {
     debug('Inicjalizacja aplikacji...');
 
-    let clockInterval;
-    
     try {
-        // Sprawdź czy wszystkie elementy formularza świateł istnieją
-        if (!verifyLightElements()) {
-            console.error('Nie wszystkie wymagane elementy formularza świateł są dostępne');
-        }
-
-        // Inicjalizacja zegara
-        clockInterval = initializeClock();
-
-        // Dodajemy inicjalizację sekcji zwijanych
+        // Najpierw zainicjalizuj rozwijane sekcje
         initializeCollapsibleSections();
         
-        // Poczekaj na załadowanie DOM
+        // Inicjalizacja zegara
+        let clockInterval = initializeClock();
+
+        // Poczekaj na pewność załadowania DOM
         await new Promise(resolve => setTimeout(resolve, 200));
 
         // Dodaj wczytywanie licznika
@@ -262,13 +255,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Inicjalizacja WebSocket i UI
         setupWebSocket();
         setupModal();
-        setupFormListeners(); // Prawidłowa inicjalizacja nasłuchiwania zdarzeń formularza
+        setupFormListeners();
 
         debug('Inicjalizacja zakończona pomyślnie');
     } catch (error) {
         console.error('Błąd podczas inicjalizacji:', error);
-        // W przypadku błędu, zatrzymaj interval zegara
-        if (clockInterval) clearInterval(clockInterval);
     }
 });
 
@@ -346,16 +337,22 @@ async function fetchRTCTime() {
         }
 
         const data = await response.json();
+        
         if (data && data.time) {
             const { hours, minutes, seconds, year, month, day } = data.time;
             
+            // Format HH:MM:SS
             const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            const dateStr = `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+            
+            // Format YYYY-MM-DD
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             
             timeElement.value = timeStr;
             dateElement.value = dateStr;
             
             debug('Zaktualizowano czas:', { time: timeStr, date: dateStr });
+        } else {
+            debug('Nieprawidłowe dane czasu:', data);
         }
     } catch (error) {
         console.error('Błąd podczas pobierania czasu RTC:', error);
@@ -601,37 +598,57 @@ function updateLightForm(lights) {
 }
 
 function setupModal() {
+    console.log('Inicjalizacja modala...');
+    
     const modal = document.getElementById('info-modal');
     const modalTitle = document.getElementById('modal-title');
     const modalDescription = document.getElementById('modal-description');
     
+    if (!modal || !modalTitle || !modalDescription) {
+        console.error('Brak elementów modala!');
+        return;
+    }
+    
+    console.log('Znaleziono elementy modala');
+    
     // Otwieranie modala przez info-icons
     document.querySelectorAll('.info-icon').forEach(button => {
-        button.addEventListener('click', function() {
-            const infoId = this.dataset.info;
+        button.addEventListener('click', function(event) {
+            event.stopPropagation(); // Zatrzymaj propagację zdarzenia
+            const infoId = this.getAttribute('data-info');
+            console.log('Kliknięto przycisk info dla:', infoId);
+            
             const info = infoContent[infoId];
             
             if (info) {
                 modalTitle.textContent = info.title;
-                modalDescription.textContent = info.description;               
+                modalDescription.textContent = info.description;
                 modal.style.display = 'block';
+                console.log('Wyświetlono modal dla:', infoId);
             } else {
-                console.error('Nie znaleziono opisu dla:', infoId);
+                console.warn('Nie znaleziono opisu dla:', infoId);
             }
         });
     });
     
     // Zamykanie modala
-    document.querySelector('.close-modal').addEventListener('click', () => {
-        modal.style.display = 'none';
-    });
+    const closeButton = document.querySelector('.close-modal');
+    if (closeButton) {
+        closeButton.addEventListener('click', () => {
+            console.log('Zamknięto modal przyciskiem X');
+            modal.style.display = 'none';
+        });
+    }
     
     // Zamykanie po kliknięciu poza modalem
     window.addEventListener('click', (event) => {
         if (event.target === modal) {
+            console.log('Zamknięto modal kliknięciem poza nim');
             modal.style.display = 'none';
         }
     });
+    
+    console.log('Inicjalizacja modala zakończona');
 }
 
 // Funkcja aktualizacji statusu świateł
@@ -1820,35 +1837,51 @@ function saveBluetoothConfig() {
 }
 
 function initializeCollapsibleSections() {
-    document.querySelectorAll('.collapsible').forEach(section => {
-        const content = section.querySelector('.card-content');
-        const collapseBtn = section.querySelector('.collapse-btn');
-        
-        // Ustaw początkowy stan (zwinięty)
-        content.style.display = 'none';
-        
-        // Nasłuchuj tylko kliknięć w przycisk trybika
-        collapseBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Zatrzymaj propagację zdarzenia
+    console.log('Inicjalizacja rozwijanch sekcji...');
+    
+    // Pobierz wszystkie przyciski zwijania
+    const collapseButtons = document.querySelectorAll('.collapse-btn');
+    console.log('Znaleziono przycisków zwijania:', collapseButtons.length);
+    
+    collapseButtons.forEach(button => {
+        button.addEventListener('click', function(event) {
+            console.log('Kliknięto przycisk zwijania');
+            event.stopPropagation(); // Zatrzymaj propagację zdarzenia
             
-            // Przełącz widoczność zawartości
-            const isCollapsed = content.style.display === 'none';
-            content.style.display = isCollapsed ? 'block' : 'none';
-            collapseBtn.classList.toggle('rotated', isCollapsed);
+            // Znajdź rodzica (.card)
+            const card = this.closest('.card');
             
-            // Zapisz stan w localStorage
-            const sectionId = section.classList[1];
-            localStorage.setItem(`section_${sectionId}`, isCollapsed ? 'expanded' : 'collapsed');
+            if (card) {
+                // Znajdź zawartość karty (.card-content)
+                const content = card.querySelector('.card-content');
+                
+                if (content) {
+                    // Przełącz widoczność zawartości
+                    const isCollapsed = content.style.display === 'none' || content.style.display === '';
+                    content.style.display = isCollapsed ? 'block' : 'none';
+                    
+                    // Dodaj/usuń klasę dla animacji obrotu przycisku
+                    this.classList.toggle('rotated', isCollapsed);
+                    
+                    console.log('Przełączono sekcję na:', isCollapsed ? 'rozwiniętą' : 'zwiniętą');
+                } else {
+                    console.warn('Nie znaleziono zawartości karty');
+                }
+            } else {
+                console.warn('Nie znaleziono karty rodzica');
+            }
         });
-        
-        // Przywróć poprzedni stan z localStorage
-        const sectionId = section.classList[1];
-        const savedState = localStorage.getItem(`section_${sectionId}`);
-        if (savedState === 'expanded') {
-            content.style.display = 'block';
-            collapseBtn.classList.add('rotated');
-        }
     });
+
+    // Domyślnie zwiń wszystkie sekcje
+    const cardContents = document.querySelectorAll('.card-content');
+    console.log('Znaleziono sekcji do zwinięcia:', cardContents.length);
+    
+    cardContents.forEach(content => {
+        content.style.display = 'none';
+    });
+    
+    console.log('Zwinięto wszystkie sekcje domyślnie');
 }
 
 // Zastąp istniejącą funkcję saveGeneralSettings tą nową wersją
