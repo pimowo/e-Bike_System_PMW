@@ -143,7 +143,7 @@ header h1 {
     min-width: 30px;
 }
 
-/* Toggle Switch - nowy styl dla selecta */
+/* Toggle Switch - styl dla selecta */
 .toggle-switch {
     margin-left: auto;
     width: 150px;
@@ -221,6 +221,214 @@ footer a:hover {
     color: var(--secondary-color);
 }
 
+/* Style dla ikonki info */
+.info-icon {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    padding: 0 5px;
+    font-size: 1.2rem;
+    transition: color 0.3s ease;
+    line-height: 1;
+    vertical-align: middle;
+    display: inline-flex;
+    align-items: center;
+}
+
+.info-icon:hover {
+    color: var(--secondary-color);
+}
+
+/* Style dla modala */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    overflow: auto;
+}
+
+.modal-content {
+    background-color: var(--card-background);
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    color: var(--danger-color);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0 5px;
+    transition: color 0.3s ease;
+}
+
+.close-modal:hover {
+    color: #d32f2f;
+}
+
+.modal-body {
+    color: var(--text-color);
+    line-height: 1.6;
+    white-space: pre-line;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    color: var(--unit-color);
+}
+
+/* Style dla powiadomień */
+.notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    border-radius: 5px;
+    color: white;
+    z-index: 1000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.notification.info {
+    background-color: #2196F3;
+}
+
+.notification.success {
+    background-color: #4CAF50;
+}
+
+.notification.error {
+    background-color: #F44336;
+}
+
+.notification.warning {
+    background-color: #FF9800;
+}
+
+.notification.hide {
+    opacity: 0;
+}
+
+/* Ukrycie ikon kalendarza i strzałek */
+.no-time-icon::-webkit-calendar-picker-indicator,
+.no-calendar-icon::-webkit-calendar-picker-indicator {
+    display: none;
+}
+
+.no-time-icon::-webkit-inner-spin-button,
+.no-calendar-icon::-webkit-inner-spin-button {
+    display: none;
+}
+
+/* Style dla parametrów sterownika */
+#kt-lcd-params, #s866-lcd-params {
+    display: none; /* domyślnie ukryte */
+}
+
+#kt-lcd-params.active, #s866-lcd-params.active {
+    display: block;
+}
+
+/* Style dla nagłówka karty */
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+}
+
+.card-header h2 {
+    flex-grow: 1;
+    text-align: center;
+    margin: 0 10px;
+}
+
+/* Style dla przycisku zwijania */
+.collapse-btn {
+    background: none;
+    border: none;
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 5px;
+    transition: transform 0.3s ease;
+    user-select: none;
+}
+
+.collapse-btn:hover {
+    opacity: 0.8;
+}
+
+.collapse-btn.rotated, 
+.collapse-btn.active {
+    transform: rotate(180deg);
+}
+
+/* Style dla rozwijanej zawartości */
+.card-content {
+    transition: all 0.3s ease-out;
+    overflow: hidden;
+}
+
+/* Style dla grup checkboxów */
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Style dla sekcji świateł */
+.light-section {
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+.light-section h4 {
+    margin-bottom: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
 /* Media Queries */
 @media (max-width: 768px) {
     .container {
@@ -264,219 +472,11 @@ footer a:hover {
     .card {
         padding: 15px;
     }
-}
-
-/* Style dla ikonki info */
-.info-icon {
-    background: none;
-    border: none;
-    color: var(--primary-color);
-    cursor: pointer;
-    padding: 0 5px;
-    font-size: 1.2rem;
-    transition: color 0.3s ease;
-    line-height: 1;
-    vertical-align: middle;
-    display: inline-flex;
-    align-items: center;
-}
-
-.info-icon:hover {
-    color: var(--secondary-color);
-}
-
-/* Style dla modala */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
-    z-index: 1000;
-}
-
-.modal-content {
-    background-color: var(--card-background);
-    margin: 15% auto;
-    padding: 20px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    width: 90%;
-    max-width: 500px;
-    position: relative;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.close-modal {
-    background: none;
-    border: none;
-    color: var(--danger-color); /* Zmiana na czerwony */
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 0 5px;
-    transition: color 0.3s ease; /* Płynna zmiana koloru przy hover */
-}
-
-.close-modal:hover {
-    color: #d32f2f; /* Ciemniejszy odcień czerwonego przy najechaniu */
-}
-
-.modal-body {
-    color: var(--text-color);
-    line-height: 1.6;
-    white-space: pre-line;
-}
-
-.modal-footer {
-    margin-top: 20px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border-color);
-    font-size: 0.9rem;
-    color: var(--unit-color);
-}
-
-/* Mobile optimization */
-@media (max-width: 768px) {
+    
     .modal-content {
         margin: 10% auto;
         width: 95%;
         max-height: 80vh;
         overflow-y: auto;
     }
-}
-
-.no-time-icon::-webkit-calendar-picker-indicator,
-.no-calendar-icon::-webkit-calendar-picker-indicator {
-    display: none;
-}
-
-.no-time-icon::-webkit-inner-spin-button,
-.no-calendar-icon::-webkit-inner-spin-button {
-    display: none;
-}
-
-#kt-lcd-params, #s866-lcd-params {
-    display: none; /* domyślnie ukryte */
-}
-
-#kt-lcd-params.active, #s866-lcd-params.active {
-    display: block;
-}
-
-.settings-group {
-    margin: 10px 0;
-}
-
-.card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-}
-
-.card-header h2 {
-    flex-grow: 1;
-    text-align: center;
-    margin: 0 10px;
-}
-
-.info-icon, .collapse-btn {
-    background: none;
-    border: none;
-    font-size: 1.2em;
-    cursor: pointer;
-    padding: 5px;
-}
-
-.info-icon:hover, .collapse-btn:hover {
-    opacity: 0.8;
-}
-
-.collapse-btn.rotated {
-    transform: rotate(180deg);
-}
-
-.checkbox-group {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.checkbox-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-
-.light-section {
-    margin-bottom: 15px;
-    border-bottom: 1px solid #ddd;
-    padding-bottom: 10px;
-}
-
-.light-section h4 {
-    margin-bottom: 10px;
-    font-size: 1rem;
-    font-weight: 600;
-}
-
-/* Style dla powiadomień */
-.notification {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    padding: 15px 20px;
-    border-radius: 5px;
-    background-color: #333;
-    color: white;
-    z-index: 1000;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    opacity: 1;
-    transition: opacity 0.3s ease;
-}
-
-.notification.info {
-    background-color: #2196F3;
-}
-
-.notification.success {
-    background-color: #4CAF50;
-}
-
-.notification.error {
-    background-color: #F44336;
-}
-
-.notification.warning {
-    background-color: #FF9800;
-}
-
-.notification.hide {
-    opacity: 0;
-}
-
-/* Style dla rozwijanej zawartości */
-.card-content {
-    transition: max-height 0.3s ease-out;
-    overflow: hidden;
-}
-
-.collapse-btn {
-    cursor: pointer;
-    transition: transform 0.3s ease;
-}
-
-.collapse-btn.active {
-    transform: rotate(180deg);
 }
