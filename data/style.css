@@ -310,10 +310,24 @@ footer a:hover {
 }
 
 /* Style dla powiadomień */
-.notification {
+/*.notification {
     position: fixed;
     bottom: 20px;
     right: 20px;
+    padding: 15px 20px;
+    border-radius: 5px;
+    color: white;
+    z-index: 1000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}*/
+
+.notification {
+    position: fixed;
+    top: 20px;  /* Zmieniono bottom: 20px na top: 20px */
+    left: 50%;  /* Dodano left: 50% */
+    transform: translateX(-50%);  /* Dodano transformację do wycentrowania */
     padding: 15px 20px;
     border-radius: 5px;
     color: white;
