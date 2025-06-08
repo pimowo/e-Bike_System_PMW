@@ -26,8 +26,8 @@ function updateClock() {
                 const dateString = `${year}-${month}-${day}`;
                 
                 // Aktualizuj pola na stronie
-                document.getElementById('rtc-time').value = timeString;
-                document.getElementById('rtc-date').value = dateString;
+                updateElementValue('rtc-time', timeString);
+                updateElementValue('rtc-date', dateString);
                 
                 console.log('Zaktualizowano czas na:', timeString);
                 console.log('Zaktualizowano datę na:', dateString);
@@ -36,7 +36,7 @@ function updateClock() {
             }
         })
         .catch(error => {
-            console.error('Błąd podczas pobierania czasu:', error);
+            handleError(error, 'Błąd podczas pobierania czasu');
         });
 }
 
@@ -65,32 +65,31 @@ function saveRTCConfig() {
     .then(response => response.json())
     .then(result => {
         if (result.status === 'ok') {
-            alert('Czas został zaktualizowany!');
+            showNotification('Czas został zaktualizowany!', 'success');
             // Odśwież wyświetlany czas
             updateClock();
         } else {
-            alert('Błąd podczas aktualizacji czasu: ' + (result.error || 'Nieznany błąd'));
+            throw new Error(result.error || 'Nieznany błąd');
         }
     })
     .catch(error => {
-        console.error('Błąd:', error);
-        alert('Wystąpił błąd podczas aktualizacji czasu.');
+        handleError(error, 'Błąd podczas aktualizacji czasu');
     });
 }
 
-// Inicjalizacja po załadowaniu strony
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("Inicjalizacja zegara...");
+// Funkcja inicjalizacji zegara
+function initializeClock() {
+    console.log('Inicjalizacja zegara');
     
-    // Aktualizuj zegar natychmiast
+    // Pierwsze pobranie
     updateClock();
     
     // Ustawienie przycisku do aktualizacji czasu
-    const saveButton = document.querySelector('.btn-save');
+    const saveButton = document.querySelector('.rtc-row .btn-save');
     if (saveButton) {
         saveButton.addEventListener('click', saveRTCConfig);
     }
     
-    // Aktualizuj zegar co minutę
-    setInterval(updateClock, 60000);
-});
+    // Aktualizacja co minutę
+    return setInterval(updateClock, 60000);
+}
