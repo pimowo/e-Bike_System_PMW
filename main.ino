@@ -708,6 +708,9 @@ void requestBmsData(const uint8_t* command, size_t length);
 void updateBmsData();
 void connectToBms();       
 
+float getOdometerValue();
+bool saveOdometerValue(float value);
+
 // --- Funkcje BLE ---
 
 // callback dla BLE
@@ -3111,6 +3114,68 @@ const char* getLightModeString(LightSettings::LightMode mode) {
 
 // --- Funkcje serwera WWW ---
 
+// Funkcja do pobierania wartości licznika
+float getOdometerValue() {
+    if (!LittleFS.begin(false)) {
+        Serial.println("Error mounting LittleFS");
+        return 0.0;
+    }
+    
+    if (!LittleFS.exists("/odometer.json")) {
+        Serial.println("Odometer file not found");
+        return 0.0;
+    }
+    
+    File file = LittleFS.open("/odometer.json", "r");
+    if (!file) {
+        Serial.println("Failed to open odometer file for reading");
+        return 0.0;
+    }
+    
+    StaticJsonDocument<64> doc;
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+    
+    if (error) {
+        Serial.println("Failed to parse odometer file");
+        return 0.0;
+    }
+    
+    return doc["value"];
+}
+
+// Funkcja do zapisywania wartości licznika
+bool saveOdometerValue(float value) {
+    if (!LittleFS.begin(false)) {
+        Serial.println("Error mounting LittleFS");
+        return false;
+    }
+    
+    // Usuń istniejący plik
+    if (LittleFS.exists("/odometer.json")) {
+        LittleFS.remove("/odometer.json");
+    }
+    
+    File file = LittleFS.open("/odometer.json", "w");
+    if (!file) {
+        Serial.println("Failed to open odometer file for writing");
+        return false;
+    }
+    
+    StaticJsonDocument<64> doc;
+    doc["value"] = value;
+    
+    size_t bytes = serializeJson(doc, file);
+    file.close();
+    
+    if (bytes == 0) {
+        Serial.println("Failed to write odometer file");
+        return false;
+    }
+    
+    return true;
+}
+
 // konfiguracja serwera WWW
 void setupWebServer() {
     // Serwowanie plików statycznych
@@ -3198,91 +3263,29 @@ void setupWebServer() {
     });
 
     // Licznik całkowity 
-// Endpoint do pobierania wartości licznika
-server.on("/api/odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
-    float value = getOdometerValue();
-    request->send(200, "text/plain", String(value));
-});
+    // Endpoint do pobierania wartości licznika
+    server.on("/api/odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
+        float value = getOdometerValue();
+        request->send(200, "text/plain", String(value));
+    });
 
-// Endpoint do ustawiania wartości licznika
-server.on("/api/setOdometer", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("value", true)) {
-        String valueStr = request->getParam("value", true)->value();
-        float value = valueStr.toFloat();
-        
-        bool success = saveOdometerValue(value);
-        
-        if (success) {
-            request->send(200, "text/plain", "OK");
+    // Endpoint do ustawiania wartości licznika
+    server.on("/api/setOdometer", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (request->hasParam("value", true)) {
+            String valueStr = request->getParam("value", true)->value();
+            float value = valueStr.toFloat();
+            
+            bool success = saveOdometerValue(value);
+            
+            if (success) {
+                request->send(200, "text/plain", "OK");
+            } else {
+                request->send(500, "text/plain", "ERROR");
+            }
         } else {
-            request->send(500, "text/plain", "ERROR");
+            request->send(400, "text/plain", "Missing value parameter");
         }
-    } else {
-        request->send(400, "text/plain", "Missing value parameter");
-    }
-});
-
-// Funkcja do pobierania wartości licznika
-float getOdometerValue() {
-    if (!LittleFS.begin(false)) {
-        Serial.println("Error mounting LittleFS");
-        return 0.0;
-    }
-    
-    if (!LittleFS.exists("/odometer.json")) {
-        Serial.println("Odometer file not found");
-        return 0.0;
-    }
-    
-    File file = LittleFS.open("/odometer.json", "r");
-    if (!file) {
-        Serial.println("Failed to open odometer file for reading");
-        return 0.0;
-    }
-    
-    StaticJsonDocument<64> doc;
-    DeserializationError error = deserializeJson(doc, file);
-    file.close();
-    
-    if (error) {
-        Serial.println("Failed to parse odometer file");
-        return 0.0;
-    }
-    
-    return doc["value"];
-}
-
-// Funkcja do zapisywania wartości licznika
-bool saveOdometerValue(float value) {
-    if (!LittleFS.begin(false)) {
-        Serial.println("Error mounting LittleFS");
-        return false;
-    }
-    
-    // Usuń istniejący plik
-    if (LittleFS.exists("/odometer.json")) {
-        LittleFS.remove("/odometer.json");
-    }
-    
-    File file = LittleFS.open("/odometer.json", "w");
-    if (!file) {
-        Serial.println("Failed to open odometer file for writing");
-        return false;
-    }
-    
-    StaticJsonDocument<64> doc;
-    doc["value"] = value;
-    
-    size_t bytes = serializeJson(doc, file);
-    file.close();
-    
-    if (bytes == 0) {
-        Serial.println("Failed to write odometer file");
-        return false;
-    }
-    
-    return true;
-}
+    });
 
     // Światła
     server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* request) {
