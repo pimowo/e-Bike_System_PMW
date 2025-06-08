@@ -73,6 +73,19 @@ async function saveLightConfig() {
         console.log(`Konfiguracja do zapisu: dzienne=${dayLights}, nocne=${nightLights}, `+
                     `dzienBlink=${dayBlink}, nocBlink=${nightBlink}, częst.=${blinkFrequency}`);
         
+        // Sprawdź, czy tylne światło jest wyłączone i zaloguj to
+        if (dayLights === 'NONE' || dayLights === 'DRL' || dayLights === 'FRONT' || dayLights === 'FRONT+DRL') {
+            console.log('Tylne światło jest WYŁĄCZONE w konfiguracji dziennej');
+        } else {
+            console.log('Tylne światło jest WŁĄCZONE w konfiguracji dziennej');
+        }
+        
+        if (nightLights === 'NONE' || nightLights === 'DRL' || nightLights === 'FRONT' || nightLights === 'FRONT+DRL') {
+            console.log('Tylne światło jest WYŁĄCZONE w konfiguracji nocnej');
+        } else {
+            console.log('Tylne światło jest WŁĄCZONE w konfiguracji nocnej');
+        }
+        
         const lightConfig = {
             dayLights: dayLights,
             nightLights: nightLights,
@@ -81,18 +94,13 @@ async function saveLightConfig() {
             blinkFrequency: blinkFrequency
         };
         
-        // Pokaż dialog potwierdzenia
-        if (!confirm("Czy na pewno chcesz zapisać ustawienia świateł?")) {
-            return; // Anulowano zapis
-        }
-        
-        // Dodaj wskaźnik ładowania
+        // Pokaż wskaźnik ładowania
         const saveBtn = document.getElementById('save-light-config');
         const originalText = saveBtn.textContent;
         saveBtn.textContent = 'Zapisywanie...';
         saveBtn.disabled = true;
 
-        // Wyślij dane jako czysty JSON
+        // Wyślij dane jako JSON
         const response = await fetch('/api/lights/config', {
             method: 'POST',
             headers: {
@@ -119,24 +127,50 @@ async function saveLightConfig() {
         saveBtn.disabled = false;
         
         if (result.status === 'ok') {
-            // Pokaż powiadomienie
-            showNotification('Zapisano ustawienia świateł!', 'success');
+            alert('Zapisano ustawienia świateł!');
             
-            // Jeśli przyszły zaktualizowane dane świateł, zaktualizuj formularz
+            // Sprawdź, czy zapisane wartości odpowiadają wysłanym
             if (result.lights) {
+                console.log('Otrzymane ustawienia z serwera:', result.lights);
+                
+                // Porównaj wartości
+                if (result.lights.dayLights !== dayLights) {
+                    console.warn(`Ostrzeżenie: Zapisana konfiguracja dziennych świateł (${result.lights.dayLights}) `+
+                                 `różni się od wysłanej (${dayLights})`);
+                }
+                
+                if (result.lights.nightLights !== nightLights) {
+                    console.warn(`Ostrzeżenie: Zapisana konfiguracja nocnych świateł (${result.lights.nightLights}) `+
+                                 `różni się od wysłanej (${nightLights})`);
+                }
+                
+                // Zaktualizuj formularz z otrzymanych danych
                 document.getElementById('day-lights').value = result.lights.dayLights;
                 document.getElementById('night-lights').value = result.lights.nightLights;
                 document.getElementById('day-blink').checked = result.lights.dayBlink;
                 document.getElementById('night-blink').checked = result.lights.nightBlink;
                 document.getElementById('blink-frequency').value = result.lights.blinkFrequency;
                 console.log('Zaktualizowano formularz z odpowiedzi serwera');
+                
+                // Sprawdź ponownie status tylnego światła po aktualizacji
+                if (result.lights.dayLights.includes('REAR')) {
+                    console.log('Po zapisie: Tylne światło jest WŁĄCZONE w konfiguracji dziennej');
+                } else {
+                    console.log('Po zapisie: Tylne światło jest WYŁĄCZONE w konfiguracji dziennej');
+                }
+                
+                if (result.lights.nightLights.includes('REAR')) {
+                    console.log('Po zapisie: Tylne światło jest WŁĄCZONE w konfiguracji nocnej');
+                } else {
+                    console.log('Po zapisie: Tylne światło jest WYŁĄCZONE w konfiguracji nocnej');
+                }
             }
         } else {
             throw new Error(result.message || 'Nieznany błąd podczas zapisu');
         }
     } catch (error) {
         console.error('Błąd podczas zapisywania:', error);
-        showNotification('Błąd: ' + error.message, 'error');
+        alert('Błąd: ' + error.message);
     }
 }
 
