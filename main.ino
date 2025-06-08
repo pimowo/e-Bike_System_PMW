@@ -3198,49 +3198,91 @@ void setupWebServer() {
     });
 
     // Licznik całkowity 
-    server.on("/api/odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
-        #ifdef DEBUG
-        Serial.print("Odczyt licznika: ");
-        Serial.println(odometer.getRawTotal());
-        #endif
-        request->send(200, "text/plain", String(odometer.getRawTotal()));
-    });
+// Endpoint do pobierania wartości licznika
+server.on("/api/odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
+    float value = getOdometerValue();
+    request->send(200, "text/plain", String(value));
+});
 
-    server.on("/api/setOdometer", HTTP_POST, [](AsyncWebServerRequest *request) {
-        #ifdef DEBUG
-        Serial.println("Otrzymano żądanie POST /api/setOdometer");
-        #endif
-
-        if (request->hasParam("value", true)) {
-            float newValue = request->getParam("value", true)->value().toFloat();
-            
-            #ifdef DEBUG
-            Serial.print("Otrzymana wartość: ");
-            Serial.println(newValue);
-            Serial.print("Stan licznika przed zapisem: ");
-            Serial.println(odometer.getRawTotal());
-            Serial.print("Licznik zainicjalizowany: ");
-            Serial.println(odometer.isValid() ? "TAK" : "NIE");
-            #endif
-
-            bool success = odometer.setInitialValue(newValue);
-            
-            #ifdef DEBUG
-            Serial.print("Wynik zapisu: ");
-            Serial.println(success ? "OK" : "BŁĄD");
-            Serial.print("Stan licznika po zapisie: ");
-            Serial.println(odometer.getRawTotal());
-            #endif
-
-            request->send(success ? 200 : 400, "text/plain", 
-                        success ? "OK" : "Invalid value");
+// Endpoint do ustawiania wartości licznika
+server.on("/api/setOdometer", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (request->hasParam("value", true)) {
+        String valueStr = request->getParam("value", true)->value();
+        float value = valueStr.toFloat();
+        
+        bool success = saveOdometerValue(value);
+        
+        if (success) {
+            request->send(200, "text/plain", "OK");
         } else {
-            #ifdef DEBUG
-            Serial.println("Błąd: brak parametru value");
-            #endif
-            request->send(400, "text/plain", "Missing value");
+            request->send(500, "text/plain", "ERROR");
         }
-    });
+    } else {
+        request->send(400, "text/plain", "Missing value parameter");
+    }
+});
+
+// Funkcja do pobierania wartości licznika
+float getOdometerValue() {
+    if (!LittleFS.begin(false)) {
+        Serial.println("Error mounting LittleFS");
+        return 0.0;
+    }
+    
+    if (!LittleFS.exists("/odometer.json")) {
+        Serial.println("Odometer file not found");
+        return 0.0;
+    }
+    
+    File file = LittleFS.open("/odometer.json", "r");
+    if (!file) {
+        Serial.println("Failed to open odometer file for reading");
+        return 0.0;
+    }
+    
+    StaticJsonDocument<64> doc;
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+    
+    if (error) {
+        Serial.println("Failed to parse odometer file");
+        return 0.0;
+    }
+    
+    return doc["value"];
+}
+
+// Funkcja do zapisywania wartości licznika
+bool saveOdometerValue(float value) {
+    if (!LittleFS.begin(false)) {
+        Serial.println("Error mounting LittleFS");
+        return false;
+    }
+    
+    // Usuń istniejący plik
+    if (LittleFS.exists("/odometer.json")) {
+        LittleFS.remove("/odometer.json");
+    }
+    
+    File file = LittleFS.open("/odometer.json", "w");
+    if (!file) {
+        Serial.println("Failed to open odometer file for writing");
+        return false;
+    }
+    
+    StaticJsonDocument<64> doc;
+    doc["value"] = value;
+    
+    size_t bytes = serializeJson(doc, file);
+    file.close();
+    
+    if (bytes == 0) {
+        Serial.println("Failed to write odometer file");
+        return false;
+    }
+    
+    return true;
+}
 
     // Światła
     server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest* request) {
@@ -3550,8 +3592,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         serializeJson(doc, response);
         
         #ifdef DEBUG
-        //Serial.print("Wysyłam aktualny czas: ");
-        //Serial.println(response);
+        Serial.println("Wysyłam aktualny czas: " + response);
         #endif
         
         request->send(200, "application/json", response);
