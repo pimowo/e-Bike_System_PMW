@@ -7,6 +7,796 @@ function debug(...args) {
     }
 }
 
+// Obiekt z informacjami dla każdego parametru
+const infoContent = {
+
+    // Sekcja zegara //
+
+    'rtc-info': {
+        title: '⏰ Konfiguracja zegara',
+        description: `Panel konfiguracji zegara czasu rzeczywistego (RTC)
+
+    ⌚ Funkcje:
+      - Synchronizacja czasu systemowego
+      - Podtrzymanie bateryjne
+      - Format 24-godzinny
+      - Kalendarz z datą
+
+    🔄 Synchronizacja:
+      1. Sprawdź czas na swoim urządzeniu
+      2. Kliknij "Ustaw aktualny czas"
+      3. System automatycznie:
+          • Pobierze czas z twojego urządzenia
+          • Zaktualizuje zegar systemowy
+          • Potwierdzi synchronizację
+
+    💡 WSKAZÓWKI:
+      - Synchronizuj czas po wymianie baterii
+      - Sprawdzaj dokładność co kilka miesięcy
+      - Używaj dokładnego źródła czasu
+
+    ⚠️ WAŻNE: 
+      - Zegar działa nawet po odłączeniu głównego zasilania
+      - Bateria podtrzymująca wystarcza na około 2-3 lata
+      - Wymień baterię gdy zauważysz rozbieżności w czasie`
+    },
+
+    // Sekcja świateł //
+
+    'light-config-info': {
+        title: '💡 Konfiguracja świateł',
+        description: `Panel konfiguracji systemu oświetlenia.
+
+    🌞 Tryb dzienny:
+      - Światła do jazdy dziennej
+      - Zwiększona widoczność
+
+    🌙 Tryb nocny:
+      - Pełne oświetlenie drogi
+      - Dostosowanie do warunków
+
+    ⚙️ Opcje konfiguracji:
+      - Przód: światła dzienne/zwykłe
+      - Tył: światło pozycyjne
+      - Tryb pulsacyjny (mruganie)
+      - Częstotliwość mrugania
+
+    💡 WSKAZÓWKI:
+      - Używaj świateł nawet w dzień
+      - Dostosuj jasność do warunków
+      - Regularnie sprawdzaj działanie
+
+    ⚠️ WAŻNE:
+      - Sprawdź lokalne przepisy
+      - Utrzymuj światła w czystości
+      - Wymień uszkodzone elementy`
+    },
+
+    'day-lights-info': {
+        title: '☀️ Światła dzienne',
+        description: `Wybór konfiguracji świateł dla jazdy w dzień:
+
+      - Wyłączone: wszystkie światła wyłączone 
+      - Przód dzień: przednie światło w trybie dziennym 
+      - Przód zwykłe: przednie światło w trybie normalnym 
+      - Tył: tylko tylne światło 
+      - Przód dzień + tył: przednie światło dzienne i tylne 
+      - Przód zwykłe + tył: przednie światło normalne i tylne`
+    },
+
+    'day-blink-info': {
+        title: 'Mruganie tylnego światła (dzień)',
+        description: `Włącza lub wyłącza funkcję mrugania tylnego światła podczas jazdy w dzień. 
+
+    Mrugające światło może być bardziej widoczne 
+    dla innych uczestników ruchu.`
+    },
+
+    'night-lights-info': {
+        title: '🌙 Światła nocne',
+        description: `Wybór konfiguracji świateł dla jazdy w nocy:
+ 
+      - Wyłączone: wszystkie światła wyłączone 
+      - Przód dzień: przednie światło w trybie dziennym 
+      - Przód zwykłe: przednie światło w trybie normalnym 
+      - Tył: tylko tylne światło 
+      - Przód dzień + tył: przednie światło dzienne i tylne 
+      - Przód zwykłe + tył: przednie światło normalne i tylne`
+    },
+
+    'night-blink-info': {
+        title: 'Mruganie tylnego światła (noc)',
+        description: `Włącza lub wyłącza funkcję mrugania tylnego światła podczas jazdy w nocy. 
+    
+    Należy rozważnie używać tej funkcji, gdyż w niektórych warunkach migające światło może być bardziej dezorientujące niż pomocne.`
+    },
+
+    'blink-frequency-info': {
+        title: '⚡ Częstotliwość mrugania',
+        description: `Określa częstotliwość mrugania tylnego światła w milisekundach. 
+        
+    Mniejsza wartość oznacza szybsze mruganie, a większa - wolniejsze. Zakres: 100-2000ms.`
+    },
+
+    // Sekcja wyświetlacza //
+
+    'display-config-info': {
+        title: '📱 Konfiguracja wyświetlacza',
+        description: `Panel konfiguracji wyświetlacza LCD.
+
+    Dostępne opcje:
+    🔆 Jasność:
+      - Tryb automatyczny: automatyczne dostosowanie jasności
+      - Jasność dzienna: poziom w trybie dziennym (0-100%)
+      - Jasność nocna: poziom w trybie nocnym (0-100%)
+    
+    💡 WSKAZÓWKI:
+      - W nocy zalecana jasność 30-50%
+      - W dzień zalecana jasność 70-100%
+    
+    ⚠️ UWAGA: 
+    Zbyt niska jasność może utrudnić odczyt w silnym świetle słonecznym`
+    },
+
+    'brightness-info': {
+        title: '🔆 Podświetlenie wyświetlacza',
+        description: `Ustaw jasność podświetlenia wyświetlacza w zakresie od 0% do 100%. 
+        
+    Wyższa wartość oznacza jaśniejszy wyświetlacz. Zalecane ustawienie to 50-70% dla optymalnej widoczności.`
+    },
+
+    'auto-mode-info': {
+        title: '🤖 Tryb automatyczny',
+        description: `Automatycznie przełącza jasność wyświetlacza w zależności od ustawionych świateł dzień/noc. W trybie dziennym używa jaśniejszego podświetlenia, a w nocnym - przyciemnionego. Gdy światła nie są włączone to jasność jest ustawiona jak dla dnia`
+    },
+
+    'day-brightness-info': {
+        title: '☀️ Jasność dzienna',
+        description: `Poziom jasności wyświetlacza używany w ciągu dnia (0-100%). Zalecana wyższa wartość dla lepszej widoczności w świetle słonecznym.`
+    },
+
+    'night-brightness-info': {
+        title: '🌙 Jasność nocna',
+        description: `Poziom jasności wyświetlacza używany w nocy (0-100%). Zalecana niższa wartość dla komfortowego użytkowania w ciemności.`
+    },
+
+    'auto-off-time-info': {
+        title: '⏰ Czas automatycznego wyłączenia',
+        description: `Określa czas bezczynności, po którym system automatycznie się wyłączy.
+
+        Zakres: 0-60 minut
+        0: Funkcja wyłączona (system nie wyłączy się automatycznie)
+        1-60: Czas w minutach do automatycznego wyłączenia
+
+        💡 WSKAZÓWKA:
+          - Krótszy czas oszczędza baterię
+          - Dłuższy czas jest wygodniejszy przy dłuższych postojach
+        
+        ⚠️ UWAGA:
+        System zawsze zapisze wszystkie ustawienia przed wyłączeniem`
+    },
+
+    // Sekcja sterownika //
+
+    'controller-config-info': {
+        title: '🎮 Konfiguracja sterownika',
+        description: `Panel konfiguracji sterownika silnika.
+
+    Obsługiwane sterowniki:
+    🔷 KT-LCD:
+      - Parametry P1-P5: podstawowa konfiguracja
+      - Parametry C1-C15: zaawansowane ustawienia
+      - Parametry L1-L3: specjalne funkcje
+    
+    🔶 S866:
+      - Parametry P1-P20: pełna konfiguracja
+    
+    ⚠️ WAŻNE:
+      - Nieprawidłowa konfiguracja może wpłynąć na:
+        • Działanie silnika
+        • Zużycie energii
+        • Żywotność komponentów
+      - W razie wątpliwości użyj ustawień domyślnych
+    
+    💡 WSKAZÓWKA:
+    Każdy parametr ma szczegółowy opis dostępny
+    pod ikoną informacji (ℹ️)`
+    },
+
+    'display-type-info': {
+        title: '🔍 Wybór typu wyświetlacza',
+        description: `Wybierz odpowiedni model wyświetlacza LCD zainstalowanego w Twoim rowerze.
+
+        🟦 KT-LCD:
+        • Standardowy wyświetlacz z serii KT
+        • Obsługuje parametry P1-P5, C1-C15, L1-L3
+        • Kompatybilny z większością kontrolerów KT
+        
+        🟨 S866:
+        • Wyświetlacz z serii Bigstone/S866
+        • Obsługuje parametry P1-P20
+        • Posiada dodatkowe funkcje konfiguracyjne
+        
+        ⚠️ UWAGA: 
+        Wybór niewłaściwego typu wyświetlacza może 
+        spowodować nieprawidłowe działanie systemu.
+        Upewnij się, że wybrany model odpowiada 
+        fizycznie zainstalowanemu wyświetlaczowi.`
+    },
+
+    // Parametry sterownika KT-LCD //
+
+    // Parametry P sterownika //
+
+    'kt-p1-info': {
+        title: '⚙️ P1 - Przełożenie silnika',
+        description: `Obliczane ze wzoru: ilość magnesów X przełożenie
+
+    Dla silników bez przekładni (np. 30H): przełożenie = 1 (P1 = 46)
+    Dla silników z przekładnią (np. XP07): przełożenie > 1 (P1 = 96)
+
+    Parametr wpływa tylko na wyświetlanie prędkości - nieprawidłowa wartość nie wpłynie na jazdę, jedynie na wskazania prędkościomierza`
+    },
+
+    'kt-p2-info': {
+        title: 'P2 - Sposób odczytu prędkości',
+        description: `Wybierz:
+        
+    0: Dla silnika bez przekładni
+      - Prędkość z czujników halla silnika
+      - Biały przewód do pomiaru temperatury
+
+    1: Dla silnika z przekładnią
+      - Prędkość z dodatkowego czujnika halla
+      - Biały przewód do pomiaru prędkości
+
+    2-6: Dla silników z wieloma magnesami pomiarowymi
+      - Prędkość z dodatkowego czujnika halla
+      - Biały przewód do pomiaru prędkości
+      *używane rzadko, ale gdy pokazuje zaniżoną prędkość spróbuj tej opcji`
+    },
+
+    'kt-p3-info': {
+        title: 'P3 - Tryb działania czujnika PAS',
+        description: `Pozwala ustawić jak ma się zachowywać wspomaganie z czujnikiem PAS podczas używania biegów 1-5
+      – 0: Tryb sterowania poprzez prędkość
+      – 1: Tryb sterowania momentem obrotowym`
+    },
+
+    'kt-p4-info': {
+        title: 'P4 - Ruszanie z manetki',
+        description: `Pozwala ustawić sposób ruszania rowerem:
+
+    0: Można ruszyć od zera używając samej manetki
+    1: Manetka działa dopiero po ruszeniu z PAS/nóg`
+    },
+
+    'kt-p5-info': {
+        title: 'P5 - Sposób obliczania poziomu naładowania akumulatora',
+        description: `Pozwala dostosować czułość wskaźnika naładowania akumulatora
+      - niższa wartość: szybsza reakcja na spadki napięcia
+      - wyższa wartość: wolniejsza reakcja, uśrednianie wskazań
+
+    Zalecane zakresy wartości:
+      - 24V: 4-11
+      - 36V: 5-15
+      - 48V: 6-20
+      - 60V: 7-30
+
+    Uwaga: Zbyt wysokie wartości mogą opóźnić ostrzeżenie o niskim poziomie baterii.
+
+    Jeśli wskaźnik pokazuje stale 100%, wykonaj:
+    1. Reset do ustawień fabrycznych
+    2. Ustaw podstawowe parametry
+    3. Wykonaj pełny cykl ładowania-rozładowania`
+    },
+
+    // Parametry C sterownika //
+
+    'kt-c1-info': {
+        title: 'C1 - Czujnik PAS',
+        description: `Konfiguracja czułości czujnika asysty pedałowania (PAS). Wpływa na to, jak szybko system reaguje na pedałowanie.`
+    },
+
+    'kt-c2-info': {
+        title: 'C2 - Typ silnika',
+        description: `Ustawienia charakterystyki silnika i jego podstawowych parametrów pracy.`
+    },
+
+    'kt-c3-info': {
+        title: 'C3 - Tryb wspomagania',
+        description: `Konfiguracja poziomów wspomagania i ich charakterystyki (eco, normal, power).`
+    },
+
+    'kt-c4-info': {
+        title: 'C4 - Manetka i PAS',
+        description: `Określa sposób współdziałania manetki z czujnikiem PAS i priorytety sterowania.`
+    },
+
+    'kt-c5-info': {
+        title: '⚠️ C5 - Regulacja prądu sterownika',
+        description: `Pozwala dostosować maksymalny prąd sterownika do możliwości akumulatora.
+    
+    Wartości:
+    3:  Prąd zmniejszony o 50% (÷2.0)
+    4:  Prąd zmniejszony o 33% (÷1.5) 
+    5:  Prąd zmniejszony o 25% (÷1.33)
+    6:  Prąd zmniejszony o 20% (÷1.25)
+    7:  Prąd zmniejszony o 17% (÷1.20)
+    8:  Prąd zmniejszony o 13% (÷1.15)
+    9:  Prąd zmniejszony o 9%  (÷1.10)
+    10: Pełny prąd sterownika
+
+    Przykład dla sterownika 25A:
+      - C5=3 → max 12.5A
+      - C5=5 → max 18.8A
+      - C5=10 → max 25A
+
+    ⚠️ WAŻNE
+    Używaj niższych wartości gdy:
+      - Masz słaby akumulator z mocnym silnikiem
+      - Chcesz wydłużyć żywotność akumulatora
+      - Występują spadki napięcia podczas przyśpieszania`
+    },
+
+    'kt-c6-info': {
+        title: 'C6 - Jasność wyświetlacza',
+        description: `Ustawienie domyślnej jasności podświetlenia wyświetlacza LCD.`
+    },
+
+    'kt-c7-info': {
+        title: 'C7 - Tempomat',
+        description: `Konfiguracja tempomatu - utrzymywania stałej prędkości.`
+    },
+
+    'kt-c8-info': {
+        title: 'C8 - Silnik',
+        description: `Dodatkowe parametry silnika, w tym temperatura i zabezpieczenia.`
+    },
+
+    'kt-c9-info': {
+        title: 'C9 - Zabezpieczenia',
+        description: `Ustawienia kodów PIN i innych zabezpieczeń systemowych.`
+    },
+
+    'kt-c10-info': {
+        title: 'C10 - Ustawienia fabryczne',
+        description: `Opcje przywracania ustawień fabrycznych i kalibracji systemu.`
+    },
+
+    'kt-c11-info': {
+        title: 'C11 - Komunikacja',
+        description: `Parametry komunikacji między kontrolerem a wyświetlaczem.`
+    },
+
+    'kt-c12-info': {
+        title: '🔋 C12 - Regulacja minimalnego napięcia wyłączenia (LVC)',
+        description: `Pozwala dostosować próg napięcia, przy którym sterownik się wyłącza (Low Voltage Cutoff).
+
+    Wartości względem napięcia domyślnego:
+    0: -2.0V     
+    1: -1.5V     
+    2: -1.0V     
+    3: -0.5V
+    4: domyślne (40V dla 48V, 30V dla 36V, 20V dla 24V)
+    5: +0.5V
+    6: +1.0V
+    7: +1.5V
+
+    Przykład dla sterownika 48V:
+      - Domyślnie (C12=4): wyłączenie przy 40V
+      - C12=0: wyłączenie przy 38V
+      - C12=7: wyłączenie przy 41.5V
+
+    ⚠️ WAŻNE WSKAZÓWKI:
+    1. Obniżenie progu poniżej 42V w sterowniku 48V może spowodować:
+      - Błędne wykrycie systemu jako 36V
+      - Nieprawidłowe wskazania poziomu naładowania (stałe 100%)
+    2. Przy częstym rozładowywaniu akumulatora:
+      - Zalecane ustawienie C12=7
+      - Zapobiega przełączaniu na tryb 36V
+      - Chroni ostatnie % pojemności akumulatora
+
+    ZASTOSOWANIE:
+      - Dostosowanie do charakterystyki BMS
+      - Optymalizacja wykorzystania pojemności akumulatora
+      - Ochrona przed głębokim rozładowaniem`
+    },
+
+    'kt-c13-info': {
+        title: '🔄 C13 - Hamowanie regeneracyjne',
+        description: `Pozwala ustawić siłę hamowania regeneracyjnego i efektywność odzysku energii.
+
+    USTAWIENIA:
+    0: Wyłączone (brak hamowania i odzysku)
+    1: Słabe hamowanie + Najwyższy odzysk energii
+    2: Umiarkowane hamowanie + Średni odzysk
+    3: Średnie hamowanie + Umiarkowany odzysk
+    4: Mocne hamowanie + Niski odzysk
+    5: Najmocniejsze hamowanie + Minimalny odzysk
+
+    ZASADA DZIAŁANIA:
+      - Niższe wartości = lepszy odzysk energii
+      - Wyższe wartości = silniejsze hamowanie
+      - Hamowanie działa na klamki hamulcowe
+      - W niektórych modelach działa też na manetkę
+
+    ⚠️ WAŻNE OSTRZEŻENIA:
+    1. Hamowanie regeneracyjne może powodować obluzowanie osi silnika
+      - ZAWSZE używaj 2 blokad osi
+      - Regularnie sprawdzaj dokręcenie
+    2. Wybór ustawienia:
+      - Priorytet odzysku energii → ustaw C13=1
+      - Priorytet siły hamowania → ustaw C13=5
+      - Kompromis → ustaw C13=2 lub C13=3
+
+    💡 WSKAZÓWKA: Zacznij od niższych wartości i zwiększaj stopniowo, obserwując zachowanie roweru i efektywność odzysku energii.`
+    },
+
+    'kt-c14-info': {
+        title: 'C14 - Poziomy PAS',
+        description: `Konfiguracja poziomów wspomagania i ich charakterystyk.`
+    },
+
+    'kt-c15-info': {
+        title: 'C15 - Prowadzenie',
+        description: `Ustawienia trybu prowadzenia roweru (walk assist).`
+    },
+
+    // Parametry L sterownika //
+    
+    'kt-l1-info': {
+        title: '🔋 L1 - Napięcie minimalne (LVC)',
+        description: `Ustawienie minimalnego napięcia pracy sterownika (Low Voltage Cutoff).
+
+    Dostępne opcje:
+    0: Automatyczny dobór progu przez sterownik
+      - 24V → wyłączenie przy 20V
+      - 36V → wyłączenie przy 30V      
+      - 48V → wyłączenie przy 40V
+      
+    Wymuszenie progu wyłączenia:
+    1: 20V
+    2: 30V
+    3: 40V
+
+    ⚠️ UWAGA: 
+    Ustawienie zbyt niskiego progu może prowadzić do uszkodzenia akumulatora!`
+    },
+
+    'kt-l2-info': {
+        title: '⚡ L2 - Silniki wysokoobrotowe',
+        description: `Parametr dla silników o wysokich obrotach (>5000 RPM).
+
+    Wartości:
+    0: Tryb normalny
+    1: Tryb wysokoobrotowy - wartość P1 jest mnożona ×2
+
+    📝 UWAGA:
+      - Parametr jest powiązany z ustawieniem P1
+      - Używaj tylko dla silników > 5000 RPM`
+    },
+
+    'kt-l3-info': {
+        title: '🔄 L3 - Tryb DUAL',
+        description: `Konfiguracja zachowania dla sterowników z podwójnym kompletem czujników halla.
+
+    Opcje:
+    0: Tryb automatyczny
+      - Automatyczne przełączenie na sprawny komplet czujników
+      - Kontynuacja pracy po awarii jednego kompletu
+
+    1: Tryb bezpieczny
+      - Wyłączenie przy awarii czujników
+      - Sygnalizacja błędu
+
+    ⚠️ WAŻNE: 
+    Dotyczy tylko sterowników z funkcją DUAL (2 komplety czujników halla)`
+    },
+
+    // Parametry sterownika S866 //
+
+    's866-p1-info': {
+        title: 'P1 - Jasność podświetlenia',
+        description: `Regulacja poziomu podświetlenia wyświetlacza.
+
+    Dostępne poziomy:
+    1: Najciemniejszy
+    2: Średni
+    3: Najjaśniejszy`
+    },
+
+    's866-p2-info': {
+        title: 'P2 - Jednostka pomiaru',
+        description: `Wybór jednostki wyświetlania dystansu i prędkości.
+
+    Opcje:
+    0: Kilometry (km)
+    1: Mile`
+    },
+
+    's866-p3-info': {
+        title: 'P3 - Napięcie nominalne',
+        description: `Wybór napięcia nominalnego systemu.
+
+    Dostępne opcje:
+    - 24V
+    - 36V
+    - 48V
+    - 60V`
+    },
+
+    's866-p4-info': {
+        title: 'P4 - Czas automatycznego uśpienia',
+        description: `Czas bezczynności po którym wyświetlacz przejdzie w stan uśpienia.
+
+    Zakres: 0-60 minut
+    0: Funkcja wyłączona (brak auto-uśpienia)
+    1-60: Czas w minutach do przejścia w stan uśpienia`
+    },
+
+    's866-p5-info': {
+        title: 'P5 - Tryb wspomagania PAS',
+        description: `Wybór liczby poziomów wspomagania.
+
+    Opcje:
+    0: Tryb 3-biegowy
+    1: Tryb 5-biegowy`
+    },
+
+    's866-p6-info': {
+        title: 'P6 - Rozmiar koła',
+        description: `Ustawienie średnicy koła dla prawidłowego obliczania prędkości.
+
+    Zakres: 5.0 - 50.0 cali
+    Dokładność: 0.1 cala
+
+    ⚠️ WAŻNE 
+    Ten parametr jest kluczowy dla prawidłowego wyświetlania prędkości.`
+    },
+
+    's866-p7-info': {
+        title: 'P7 - Liczba magnesów czujnika prędkości',
+        description: `Konfiguracja czujnika prędkości.
+
+    Zakres: 1-100 magnesów
+
+    Dla silnika z przekładnią:
+    Wartość = Liczba magnesów × Przełożenie
+
+    Przykład:
+    - 20 magnesów, przełożenie 4.3
+    - Wartość = 20 × 4.3 = 86`
+    },
+
+    's866-p8-info': {
+        title: 'P8 - Limit prędkości',
+        description: `Ustawienie maksymalnej prędkości pojazdu.
+
+    Zakres: 0-100 km/h
+    100: Brak limitu prędkości
+
+    ⚠️ UWAGA: 
+    - Dokładność: ±1 km/h
+    - Limit dotyczy zarówno mocy jak i skrętu
+    - Wartości są zawsze w km/h, nawet przy wyświetlaniu w milach`
+    },
+
+    's866-p9-info': {
+        title: 'P9 - Tryb startu',
+        description: `Wybór sposobu uruchamiania wspomagania.
+
+    0: Start od zera (zero start)
+    1: Start z rozbiegu (non-zero start)`
+    },
+
+    's866-p10-info': {
+        title: 'P10 - Tryb jazdy',
+        description: `Wybór trybu wspomagania.
+
+    0: Wspomaganie PAS (moc zależna od siły pedałowania)
+    1: Tryb elektryczny (sterowanie manetką)
+    2: Tryb hybrydowy (PAS + manetka)`
+    },
+
+    's866-p11-info': {
+        title: 'P11 - Czułość PAS',
+        description: `Regulacja czułości czujnika wspomagania.
+
+    Zakres: 1-24
+    - Niższe wartości = mniejsza czułość
+    - Wyższe wartości = większa czułość`
+    },
+
+    's866-p12-info': {
+        title: 'P12 - Siła startu PAS',
+        description: `Intensywność wspomagania przy rozpoczęciu pedałowania.
+
+    Zakres: 1-5
+    1: Najsłabszy start
+    5: Najmocniejszy start`
+    },
+
+    's866-p13-info': {
+        title: 'P13 - Typ czujnika PAS',
+        description: `Wybór typu czujnika PAS według liczby magnesów.
+
+    Dostępne opcje:
+    - 5 magnesów
+    - 8 magnesów
+    - 12 magnesów`
+    },
+
+    's866-p14-info': {
+        title: 'P14 - Limit prądu kontrolera',
+        description: `Ustawienie maksymalnego prądu kontrolera.
+
+    Zakres: 1-20A`
+    },
+
+    's866-p15-info': {
+        title: 'P15 - Napięcie odcięcia',
+        description: `Próg napięcia przy którym kontroler wyłączy się.`
+    },
+
+    's866-p16-info': {
+        title: 'P16 - Reset licznika ODO',
+        description: `Resetowanie licznika całkowitego przebiegu.
+
+    Aby zresetować:
+    Przytrzymaj przycisk przez 5 sekund`
+    },
+
+    's866-p17-info': {
+        title: 'P17 - Tempomat',
+        description: `Włączenie/wyłączenie funkcji tempomatu.
+
+    0: Tempomat wyłączony
+    1: Tempomat włączony
+
+    ⚠️ Uwaga
+    Działa tylko z protokołem 2`
+    },
+
+    's866-p18-info': {
+        title: 'P18 - Kalibracja prędkości',
+        description: `Współczynnik korekcji wyświetlanej prędkości.
+
+    Zakres: 50% - 150%`
+    },
+
+    's866-p19-info': {
+        title: 'P19 - Bieg zerowy PAS',
+        description: `Konfiguracja biegu zerowego w systemie PAS.
+
+    0: Z biegiem zerowym
+    1: Bez biegu zerowego`
+    },
+
+    's866-p20-info': {
+        title: 'P20 - Protokół komunikacji',
+        description: `Wybór protokołu komunikacji sterownika.
+
+    0: Protokół 2
+    1: Protokół 5S
+    2: Protokół Standby
+    3: Protokół Standby alternatywny`
+    },
+
+    // Sekcja ustawień ogólnych //
+
+    'general-settings-info': {
+        title: '⚙️ Ustawienia ogólne',
+        description: `Podstawowa konfiguracja systemu.
+
+    🚲 Parametry roweru:
+      - Rozmiar koła: wpływa na pomiar prędkości
+      - Limit prędkości: zgodnie z przepisami
+      - Jednostki: km/h lub mph
+    
+    ⏰ Automatyczne wyłączanie:
+      - Czas do uśpienia: 0-60 minut
+      - 0 = funkcja wyłączona
+        
+    💾 Opcje konfiguracji:
+      - Reset do ustawień fabrycznych
+      - Kopia zapasowa konfiguracji
+    
+    ⚠️ UWAGA:
+    Reset ustawień usuwa wszystkie
+    spersonalizowane konfiguracje!`
+    },
+
+    // Licznik całkowity
+    'total-odometer-info': {
+        title: 'Przebieg całkowity',
+        description: `Całkowity przebieg roweru w kilometrach. Można ustawić wartość początkową, np. przy przeniesieniu z innego licznika.`
+    },
+
+    // Rozmiar koła
+    'wheel-size-info': {
+        title: 'Rozmiar koła',
+        description: `Wybierz rozmiar koła swojego roweru. Jest to ważne dla prawidłowego obliczania prędkości i dystansu.`
+    },
+
+    // Sekcja Bluetooth
+    'bluetooth-config-info': {
+        title: '📶 Konfiguracja Bluetooth',
+        description: `Panel konfiguracji połączeń bezprzewodowych.
+
+	'front-tpms-mac-info': {
+		title: 'Adres MAC przedniego czujnika TPMS',
+		description: `Wprowadź adres MAC przedniego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.    
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.    
+		Przykład: A1:B2:C3:D4:E5:F6`
+	},
+
+	'rear-tpms-mac-info': {
+		title: 'Adres MAC tylnego czujnika TPMS',
+		description: `Wprowadź adres MAC tylnego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.
+		
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.
+		
+		Przykład: A1:B2:C3:D4:E5:F6`
+	},
+
+    🔋 BMS (Battery Management System):
+      - Monitoring stanu baterii
+      - Pomiar temperatury ogniw
+      - Kontrola napięcia
+      - Statystyki ładowania
+    
+    🌡️ TPMS (Tire Pressure Monitoring):
+      - Ciśnienie w oponach
+      - Temperatura opon
+      - Stan baterii czujników
+    
+    📱 Opcje połączenia:
+      - Auto-łączenie ze znanymi urządzeniami
+      - Skanowanie nowych czujników
+      - Parowanie urządzeń
+    
+    💡 WSKAZÓWKI:
+      - Utrzymuj czujniki w zasięgu 2-3m
+      - Sprawdzaj stan baterii czujników
+      - Regularnie aktualizuj oprogramowanie`
+    },
+
+    'bms-info': {
+        title: 'System zarządzania baterią (BMS)',
+        description: `BMS (Battery Management System) to system monitorujący stan baterii. Po włączeniu tej opcji, urządzenie będzie odbierać dane o stanie baterii przez Bluetooth, takie jak:
+             
+    • Pojemność (Ah)
+    • Energia (Wh)
+    • Temperatura ogniw (°C)
+    • Stan naładowania (SOC)`
+    },
+
+    // Opis dla TPMS
+    'tpms-info': {
+        title: 'System monitorowania ciśnienia w oponach (TPMS)',
+        description: `TPMS (Tire Pressure Monitoring System) to system monitorujący ciśnienie w oponach. Po włączeniu tej opcji, urządzenie będzie odbierać dane z czujników przez Bluetooth, takie jak:
+                
+    • Ciśnienie w oponach (bar)
+    • Temperatura opon (°C)
+    • Stan baterii czujników (V)`
+    },
+	
+	'front-tpms-mac-info': {
+		title: 'Adres MAC przedniego czujnika TPMS',
+		description: `Wprowadź adres MAC przedniego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.    
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.    
+		Przykład: A1:B2:C3:D4:E5:F6`
+	},
+
+	'rear-tpms-mac-info': {
+		title: 'Adres MAC tylnego czujnika TPMS',
+		description: `Wprowadź adres MAC tylnego czujnika TPMS w formacie XX:XX:XX:XX:XX:XX.		
+		Możesz znaleźć adres MAC używając aplikacji do skanowania Bluetooth na telefonie podczas kalibracji czujników.		
+		Przykład: A1:B2:C3:D4:E5:F6`
+	}
+};
+
 // Główna inicjalizacja po załadowaniu DOM
 document.addEventListener('DOMContentLoaded', async function() {
     debug('Inicjalizacja aplikacji...');
