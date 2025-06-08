@@ -1,5 +1,3 @@
-// Konfiguracja świateł - funkcje pomocnicze
-
 // Funkcja do ładowania konfiguracji świateł
 async function loadLightConfig() {
     console.log('Ładowanie konfiguracji świateł...');
@@ -15,48 +13,38 @@ async function loadLightConfig() {
         
         if (data.status === 'ok' && data.lights) {
             // Aktualizacja interfejsu
-            document.getElementById('day-lights').value = data.lights.dayLights || 'DRL+REAR';
-            document.getElementById('night-lights').value = data.lights.nightLights || 'FRONT+REAR';
-            document.getElementById('day-blink').checked = data.lights.dayBlink !== undefined ? data.lights.dayBlink : true;
-            document.getElementById('night-blink').checked = data.lights.nightBlink !== undefined ? data.lights.nightBlink : false;
-            document.getElementById('blink-frequency').value = data.lights.blinkFrequency || 500;
+            const dayLights = document.getElementById('day-lights');
+            const nightLights = document.getElementById('night-lights');
+            const dayBlink = document.getElementById('day-blink');
+            const nightBlink = document.getElementById('night-blink');
+            const blinkFrequency = document.getElementById('blink-frequency');
+            
+            if (dayLights) dayLights.value = data.lights.dayLights || 'DRL+REAR';
+            if (nightLights) nightLights.value = data.lights.nightLights || 'FRONT+REAR';
+            if (dayBlink) dayBlink.checked = data.lights.dayBlink !== undefined ? data.lights.dayBlink : true;
+            if (nightBlink) nightBlink.checked = data.lights.nightBlink !== undefined ? data.lights.nightBlink : false;
+            if (blinkFrequency) blinkFrequency.value = data.lights.blinkFrequency || 500;
             
             console.log('Zaktualizowano formularz z konfiguracji z serwera');
         } else {
             console.warn('Odpowiedź serwera nie zawiera danych o światłach, używam domyślnych wartości');
             // Ustawienia domyślne
-            document.getElementById('day-lights').value = 'DRL+REAR';
-            document.getElementById('night-lights').value = 'FRONT+REAR';
-            document.getElementById('day-blink').checked = true;
-            document.getElementById('night-blink').checked = false;
-            document.getElementById('blink-frequency').value = 500;
+            const dayLights = document.getElementById('day-lights');
+            const nightLights = document.getElementById('night-lights');
+            const dayBlink = document.getElementById('day-blink');
+            const nightBlink = document.getElementById('night-blink');
+            const blinkFrequency = document.getElementById('blink-frequency');
+            
+            if (dayLights) dayLights.value = 'DRL+REAR';
+            if (nightLights) nightLights.value = 'FRONT+REAR';
+            if (dayBlink) dayBlink.checked = true;
+            if (nightBlink) nightBlink.checked = false;
+            if (blinkFrequency) blinkFrequency.value = 500;
         }
     } catch (error) {
         console.error('Błąd podczas ładowania konfiguracji świateł:', error);
         // Ustawienia domyślne w przypadku błędu
-        document.getElementById('day-lights').value = 'DRL+REAR';
-        document.getElementById('night-lights').value = 'FRONT+REAR';
-        document.getElementById('day-blink').checked = true;
-        document.getElementById('night-blink').checked = false;
-        document.getElementById('blink-frequency').value = 500;
     }
-}
-
-// Funkcja do wyświetlania powiadomień
-function showNotification(message, type = 'info') {
-    // Utwórz element powiadomienia
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-    
-    // Dodaj element do strony
-    document.body.appendChild(notification);
-    
-    // Ustaw timeout do ukrycia i usunięcia powiadomienia
-    setTimeout(() => {
-        notification.classList.add('hide');
-        setTimeout(() => notification.remove(), 500);
-    }, 3000);
 }
 
 // Funkcja do zapisywania konfiguracji świateł
@@ -127,7 +115,8 @@ async function saveLightConfig() {
         saveBtn.disabled = false;
         
         if (result.status === 'ok') {
-            alert('Zapisano ustawienia świateł!');
+            //alert('Zapisano ustawienia świateł!');
+			showNotification('Zapisano ustawienia świateł!', 'success');
             
             // Sprawdź, czy zapisane wartości odpowiadają wysłanym
             if (result.lights) {
@@ -170,18 +159,7 @@ async function saveLightConfig() {
         }
     } catch (error) {
         console.error('Błąd podczas zapisywania:', error);
-        alert('Błąd: ' + error.message);
+        //alert('Błąd: ' + error.message);
+		showNotification('Błąd: ' + error.message, 'error');
     }
 }
-
-// Inicjalizacja po załadowaniu dokumentu
-document.addEventListener('DOMContentLoaded', function() {
-    // Ładowanie konfiguracji świateł
-    loadLightConfig();
-    
-    // Przypisanie funkcji do przycisku zapisu
-    const saveBtn = document.getElementById('save-light-config');
-    if (saveBtn) {
-        saveBtn.addEventListener('click', saveLightConfig);
-    }
-});
