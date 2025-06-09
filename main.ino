@@ -435,6 +435,7 @@ int power_avg_w;
 int power_max_w;
 float speed_avg_kmh;
 float speed_max_kmh;
+
 // kadencja
 #define CADENCE_SAMPLES_WINDOW 4
 #define CADENCE_OPTIMAL_MIN 75
@@ -626,19 +627,6 @@ class TemperatureSensor {
         }
 };
 
-// void IRAM_ATTR cadence_ISR() {
-//     unsigned long now = millis();
-//     unsigned long minDelay = max(8, 200 / cadence_pulses_per_revolution); // Minimum 8ms
-    
-//     if (now - cadence_last_pulse_time > minDelay) {
-//         for (int i = CADENCE_SAMPLES_WINDOW - 1; i > 0; i--) {
-//             cadence_pulse_times[i] = cadence_pulse_times[i - 1];
-//         }
-//         cadence_pulse_times[0] = now;
-//         cadence_last_pulse_time = now;
-//     }
-// }
-
 void IRAM_ATTR cadence_ISR() {
     unsigned long now = millis();
     unsigned long minDelay = max(8, 200 / cadence_pulses_per_revolution); // Minimum 8ms
@@ -656,9 +644,6 @@ void IRAM_ATTR cadence_ISR() {
  ********************************************************************/
 
 // --- Deklaracje funkcji obsługi świateł ---
-void setLights();
-void saveLightSettings();
-void loadLightSettings();
 void applyBacklightSettings();
 void printLightConfigFile();
 
@@ -694,8 +679,6 @@ void setCadencePulsesPerRevolution(uint8_t pulses);
 void goToSleep();
 bool isValidTemperature(float temp);
 void handleTemperature();
-void saveLightMode();
-void loadLightMode();
 
 // --- Deklaracje funkcji konfiguracyjnych ---
 void loadSettings();
@@ -885,7 +868,7 @@ class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 // wysyłanie zapytania do BMS
 void requestBmsData(const uint8_t* command, size_t length) {
     if (bleClient && bleClient->isConnected() && bleCharacteristicTx) {
-//        bleCharacteristicTx->writeValue(command, length);
+        //bleCharacteristicTx->writeValue(command, length);
     }
 }
 
@@ -1149,116 +1132,6 @@ void checkTpmsTimeout() {
 }
 
 // --- Funkcje konfiguracji ---
-
-// zapis ustawień świateł
-// void saveLightSettings() {
-//     #ifdef DEBUG
-//     Serial.println("Zapisywanie ustawień świateł");
-//     #endif
-
-//     // Przygotuj dokument JSON
-//     StaticJsonDocument<256> doc;
-    
-//     // Zapisz ustawienia
-//     doc["dayLights"] = lightSettings.dayLights;
-//     doc["nightLights"] = lightSettings.nightLights;
-//     doc["dayBlink"] = lightSettings.dayBlink;
-//     doc["nightBlink"] = lightSettings.nightBlink;
-//     doc["blinkFrequency"] = lightSettings.blinkFrequency;
-
-//     // Otwórz plik do zapisu
-//     File file = LittleFS.open("/lights.json", "w");
-//     if (!file) {
-//         #ifdef DEBUG
-//         Serial.println("Błąd otwarcia pliku do zapisu");
-//         #endif
-//         return;
-//     }
-
-//     // Zapisz JSON do pliku
-//     if (serializeJson(doc, file) == 0) {
-//         #ifdef DEBUG
-//         Serial.println("Błąd podczas zapisu do pliku");
-//         #endif
-//     }
-
-//     file.close();
-
-//     #ifdef DEBUG
-//     Serial.println("Ustawienia świateł zapisane");
-//     Serial.print("dayLights: "); Serial.println(lightSettings.dayLights);
-//     Serial.print("nightLights: "); Serial.println(lightSettings.nightLights);
-//     #endif
-
-//     // Od razu zastosuj nowe ustawienia
-//     setLights();
-// }
-
-// wczytywanie ustawień świateł
-// void loadLightSettings() {
-//     #ifdef DEBUG
-//     Serial.println("Wczytywanie ustawień świateł");
-//     #endif
-
-//     if (LittleFS.exists("/lights.json")) {
-//         File file = LittleFS.open("/lights.json", "r");
-//         if (file) {
-//             StaticJsonDocument<512> doc;
-//             DeserializationError error = deserializeJson(doc, file);
-//             file.close();
-
-//             if (!error) {
-//                 const char* dayLightsStr = doc["dayLights"] | "FRONT";
-//                 const char* nightLightsStr = doc["nightLights"] | "BOTH";
-
-//                 // Konwersja stringów na enum
-//                 if (strcmp(dayLightsStr, "FRONT") == 0) 
-//                     lightSettings.dayLights = LightSettings::FRONT;
-//                 else if (strcmp(dayLightsStr, "REAR") == 0) 
-//                     lightSettings.dayLights = LightSettings::REAR;
-//                 else if (strcmp(dayLightsStr, "BOTH") == 0) 
-//                     lightSettings.dayLights = LightSettings::BOTH;
-//                 else 
-//                     lightSettings.dayLights = LightSettings::NONE;
-
-//                 if (strcmp(nightLightsStr, "FRONT") == 0) 
-//                     lightSettings.nightLights = LightSettings::FRONT;
-//                 else if (strcmp(nightLightsStr, "REAR") == 0) 
-//                     lightSettings.nightLights = LightSettings::REAR;
-//                 else if (strcmp(nightLightsStr, "BOTH") == 0) 
-//                     lightSettings.nightLights = LightSettings::BOTH;
-//                 else 
-//                     lightSettings.nightLights = LightSettings::NONE;
-
-//                 lightSettings.dayBlink = doc["dayBlink"] | false;
-//                 lightSettings.nightBlink = doc["nightBlink"] | false;
-//                 // W funkcji loadLightSettings (około linii 1210):
-//                 lightSettings.blinkFrequency = doc["blinkFrequency"] | 500;
-
-//                 #ifdef DEBUG
-//                 Serial.println("Wczytane ustawienia migania:");
-//                 Serial.print("dayBlink: "); Serial.println(lightSettings.dayBlink ? "ON" : "OFF");
-//                 Serial.print("nightBlink: "); Serial.println(lightSettings.nightBlink ? "ON" : "OFF");
-//                 Serial.print("blinkFrequency: "); Serial.println(lightSettings.blinkFrequency);
-//                 #endif
-           
-//             }
-//         }
-//     } else {
-//         // Ustawienia domyślne
-//         lightSettings.dayLights = LightSettings::FRONT;
-//         lightSettings.nightLights = LightSettings::BOTH;
-//         lightSettings.dayBlink = false;
-//         lightSettings.nightBlink = false;
-//         lightSettings.blinkFrequency = 500;
-//     }
-// }
-
-void setLights() {}
-void saveLightSettings() {}
-void loadLightSettings() {}
-void saveLightMode() {}
-void loadLightMode() {}
 
 void printLightConfig() {
     if (!LittleFS.begin(false)) {
@@ -1549,7 +1422,6 @@ void drawLightStatus() {
 }
 
 // wyświetlanie poziomu wspomagania
-// wyświetlanie poziomu wspomagania
 void drawAssistLevel() {
     display.setFont(czcionka_duza);
 
@@ -1560,10 +1432,10 @@ void drawAssistLevel() {
         // Wyświetlanie poziomu asysty
         if (legalMode) {
             // Wymiary cyfry i tła
-            const int digit_height = 20;  // wysokość czcionki
-            const int padding = 3;        // margines wewnętrzny
-            const int total_width = 16 + (padding * 2);  // szerokość cyfry + marginesy
-            const int total_height = digit_height + (padding * 2);  // wysokość + marginesy
+            const int digit_height = 20;                           // wysokość czcionki
+            const int padding = 3;                                 // margines wewnętrzny
+            const int total_width = 16 + (padding * 2);            // szerokość cyfry + marginesy
+            const int total_height = digit_height + (padding * 2); // wysokość + marginesy
             
             int x = 2;
             int y = 40;
@@ -2399,12 +2271,10 @@ void activateConfigMode() {
 
     // 1. Inicjalizacja LittleFS
     if (!LittleFS.begin(true)) {
-        // #ifdef DEBUG
-        // Serial.println("Błąd montowania LittleFS");
-        // #endif
         DEBUG_PRINT("Błąd montowania LittleFS");
         return;
     }
+
     #ifdef DEBUG
     Serial.println("LittleFS zainicjalizowany");
     #endif
@@ -2483,11 +2353,11 @@ void activateConfigMode() {
 
 // dezaktywacja trybu konfiguracji
 void deactivateConfigMode() {    
-    if (!configModeActive) return;  // Jeśli tryb konfiguracji nie jest aktywny, przerwij
-    server.end();                   // Zatrzymaj serwer HTTP
-    WiFi.softAPdisconnect(true);    // Wyłącz punkt dostępowy WiFi
-    WiFi.mode(WIFI_OFF);            // Wyłącz moduł WiFi
-    LittleFS.end();                 // Odmontuj system plików
+    if (!configModeActive) return; // Jeśli tryb konfiguracji nie jest aktywny, przerwij
+    server.end();                  // Zatrzymaj serwer HTTP
+    WiFi.softAPdisconnect(true);   // Wyłącz punkt dostępowy WiFi
+    WiFi.mode(WIFI_OFF);           // Wyłącz moduł WiFi
+    LittleFS.end();                // Odmontuj system plików
     
     configModeActive = false;
     
@@ -2616,169 +2486,6 @@ void goToSleep() {
     esp_deep_sleep_start();
 }
 
-// ustawiania świateł
-// void setLights() {
-//     // Wyłącz wszystkie światła
-//     digitalWrite(FrontDayPin, LOW);
-//     digitalWrite(FrontPin, LOW);
-//     digitalWrite(RearPin, LOW);
-
-//     #ifdef DEBUG
-//     Serial.printf("setLights: lightMode=%d, configModeActive=%d\n", lightMode, configModeActive);
-//     #endif
-
-//     // Jeśli światła wyłączone (lightMode == 0) lub tryb konfiguracji jest aktywny, kończymy
-//     if (lightMode == 0 || configModeActive) {
-//         #ifdef DEBUG
-//         Serial.println("Światła wyłączone");
-//         #endif
-//         applyBacklightSettings(); // Aktualizuj jasność wyświetlacza
-//         return;
-//     }
-
-//     // Sprawdź, czy mruganie jest włączone dla trybu świateł (dotyczy tylko tylnego światła)
-//     bool shouldBlink = false;
-//     if (lightMode == 1 && lightSettings.dayBlink) { // tryb dzienny
-//         shouldBlink = true;
-//     } else if (lightMode == 2 && lightSettings.nightBlink) { // tryb nocny
-//         shouldBlink = true;
-//     }
-
-//     #ifdef DEBUG
-//     if (shouldBlink) {
-//         Serial.printf("Miganie aktywne, blinkState=%d\n", blinkState);
-//     }
-//     #endif
-
-//     // Zastosuj ustawienia zgodnie z trybem
-//     if (lightMode == 1) { // Tryb dzienny
-//         switch (lightSettings.dayLights) {
-//             case LightSettings::NONE:
-//                 // Wszystkie światła pozostają wyłączone
-//                 #ifdef DEBUG
-//                 Serial.println("Tryb dzienny: NONE");
-//                 #endif
-//                 break;
-//             case LightSettings::FRONT:
-//                 digitalWrite(FrontDayPin, HIGH);
-//                 #ifdef DEBUG
-//                 Serial.println("Tryb dzienny: FRONT");
-//                 #endif
-//                 break;
-//             case LightSettings::REAR:
-//                 // Tylne światło - z uwzględnieniem migania
-//                 if (!shouldBlink || blinkState) {
-//                     digitalWrite(RearPin, HIGH);
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb dzienny: REAR (włączone)");
-//                     #endif
-//                 } else {
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb dzienny: REAR (wyłączone - miganie)");
-//                     #endif
-//                 }
-//                 break;
-//             case LightSettings::BOTH:
-//                 digitalWrite(FrontDayPin, HIGH);
-//                 // Tylne światło - z uwzględnieniem migania
-//                 if (!shouldBlink || blinkState) {
-//                     digitalWrite(RearPin, HIGH);
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb dzienny: BOTH (tylne włączone)");
-//                     #endif
-//                 } else {
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb dzienny: BOTH (tylne wyłączone - miganie)");
-//                     #endif
-//                 }
-//                 break;
-//         }
-//     } else if (lightMode == 2) { // Tryb nocny
-//         switch (lightSettings.nightLights) {
-//             case LightSettings::NONE:
-//                 // Wszystkie światła pozostają wyłączone
-//                 #ifdef DEBUG
-//                 Serial.println("Tryb nocny: NONE");
-//                 #endif
-//                 break;
-//             case LightSettings::FRONT:
-//                 digitalWrite(FrontPin, HIGH);
-//                 #ifdef DEBUG
-//                 Serial.println("Tryb nocny: FRONT");
-//                 #endif
-//                 break;
-//             case LightSettings::REAR:
-//                 // Tylne światło - z uwzględnieniem migania
-//                 if (!shouldBlink || blinkState) {
-//                     digitalWrite(RearPin, HIGH);
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb nocny: REAR (włączone)");
-//                     #endif
-//                 } else {
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb nocny: REAR (wyłączone - miganie)");
-//                     #endif
-//                 }
-//                 break;
-//             case LightSettings::BOTH:
-//                 digitalWrite(FrontPin, HIGH);
-//                 // Tylne światło - z uwzględnieniem migania
-//                 if (!shouldBlink || blinkState) {
-//                     digitalWrite(RearPin, HIGH);
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb nocny: BOTH (tylne włączone)");
-//                     #endif
-//                 } else {
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb nocny: BOTH (tylne wyłączone - miganie)");
-//                     #endif
-//                 }
-//                 break;
-//         }
-//     }
-    
-//     // Aktualizuj jasność wyświetlacza
-//     applyBacklightSettings();
-// }
-
-// ustawienia podświetlenia
-// void applyBacklightSettings() {
-//     int targetBrightness;
-    
-//     if (!backlightSettings.autoMode) {
-//         // Tryb manualny - użyj podstawowej jasności
-//         targetBrightness = backlightSettings.Brightness;
-//     } else {
-//         // Tryb auto - sprawdź stan świateł
-//         if (lightMode == 2) {  // Światła nocne
-//             targetBrightness = backlightSettings.nightBrightness;
-//         } else {  // Światła dzienne (lightMode == 1) lub wyłączone (lightMode == 0)
-//             targetBrightness = backlightSettings.dayBrightness;
-//         }
-//     }
-    
-//     // Nieliniowe mapowanie jasności
-//     // Używamy funkcji wykładniczej do lepszego rozłożenia jasności
-//     // Wzór: (x^2)/100 daje nam wartość od 0 do 100
-//     float normalized = (targetBrightness * targetBrightness) / 100.0;
-    
-//     // Mapujemy wartość na zakres 16-255
-//     // Minimum ustawiamy na 16, bo niektóre wyświetlacze OLED mogą się wyłączać przy niższych wartościach
-//     displayBrightness = map(normalized, 0, 100, 16, 255);
-    
-//     // Zastosuj jasność do wyświetlacza
-//     display.setContrast(displayBrightness);
-    
-//     #ifdef DEBUG
-//     Serial.print("Target brightness: ");
-//     Serial.print(targetBrightness);
-//     Serial.print("%, Normalized: ");
-//     Serial.print(normalized);
-//     Serial.print("%, Display brightness: ");
-//     Serial.println(displayBrightness);
-//     #endif
-// }
-
 void applyBacklightSettings() {
     int targetBrightness;
     
@@ -2842,11 +2549,6 @@ void printLightConfigFile() {
     if (LittleFS.exists("/lights.json")) {
         File file = LittleFS.open("/lights.json", "r");
         if (file) {
-            // Serial.println("------------ ZAWARTOŚĆ STAREGO PLIKU KONFIGURACYJNEGO -----------");
-            // while (file.available()) {
-            //     Serial.write(file.read());
-            // }
-            // Serial.println("\n------------------------------------------------------------------");
             DEBUG_PRINT("Odczytano istniejący plik konfiguracyjny");
             file.close();
         }
@@ -2877,95 +2579,6 @@ void handleTemperature() {
         conversionRequested = false;
     }
 }
-
-// zapisywanie trybu świateł
-// void saveLightMode() {
-//     #ifdef DEBUG
-//     Serial.printf("Zapisywanie trybu świateł: %d\n", lightMode);
-//     #endif
-
-//     if (!LittleFS.begin(false)) {
-//         #ifdef DEBUG
-//         Serial.println("Błąd montowania LittleFS przy zapisie trybu świateł");
-//         #endif
-//         return;
-//     }
-
-//     // Przygotuj dokument JSON
-//     StaticJsonDocument<64> doc;
-//     doc["lightMode"] = lightMode;
-
-//     // Otwórz plik do zapisu
-//     File file = LittleFS.open("/light_mode.json", "w");
-//     if (!file) {
-//         #ifdef DEBUG
-//         Serial.println("Nie można otworzyć pliku trybu świateł do zapisu");
-//         #endif
-//         return;
-//     }
-
-//     // Zapisz JSON do pliku
-//     if (serializeJson(doc, file) == 0) {
-//         #ifdef DEBUG
-//         Serial.println("Błąd podczas zapisu trybu świateł do pliku");
-//         #endif
-//     } else {
-//         #ifdef DEBUG
-//         Serial.println("Zapisano pomyślnie");
-//         #endif
-//     }
-
-//     file.close();
-
-//     #ifdef DEBUG
-//     Serial.printf("Zapisano tryb świateł: %d\n", lightMode);
-//     #endif
-// }
-
-// wczytywanie trybu świateł
-// void loadLightMode() {
-//     #ifdef DEBUG
-//     Serial.println("Wczytywanie trybu świateł");
-//     #endif
-
-//     // Domyślnie światła wyłączone
-//     int defaultLightMode = 0;
-    
-//     if (LittleFS.exists("/light_mode.json")) {
-//         File file = LittleFS.open("/light_mode.json", "r");
-//         if (file) {
-//             StaticJsonDocument<64> doc;
-//             DeserializationError error = deserializeJson(doc, file);
-//             file.close();
-
-//             if (!error && doc.containsKey("lightMode")) {
-//                 lightMode = doc["lightMode"] | defaultLightMode;
-//                 #ifdef DEBUG
-//                 Serial.printf("Wczytano tryb świateł: %d\n", lightMode);
-//                 #endif
-//             } else {
-//                 #ifdef DEBUG
-//                 Serial.println("Błąd podczas parsowania light_mode.json lub brak klucza lightMode");
-//                 Serial.println("Używam domyślnego trybu świateł (wyłączone)");
-//                 #endif
-//                 lightMode = defaultLightMode;
-//             }
-//         } else {
-//             #ifdef DEBUG
-//             Serial.println("Nie można otworzyć pliku light_mode.json");
-//             Serial.println("Używam domyślnego trybu świateł (wyłączone)");
-//             #endif
-//             lightMode = defaultLightMode;
-//         }
-//     } else {
-//         #ifdef DEBUG
-//         Serial.println("Plik light_mode.json nie istnieje, używam trybu domyślnego (wyłączone)");
-//         #endif
-//         lightMode = defaultLightMode;
-//         // Zapisz domyślny tryb
-//         saveLightMode();
-//     }
-// }
 
 // --- Funkcje konfiguracji systemu ---
 
@@ -3237,33 +2850,6 @@ void setupWebServer() {
         request->send(200, "application/json", response);
     });
 
-    // Dodaj ten endpoint w funkcji setupWebServer()
-    // server.on("/api/reset-odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
-    //     bool success = false;
-        
-    //     // Utwórz nową instancję OdometerManager
-    //     OdometerManager tempOdometer;
-    //     success = tempOdometer.resetOdometer();
-        
-    //     // Odśwież główną instancję licznika (jeśli to konieczne)
-    //     odometer.initialize();
-        
-    //     #ifdef DEBUG
-    //     Serial.printf("Resetowanie licznika: %s\n", success ? "POWODZENIE" : "BŁĄD");
-    //     tempOdometer.debugPreferences();
-    //     #endif
-        
-    //     // Przygotuj odpowiedź JSON
-    //     StaticJsonDocument<128> doc;
-    //     doc["success"] = success;
-    //     doc["message"] = success ? "Licznik zresetowany" : "Błąd resetowania licznika";
-    //     doc["newValue"] = odometer.getRawTotal();
-        
-    //     String response;
-    //     serializeJson(doc, response);
-    //     request->send(200, "application/json", response);
-    // });
-
     // Dodaj endpoint do otrzymania informacji diagnostycznych
     server.on("/api/debug-odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
         #ifdef DEBUG
@@ -3335,219 +2921,65 @@ void setupWebServer() {
         request->send(200, "application/json", response);
     });
 
-server.on("/api/lights/file", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!LittleFS.begin(false)) {
-        request->send(500, "application/json", "{\"error\":\"Failed to mount filesystem\"}");
-        return;
-    }
-    
-    if (LittleFS.exists("/light_config.json")) {
-        File file = LittleFS.open("/light_config.json", "r");
-        if (!file) {
-            request->send(500, "application/json", "{\"error\":\"Failed to open config file\"}");
+    server.on("/api/lights/file", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (!LittleFS.begin(false)) {
+            request->send(500, "application/json", "{\"error\":\"Failed to mount filesystem\"}");
             return;
         }
         
-        // Odczytaj zawartość pliku
-        String content = file.readString();
-        file.close();
-        
-        // Analizuj JSON, aby wyświetlić go w bardziej czytelnej formie
-        StaticJsonDocument<256> doc;
-        DeserializationError error = deserializeJson(doc, content);
-        
-        if (error) {
-            request->send(200, "text/plain", content); // Pokaż surową zawartość w przypadku błędu parsowania
-        } else {
-            // Dodaj dodatkowe informacje
-            JsonObject debug = doc.createNestedObject("_debug");
-            if (doc.containsKey("dayConfig")) {
-                uint8_t dayConfigValue = doc["dayConfig"];
-                debug["dayConfig_hex"] = "0x" + String(dayConfigValue, HEX);
-                debug["dayConfig_bin"] = "0b" + String(dayConfigValue, BIN);
-                debug["dayConfig_FRONT"] = (dayConfigValue & LightManager::FRONT) != 0;
-                debug["dayConfig_DRL"] = (dayConfigValue & LightManager::DRL) != 0;
-                debug["dayConfig_REAR"] = (dayConfigValue & LightManager::REAR) != 0;
+        if (LittleFS.exists("/light_config.json")) {
+            File file = LittleFS.open("/light_config.json", "r");
+            if (!file) {
+                request->send(500, "application/json", "{\"error\":\"Failed to open config file\"}");
+                return;
             }
             
-            if (doc.containsKey("nightConfig")) {
-                uint8_t nightConfigValue = doc["nightConfig"];
-                debug["nightConfig_hex"] = "0x" + String(nightConfigValue, HEX);
-                debug["nightConfig_bin"] = "0b" + String(nightConfigValue, BIN);
-                debug["nightConfig_FRONT"] = (nightConfigValue & LightManager::FRONT) != 0;
-                debug["nightConfig_DRL"] = (nightConfigValue & LightManager::DRL) != 0;
-                debug["nightConfig_REAR"] = (nightConfigValue & LightManager::REAR) != 0;
-            }
+            // Odczytaj zawartość pliku
+            String content = file.readString();
+            file.close();
             
-            String enriched;
-            serializeJsonPretty(doc, enriched);
-            request->send(200, "application/json", enriched);
-        }
-    } else {
-        request->send(404, "application/json", "{\"error\":\"Config file not found\"}");
-    }
-});
-
-// Endpoint GET dla konfiguracji świateł
-server.on("/api/lights/config", HTTP_GET, [](AsyncWebServerRequest *request) {
-    StaticJsonDocument<512> doc;
-    
-    doc["status"] = "ok";
-    JsonObject lights = doc.createNestedObject("lights");
-    lights["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
-    lights["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
-    lights["dayBlink"] = lightManager.getDayBlink();
-    lights["nightBlink"] = lightManager.getNightBlink();
-    lights["blinkFrequency"] = lightManager.getBlinkFrequency();
-    lights["currentMode"] = (int)lightManager.getMode();
-    
-    String response;
-    serializeJson(doc, response);
-    
-    #ifdef DEBUG
-    Serial.printf("[LightsConfig] GET config: %s\n", response.c_str());
-    #endif
-    
-    request->send(200, "application/json", response);
-});
-
-// Endpoint POST dla konfiguracji świateł
-server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
-    // Ten handler zostanie wywołany po zakończeniu przetwarzania danych
-}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-    if (index + len != total) {
-        return; // Czekamy na wszystkie dane
-    }
-    
-    #ifdef DEBUG
-    Serial.println("[LightsConfig] Processing request");
-    Serial.printf("[LightsConfig] Content-Type: %s\n", request->contentType().c_str());
-    Serial.printf("[LightsConfig] Data length: %d bytes\n", len);
-    #endif
-
-    // Zmienna na dane JSON
-    String jsonString;
-    
-    // Określ źródło danych na podstawie Content-Type
-    if (request->contentType() == "application/x-www-form-urlencoded") {
-        // Obsługa form-encoded
-        if (request->hasParam("data", true)) {
-            jsonString = request->getParam("data", true)->value();
-            #ifdef DEBUG
-            Serial.printf("[LightsConfig] Form data param: %s\n", jsonString.c_str());
-            #endif
+            // Analizuj JSON, aby wyświetlić go w bardziej czytelnej formie
+            StaticJsonDocument<256> doc;
+            DeserializationError error = deserializeJson(doc, content);
+            
+            if (error) {
+                request->send(200, "text/plain", content); // Pokaż surową zawartość w przypadku błędu parsowania
+            } else {
+                // Dodaj dodatkowe informacje
+                JsonObject debug = doc.createNestedObject("_debug");
+                if (doc.containsKey("dayConfig")) {
+                    uint8_t dayConfigValue = doc["dayConfig"];
+                    debug["dayConfig_hex"] = "0x" + String(dayConfigValue, HEX);
+                    debug["dayConfig_bin"] = "0b" + String(dayConfigValue, BIN);
+                    debug["dayConfig_FRONT"] = (dayConfigValue & LightManager::FRONT) != 0;
+                    debug["dayConfig_DRL"] = (dayConfigValue & LightManager::DRL) != 0;
+                    debug["dayConfig_REAR"] = (dayConfigValue & LightManager::REAR) != 0;
+                }
+                
+                if (doc.containsKey("nightConfig")) {
+                    uint8_t nightConfigValue = doc["nightConfig"];
+                    debug["nightConfig_hex"] = "0x" + String(nightConfigValue, HEX);
+                    debug["nightConfig_bin"] = "0b" + String(nightConfigValue, BIN);
+                    debug["nightConfig_FRONT"] = (nightConfigValue & LightManager::FRONT) != 0;
+                    debug["nightConfig_DRL"] = (nightConfigValue & LightManager::DRL) != 0;
+                    debug["nightConfig_REAR"] = (nightConfigValue & LightManager::REAR) != 0;
+                }
+                
+                String enriched;
+                serializeJsonPretty(doc, enriched);
+                request->send(200, "application/json", enriched);
+            }
         } else {
-            #ifdef DEBUG
-            Serial.println("[LightsConfig] Missing data parameter in form data");
-            #endif
-            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing data parameter\"}");
-            return;
+            request->send(404, "application/json", "{\"error\":\"Config file not found\"}");
         }
-    } 
-    else if (request->contentType() == "application/json") {
-        // Obsługa czystego JSON
-        if (len > 0) {
-            data[len] = '\0'; // Dodaj null terminator
-            jsonString = String((char*)data);
-            #ifdef DEBUG
-            Serial.printf("[LightsConfig] Direct JSON data: %s\n", jsonString.c_str());
-            #endif
-        } else {
-            #ifdef DEBUG
-            Serial.println("[LightsConfig] Empty JSON data");
-            #endif
-            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Empty JSON data\"}");
-            return;
-        }
-    }
-    else {
-        // Nieznany format danych
-        #ifdef DEBUG
-        Serial.printf("[LightsConfig] Unsupported Content-Type: %s\n", request->contentType().c_str());
-        #endif
-        request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Unsupported content type\"}");
-        return;
-    }
-    
-    // Parsowanie JSON
-    StaticJsonDocument<512> doc;
-    DeserializationError error = deserializeJson(doc, jsonString);
-    
-    if (error) {
-        #ifdef DEBUG
-        Serial.printf("[LightsConfig] JSON parsing error: %s\n", error.c_str());
-        #endif
-        request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON format\"}");
-        return;
-    }
-    
-    // Przetwarzanie danych
-    bool configSuccess = false;
-    
-    // Zapisz poprzednie wartości dla porównania
-    uint8_t oldDayConfig = lightManager.getDayConfig();
-    uint8_t oldNightConfig = lightManager.getNightConfig();
-    bool oldDayBlink = lightManager.getDayBlink();
-    bool oldNightBlink = lightManager.getNightBlink();
-    uint16_t oldBlinkFrequency = lightManager.getBlinkFrequency();
-    
-    #ifdef DEBUG
-    Serial.println("[LightsConfig] Current configuration:");
-    Serial.printf("  dayConfig: 0x%02X (%s)\n", oldDayConfig, lightManager.getConfigString(oldDayConfig).c_str());
-    Serial.printf("  nightConfig: 0x%02X (%s)\n", oldNightConfig, lightManager.getConfigString(oldNightConfig).c_str());
-    Serial.printf("  dayBlink: %d\n", oldDayBlink);
-    Serial.printf("  nightBlink: %d\n", oldNightBlink);
-    Serial.printf("  blinkFrequency: %d\n", oldBlinkFrequency);
-    #endif
-    
-    // Zmień tylko te wartości, które są w żądaniu
-    if (doc.containsKey("dayLights")) {
-        const char* dayLightsStr = doc["dayLights"];
-        uint8_t dayConfig = lightManager.parseConfigString(dayLightsStr);
-        bool dayBlink = doc.containsKey("dayBlink") ? doc["dayBlink"].as<bool>() : oldDayBlink;
+    });
+
+    // Endpoint GET dla konfiguracji świateł
+    server.on("/api/lights/config", HTTP_GET, [](AsyncWebServerRequest *request) {
+        StaticJsonDocument<512> doc;
         
-        lightManager.setDayConfig(dayConfig, dayBlink);
-        #ifdef DEBUG
-        Serial.printf("[LightsConfig] Set day config: '%s' => 0x%02X, blink: %d\n", 
-                    dayLightsStr, dayConfig, dayBlink);
-        #endif
-    }
-    
-    if (doc.containsKey("nightLights")) {
-        const char* nightLightsStr = doc["nightLights"];
-        uint8_t nightConfig = lightManager.parseConfigString(nightLightsStr);
-        bool nightBlink = doc.containsKey("nightBlink") ? doc["nightBlink"].as<bool>() : oldNightBlink;
-        
-        lightManager.setNightConfig(nightConfig, nightBlink);
-        #ifdef DEBUG
-        Serial.printf("[LightsConfig] Set night config: '%s' => 0x%02X, blink: %d\n", 
-                    nightLightsStr, nightConfig, nightBlink);
-        #endif
-    }
-    
-    if (doc.containsKey("blinkFrequency")) {
-        lightManager.setBlinkFrequency(doc["blinkFrequency"] | oldBlinkFrequency);
-        #ifdef DEBUG
-        Serial.printf("[LightsConfig] Set blink frequency: %d\n", 
-                    (int)doc["blinkFrequency"]);
-        #endif
-    }
-    
-    // Zapisz konfigurację
-    configSuccess = lightManager.saveConfig();
-    #ifdef DEBUG
-    Serial.printf("[LightsConfig] Config save %s\n", configSuccess ? "succeeded" : "failed");
-    #endif
-    
-    // Przygotuj odpowiedź
-    StaticJsonDocument<512> responseDoc;
-    
-    if (configSuccess) {
-        responseDoc["status"] = "ok";
-        responseDoc["message"] = "Konfiguracja zapisana pomyślnie";
-        
-        // Dodaj aktualne ustawienia świateł do odpowiedzi
-        JsonObject lights = responseDoc.createNestedObject("lights");
+        doc["status"] = "ok";
+        JsonObject lights = doc.createNestedObject("lights");
         lights["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
         lights["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
         lights["dayBlink"] = lightManager.getDayBlink();
@@ -3555,22 +2987,176 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         lights["blinkFrequency"] = lightManager.getBlinkFrequency();
         lights["currentMode"] = (int)lightManager.getMode();
         
-        // Zastosuj nowe ustawienia natychmiast
-        LightManager::LightMode currentMode = lightManager.getMode();
-        lightManager.setMode(currentMode);  // To wymusi ponowną konfigurację świateł
-    } else {
-        responseDoc["status"] = "error";
-        responseDoc["message"] = "Błąd podczas zapisu konfiguracji świateł";
-    }
-    
-    String responseStr;
-    serializeJson(responseDoc, responseStr);
-    #ifdef DEBUG
-    Serial.printf("[LightsConfig] Sending response: %s\n", responseStr.c_str());
-    #endif
-    
-    request->send(200, "application/json", responseStr);
-});
+        String response;
+        serializeJson(doc, response);
+        
+        #ifdef DEBUG
+        Serial.printf("[LightsConfig] GET config: %s\n", response.c_str());
+        #endif
+        
+        request->send(200, "application/json", response);
+    });
+
+    // Endpoint POST dla konfiguracji świateł
+    server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Ten handler zostanie wywołany po zakończeniu przetwarzania danych
+    }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        if (index + len != total) {
+            return; // Czekamy na wszystkie dane
+        }
+        
+        #ifdef DEBUG
+        Serial.println("[LightsConfig] Processing request");
+        Serial.printf("[LightsConfig] Content-Type: %s\n", request->contentType().c_str());
+        Serial.printf("[LightsConfig] Data length: %d bytes\n", len);
+        #endif
+
+        // Zmienna na dane JSON
+        String jsonString;
+        
+        // Określ źródło danych na podstawie Content-Type
+        if (request->contentType() == "application/x-www-form-urlencoded") {
+            // Obsługa form-encoded
+            if (request->hasParam("data", true)) {
+                jsonString = request->getParam("data", true)->value();
+                #ifdef DEBUG
+                Serial.printf("[LightsConfig] Form data param: %s\n", jsonString.c_str());
+                #endif
+            } else {
+                #ifdef DEBUG
+                Serial.println("[LightsConfig] Missing data parameter in form data");
+                #endif
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing data parameter\"}");
+                return;
+            }
+        } 
+        else if (request->contentType() == "application/json") {
+            // Obsługa czystego JSON
+            if (len > 0) {
+                data[len] = '\0'; // Dodaj null terminator
+                jsonString = String((char*)data);
+                #ifdef DEBUG
+                Serial.printf("[LightsConfig] Direct JSON data: %s\n", jsonString.c_str());
+                #endif
+            } else {
+                #ifdef DEBUG
+                Serial.println("[LightsConfig] Empty JSON data");
+                #endif
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Empty JSON data\"}");
+                return;
+            }
+        }
+        else {
+            // Nieznany format danych
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] Unsupported Content-Type: %s\n", request->contentType().c_str());
+            #endif
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Unsupported content type\"}");
+            return;
+        }
+        
+        // Parsowanie JSON
+        StaticJsonDocument<512> doc;
+        DeserializationError error = deserializeJson(doc, jsonString);
+        
+        if (error) {
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] JSON parsing error: %s\n", error.c_str());
+            #endif
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON format\"}");
+            return;
+        }
+        
+        // Przetwarzanie danych
+        bool configSuccess = false;
+        
+        // Zapisz poprzednie wartości dla porównania
+        uint8_t oldDayConfig = lightManager.getDayConfig();
+        uint8_t oldNightConfig = lightManager.getNightConfig();
+        bool oldDayBlink = lightManager.getDayBlink();
+        bool oldNightBlink = lightManager.getNightBlink();
+        uint16_t oldBlinkFrequency = lightManager.getBlinkFrequency();
+        
+        #ifdef DEBUG
+        Serial.println("[LightsConfig] Current configuration:");
+        Serial.printf("  dayConfig: 0x%02X (%s)\n", oldDayConfig, lightManager.getConfigString(oldDayConfig).c_str());
+        Serial.printf("  nightConfig: 0x%02X (%s)\n", oldNightConfig, lightManager.getConfigString(oldNightConfig).c_str());
+        Serial.printf("  dayBlink: %d\n", oldDayBlink);
+        Serial.printf("  nightBlink: %d\n", oldNightBlink);
+        Serial.printf("  blinkFrequency: %d\n", oldBlinkFrequency);
+        #endif
+        
+        // Zmień tylko te wartości, które są w żądaniu
+        if (doc.containsKey("dayLights")) {
+            const char* dayLightsStr = doc["dayLights"];
+            uint8_t dayConfig = lightManager.parseConfigString(dayLightsStr);
+            bool dayBlink = doc.containsKey("dayBlink") ? doc["dayBlink"].as<bool>() : oldDayBlink;
+            
+            lightManager.setDayConfig(dayConfig, dayBlink);
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] Set day config: '%s' => 0x%02X, blink: %d\n", 
+                        dayLightsStr, dayConfig, dayBlink);
+            #endif
+        }
+        
+        if (doc.containsKey("nightLights")) {
+            const char* nightLightsStr = doc["nightLights"];
+            uint8_t nightConfig = lightManager.parseConfigString(nightLightsStr);
+            bool nightBlink = doc.containsKey("nightBlink") ? doc["nightBlink"].as<bool>() : oldNightBlink;
+            
+            lightManager.setNightConfig(nightConfig, nightBlink);
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] Set night config: '%s' => 0x%02X, blink: %d\n", 
+                        nightLightsStr, nightConfig, nightBlink);
+            #endif
+        }
+        
+        if (doc.containsKey("blinkFrequency")) {
+            lightManager.setBlinkFrequency(doc["blinkFrequency"] | oldBlinkFrequency);
+            #ifdef DEBUG
+            Serial.printf("[LightsConfig] Set blink frequency: %d\n", 
+                        (int)doc["blinkFrequency"]);
+            #endif
+        }
+        
+        // Zapisz konfigurację
+        configSuccess = lightManager.saveConfig();
+        #ifdef DEBUG
+        Serial.printf("[LightsConfig] Config save %s\n", configSuccess ? "succeeded" : "failed");
+        #endif
+        
+        // Przygotuj odpowiedź
+        StaticJsonDocument<512> responseDoc;
+        
+        if (configSuccess) {
+            responseDoc["status"] = "ok";
+            responseDoc["message"] = "Konfiguracja zapisana pomyślnie";
+            
+            // Dodaj aktualne ustawienia świateł do odpowiedzi
+            JsonObject lights = responseDoc.createNestedObject("lights");
+            lights["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
+            lights["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
+            lights["dayBlink"] = lightManager.getDayBlink();
+            lights["nightBlink"] = lightManager.getNightBlink();
+            lights["blinkFrequency"] = lightManager.getBlinkFrequency();
+            lights["currentMode"] = (int)lightManager.getMode();
+            
+            // Zastosuj nowe ustawienia natychmiast
+            LightManager::LightMode currentMode = lightManager.getMode();
+            lightManager.setMode(currentMode);  // To wymusi ponowną konfigurację świateł
+        } else {
+            responseDoc["status"] = "error";
+            responseDoc["message"] = "Błąd podczas zapisu konfiguracji świateł";
+        }
+        
+        String responseStr;
+        serializeJson(responseDoc, responseStr);
+        #ifdef DEBUG
+        Serial.printf("[LightsConfig] Sending response: %s\n", responseStr.c_str());
+        #endif
+        
+        request->send(200, "application/json", responseStr);
+    });
 
     // Dodaj endpoint do testowania konfiguracji
     server.on("/api/lights/debug", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -3766,26 +3352,6 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         serializeJson(doc, response);
         request->send(200, "application/json", response);
     });
-
-    // server.on("/save-bluetooth-config", HTTP_POST, [](AsyncWebServerRequest *request) {
-    //     if (request->hasParam("body", true)) {
-    //         String json = request->getParam("body", true)->value();
-    //         StaticJsonDocument<64> doc;
-    //         DeserializationError error = deserializeJson(doc, json);
-
-    //         if (!error) {
-    //             bluetoothConfig.bmsEnabled = doc["bmsEnabled"] | false;
-    //             bluetoothConfig.tpmsEnabled = doc["tpmsEnabled"] | false;
-                
-    //             saveBluetoothConfigToFile();
-    //             request->send(200, "application/json", "{\"success\":true}");
-    //         } else {
-    //             request->send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
-    //         }
-    //     } else {
-    //         request->send(400, "application/json", "{\"success\":false,\"error\":\"No data\"}");
-    //     }
-    // });
 
     server.on("/save-bluetooth-config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
@@ -3986,7 +3552,6 @@ bool testFileSystem() {
 }
 
 // Sprawdzenie i formatowanie systemu plików przy starcie
-// Lepsza obsługa błędów w funkcji initLittleFS
 bool initLittleFS() {
     if (!LittleFS.begin(false)) { // Najpierw spróbuj bez formatowania
         #ifdef DEBUG
@@ -4019,6 +3584,7 @@ void listFiles() {
     #ifdef DEBUG
     Serial.println("Files in LittleFS:");
     #endif
+
     File root = LittleFS.open("/");
     if (!root) {
         #ifdef DEBUG
@@ -4026,6 +3592,7 @@ void listFiles() {
         #endif
         return;
     }
+    
     if (!root.isDirectory()) {
         #ifdef DEBUG
         Serial.println(" - Not a directory");
@@ -4266,9 +3833,6 @@ void setup() {
 
     // Inicjalizacja LittleFS i wczytanie ustawień
     if (!LittleFS.begin(true)) {
-        // #ifdef DEBUG
-        // Serial.println("Błąd montowania LittleFS");
-        // #endif
         DEBUG_PRINT("Błąd montowania LittleFS");
     } else {
         #ifdef DEBUG
@@ -4278,21 +3842,6 @@ void setup() {
         loadBacklightSettingsFromFile();
         loadGeneralSettingsFromFile();
         loadBluetoothConfigFromFile();
-        
-        // File file = LittleFS.open("/bluetooth_config.json", "r");
-        // if (!file) {
-        //     #ifdef DEBUG
-        //     Serial.println("Tworzę domyślny plik konfiguracyjny Bluetooth");
-        //     #endif
-        //     bluetoothConfig.bmsEnabled = false;
-        //     bluetoothConfig.tpmsEnabled = false;
-        //     strcpy(bluetoothConfig.bmsMac, "");
-        //     strcpy(bluetoothConfig.frontTpmsMac, "");
-        //     strcpy(bluetoothConfig.rearTpmsMac, "");
-        //     saveBluetoothConfigToFile();
-        // } else {
-        //     file.close();
-        // }
         
         if (!LittleFS.exists("/bluetooth_config.json")) {
             DEBUG_PRINT("Tworzę domyślny plik konfiguracyjny Bluetooth");
@@ -4361,7 +3910,6 @@ void setup() {
     }
 
     // Zastosuj wczytane ustawienia
-    setLights();  
     applyBacklightSettings();
 
     #ifdef DEBUG
