@@ -417,7 +417,6 @@ public:
 // Dodaj tę funkcję przed miejscem, gdzie chcesz jej użyć (najlepiej po deklaracjach klas)
 
 // Szablon funkcji do ładowania konfiguracji z pliku JSON
-
 template <typename T>
 bool loadJsonConfig(const char* filename, T& config, void (*parseFunction)(JsonDocument&, T&), bool createIfMissing = true) {
     if (!LittleFS.exists(filename)) {
