@@ -325,8 +325,7 @@ public:
 
 // Klasa obsługująca czujnik temperatury
 class TemperatureSensor {
-    private:
-        static constexpr float INVALID_TEMP = -999.0f;
+    private:        
         static constexpr float MIN_VALID_TEMP = -50.0f;
         static constexpr float MAX_VALID_TEMP = 100.0f;
         bool conversionRequested = false;
@@ -335,6 +334,8 @@ class TemperatureSensor {
         DallasTemperature* controllerSensor;
 
     public:
+        static constexpr float INVALID_TEMP = -999.0f;
+
         TemperatureSensor(DallasTemperature* air, DallasTemperature* controller) 
             : airSensor(air), controllerSensor(controller) {}
 
@@ -415,6 +416,7 @@ public:
 
 // Dodaj tę funkcję przed miejscem, gdzie chcesz jej użyć (najlepiej po deklaracjach klas)
 
+// Szablon funkcji do ładowania konfiguracji z pliku JSON
 // Szablon funkcji do ładowania konfiguracji z pliku JSON
 template <typename T>
 bool loadJsonConfig(const char* filename, T& config, void (*parseFunction)(JsonDocument&, T&), bool createIfMissing = true) {
@@ -2821,11 +2823,11 @@ void handleTemperature() {
     float newControllerTemp = tempSensor.readControllerTemperature();
     
     // Aktualizuj zmienne globalne tylko gdy mamy prawidłowe odczyty
-    if (newAirTemp != tempSensor.INVALID_TEMP) {
+    if (newAirTemp != TemperatureSensor::INVALID_TEMP) {
         currentTemp = newAirTemp;
     }
     
-    if (newControllerTemp != tempSensor.INVALID_TEMP) {
+    if (newControllerTemp != TemperatureSensor::INVALID_TEMP) {
         temp_controller = newControllerTemp;
     }
 }
