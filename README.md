@@ -28,9 +28,9 @@ e-Bike System PMW to zaawansowany system zaprojektowany dla rowerów elektryczny
   - `BTN_DOWN`: GPIO 14
   - `BTN_SET`: GPIO 12
 - **💡 Światła**:
-  - `FrontDayPin`: GPIO 5
-  - `FrontPin`: GPIO 18
-  - `RearPin`: GPIO 19
+  - `FrontDayPin`: GPIO 18
+  - `FrontPin`: GPIO 19
+  - `RearPin`: GPIO 23
   - docelowo światła na osobnym uC
     ATtyny85 z możliwością przełącznia świateł, różnymi trybami mrugania tylnego światła
 - **🔌 Ładowarka USB**:
