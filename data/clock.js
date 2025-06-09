@@ -19,11 +19,11 @@ function updateClock() {
                 const seconds = String(time.seconds).padStart(2, '0');
                 const timeString = `${hours}:${minutes}:${seconds}`;
                 
-                // Format daty YYYY-MM-DD
+                // Format daty DD/MM/YYYY (zmieniono kolejność wyświetlania)
                 const year = time.year;
                 const month = String(time.month).padStart(2, '0');
                 const day = String(time.day).padStart(2, '0');
-                const dateString = `${year}-${month}-${day}`;
+                const dateString = `${day}/${month}/${year}`; // Zmieniono format daty
                 
                 // Aktualizuj pola na stronie
                 updateElementValue('rtc-time', timeString);
@@ -90,6 +90,6 @@ function initializeClock() {
         saveButton.addEventListener('click', saveRTCConfig);
     }
     
-    // Aktualizacja co minutę
-    return setInterval(updateClock, 60000);
+    // Aktualizacja co 1 sekundę (zamiast co minutę) dla bieżącego czasu
+    return setInterval(updateClock, 1000);  // Zmieniono z 60000 na 1000
 }
