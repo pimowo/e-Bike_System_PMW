@@ -74,6 +74,14 @@
 
 #define DEBUG
 
+#ifdef DEBUG
+  #define DEBUG_PRINT(x) Serial.println(x)
+  #define DEBUG_PRINTF(...) Serial.printf(__VA_ARGS__)
+#else
+  #define DEBUG_PRINT(x)
+  #define DEBUG_PRINTF(...)
+#endif
+
 // Wersja oprogramowania
 const char* VERSION = "9.6.25";
 
@@ -443,6 +451,7 @@ uint8_t cadence_pulses_per_revolution = 1;  // Zakres 1-24
 uint32_t cadence_sum = 0;
 uint32_t cadence_samples = 0;
 unsigned long last_avg_max_update = 0;
+volatile uint8_t cadence_pulse_index = 0;
 const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
 const unsigned long cadenceArrowTimeout = 1000; // czas wyświetlania strzałek w milisekundach (1 sekunda)
 
@@ -617,15 +626,27 @@ class TemperatureSensor {
         }
 };
 
+// void IRAM_ATTR cadence_ISR() {
+//     unsigned long now = millis();
+//     unsigned long minDelay = max(8, 200 / cadence_pulses_per_revolution); // Minimum 8ms
+    
+//     if (now - cadence_last_pulse_time > minDelay) {
+//         for (int i = CADENCE_SAMPLES_WINDOW - 1; i > 0; i--) {
+//             cadence_pulse_times[i] = cadence_pulse_times[i - 1];
+//         }
+//         cadence_pulse_times[0] = now;
+//         cadence_last_pulse_time = now;
+//     }
+// }
+
 void IRAM_ATTR cadence_ISR() {
     unsigned long now = millis();
     unsigned long minDelay = max(8, 200 / cadence_pulses_per_revolution); // Minimum 8ms
     
     if (now - cadence_last_pulse_time > minDelay) {
-        for (int i = CADENCE_SAMPLES_WINDOW - 1; i > 0; i--) {
-            cadence_pulse_times[i] = cadence_pulse_times[i - 1];
-        }
-        cadence_pulse_times[0] = now;
+        // Użyj indeksu cyklicznego zamiast przesuwania całej tablicy
+        cadence_pulse_index = (cadence_pulse_index + 1) % CADENCE_SAMPLES_WINDOW;
+        cadence_pulse_times[cadence_pulse_index] = now;
         cadence_last_pulse_time = now;
     }
 }
@@ -1410,8 +1431,15 @@ void loadBluetoothConfigFromFile() {
             strlcpy(bluetoothConfig.bmsMac, doc["bmsMac"], sizeof(bluetoothConfig.bmsMac));
         }
         
-        if (doc.containsKey("frontTpmsMac")) {
-            strlcpy(bluetoothConfig.frontTpmsMac, doc["frontTpmsMac"], sizeof(bluetoothConfig.frontTpmsMac));
+        // if (doc.containsKey("frontTpmsMac")) {
+        //     strlcpy(bluetoothConfig.frontTpmsMac, doc["frontTpmsMac"], sizeof(bluetoothConfig.frontTpmsMac));
+        // }
+
+        if (doc.containsKey("frontTpmsMac") && doc["frontTpmsMac"].is<const char*>()) {
+            strlcpy(bluetoothConfig.frontTpmsMac, doc["frontTpmsMac"].as<const char*>(), sizeof(bluetoothConfig.frontTpmsMac));
+        } else {
+            // Domyślna wartość w przypadku błędu
+            bluetoothConfig.frontTpmsMac[0] = '\0';
         }
         
         if (doc.containsKey("rearTpmsMac")) {
@@ -2371,9 +2399,10 @@ void activateConfigMode() {
 
     // 1. Inicjalizacja LittleFS
     if (!LittleFS.begin(true)) {
-        #ifdef DEBUG
-        Serial.println("Błąd montowania LittleFS");
-        #endif
+        // #ifdef DEBUG
+        // Serial.println("Błąd montowania LittleFS");
+        // #endif
+        DEBUG_PRINT("Błąd montowania LittleFS");
         return;
     }
     #ifdef DEBUG
@@ -2813,11 +2842,12 @@ void printLightConfigFile() {
     if (LittleFS.exists("/lights.json")) {
         File file = LittleFS.open("/lights.json", "r");
         if (file) {
-            Serial.println("------------ ZAWARTOŚĆ STAREGO PLIKU KONFIGURACYJNEGO -----------");
-            while (file.available()) {
-                Serial.write(file.read());
-            }
-            Serial.println("\n------------------------------------------------------------------");
+            // Serial.println("------------ ZAWARTOŚĆ STAREGO PLIKU KONFIGURACYJNEGO -----------");
+            // while (file.available()) {
+            //     Serial.write(file.read());
+            // }
+            // Serial.println("\n------------------------------------------------------------------");
+            DEBUG_PRINT("Odczytano istniejący plik konfiguracyjny");
             file.close();
         }
     }
@@ -4236,9 +4266,10 @@ void setup() {
 
     // Inicjalizacja LittleFS i wczytanie ustawień
     if (!LittleFS.begin(true)) {
-        #ifdef DEBUG
-        Serial.println("Błąd montowania LittleFS");
-        #endif
+        // #ifdef DEBUG
+        // Serial.println("Błąd montowania LittleFS");
+        // #endif
+        DEBUG_PRINT("Błąd montowania LittleFS");
     } else {
         #ifdef DEBUG
         Serial.println("LittleFS zamontowany pomyślnie");
@@ -4248,19 +4279,29 @@ void setup() {
         loadGeneralSettingsFromFile();
         loadBluetoothConfigFromFile();
         
-        File file = LittleFS.open("/bluetooth_config.json", "r");
-        if (!file) {
-            #ifdef DEBUG
-            Serial.println("Tworzę domyślny plik konfiguracyjny Bluetooth");
-            #endif
+        // File file = LittleFS.open("/bluetooth_config.json", "r");
+        // if (!file) {
+        //     #ifdef DEBUG
+        //     Serial.println("Tworzę domyślny plik konfiguracyjny Bluetooth");
+        //     #endif
+        //     bluetoothConfig.bmsEnabled = false;
+        //     bluetoothConfig.tpmsEnabled = false;
+        //     strcpy(bluetoothConfig.bmsMac, "");
+        //     strcpy(bluetoothConfig.frontTpmsMac, "");
+        //     strcpy(bluetoothConfig.rearTpmsMac, "");
+        //     saveBluetoothConfigToFile();
+        // } else {
+        //     file.close();
+        // }
+        
+        if (!LittleFS.exists("/bluetooth_config.json")) {
+            DEBUG_PRINT("Tworzę domyślny plik konfiguracyjny Bluetooth");
             bluetoothConfig.bmsEnabled = false;
             bluetoothConfig.tpmsEnabled = false;
-            strcpy(bluetoothConfig.bmsMac, "");
-            strcpy(bluetoothConfig.frontTpmsMac, "");
-            strcpy(bluetoothConfig.rearTpmsMac, "");
+            bluetoothConfig.bmsMac[0] = '\0';
+            bluetoothConfig.frontTpmsMac[0] = '\0';
+            bluetoothConfig.rearTpmsMac[0] = '\0';
             saveBluetoothConfigToFile();
-        } else {
-            file.close();
         }
     }
 
