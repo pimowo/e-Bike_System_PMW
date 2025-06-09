@@ -105,7 +105,7 @@ const char* LIGHT_CONFIG_FILE = "/light_config.json";
 #define CONTROLLER_TX_PIN 17 // ESP32 TX (połącz z RX sterownika)
 
 // Parametry komunikacji
-#define KT_UART_BAUD 9600     // Prędkość komunikacji na podstawie OSKD
+#define CONTROLLER_UART_BAUD 9600     // Prędkość komunikacji na podstawie OSKD
 
 // Stałe protokołu komunikacyjnego
 #define CONTROLLER_PACKET_SIZE 12
