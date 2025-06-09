@@ -417,7 +417,6 @@ public:
 // Dodaj tę funkcję przed miejscem, gdzie chcesz jej użyć (najlepiej po deklaracjach klas)
 
 // Szablon funkcji do ładowania konfiguracji z pliku JSON
-// Szablon funkcji do ładowania konfiguracji z pliku JSON
 template <typename T>
 bool loadJsonConfig(const char* filename, T& config, void (*parseFunction)(JsonDocument&, T&), bool createIfMissing = true) {
     if (!LittleFS.exists(filename)) {
@@ -434,7 +433,7 @@ bool loadJsonConfig(const char* filename, T& config, void (*parseFunction)(JsonD
         }
         
         StaticJsonDocument<256> doc;
-        parseFunction(doc, config); // Ta funkcja powinna wypełnić doc danymi z config
+        parseFunction(doc, config);
         if (serializeJson(doc, file) == 0) {
             DEBUG_PRINT("Błąd zapisu do pliku: " + String(filename));
             file.close();
@@ -2823,11 +2822,11 @@ void handleTemperature() {
     float newControllerTemp = tempSensor.readControllerTemperature();
     
     // Aktualizuj zmienne globalne tylko gdy mamy prawidłowe odczyty
-    if (newAirTemp != TemperatureSensor::INVALID_TEMP) {
+    if (newAirTemp != TEMP_ERROR) {  // używamy stałej globalnej zamiast prywatnej stałej klasy
         currentTemp = newAirTemp;
     }
     
-    if (newControllerTemp != TemperatureSensor::INVALID_TEMP) {
+    if (newControllerTemp != TEMP_ERROR) {  // używamy stałej globalnej zamiast prywatnej stałej klasy
         temp_controller = newControllerTemp;
     }
 }
