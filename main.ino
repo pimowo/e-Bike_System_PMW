@@ -75,7 +75,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "8.6.25";
+const char* VERSION = "9.6.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
