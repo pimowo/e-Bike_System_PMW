@@ -100,6 +100,24 @@ const char* LIGHT_CONFIG_FILE = "/light_config.json";
 // hamulec
 #define BRAKE_SENSOR_PIN 26  // czujnik hamulca
 
+// Konfiguracja pinów UART
+#define CONTROLLER_RX_PIN 16 // ESP32 RX (połącz z TX sterownika)
+#define CONTROLLER_TX_PIN 17 // ESP32 TX (połącz z RX sterownika)
+
+// Parametry komunikacji
+#define KT_UART_BAUD 9600     // Prędkość komunikacji na podstawie OSKD
+
+// Stałe protokołu komunikacyjnego
+#define CONTROLLER_PACKET_SIZE 12
+
+// RPM i przelicznik prędkości
+#define RPM_CONSTANT 0.1885
+
+// Typy parametrów
+#define KT_PARAM_P 1
+#define KT_PARAM_C 2
+#define KT_PARAM_L 3
+
 // Stałe czasowe
 const unsigned long DEBOUNCE_DELAY = 25;
 const unsigned long BUTTON_DELAY = 200;
@@ -710,6 +728,24 @@ void connectToBms();
 
 float getOdometerValue();
 bool saveOdometerValue(float value);
+
+// --- UART kontroler
+
+// Funkcja wysyłająca komendę włączenia/wyłączenia świateł do sterownika KT
+void sendLightCommandToKT(bool lightsOn) {
+    // Przykładowy format komendy (musisz dostosować do faktycznego protokołu KT)
+    if (lightsOn) {
+        Serial2.write(0xA5); // Przykładowy nagłówek
+        Serial2.write(0x03); // Przykładowa długość danych
+        Serial2.write(0x01); // Przykładowy kod komendy "włącz światła"
+        Serial2.write(0xA9); // Przykładowa suma kontrolna
+    } else {
+        Serial2.write(0xA5); // Przykładowy nagłówek
+        Serial2.write(0x03); // Przykładowa długość danych
+        Serial2.write(0x00); // Przykładowy kod komendy "wyłącz światła"
+        Serial2.write(0xA8); // Przykładowa suma kontrolna
+    }
+}
 
 // --- Funkcje BLE ---
 
@@ -1506,17 +1542,39 @@ void drawTopBar() {
     display.drawStr(100, 10, voltStr);
 }
 
+// // wyświetlanie statusu świateł
+// void drawLightStatus() {
+//     display.setFont(czcionka_mala);
+
+//     switch (lightManager.getMode()) {
+//         case LightManager::DAY:
+//             display.drawStr(28, 45, "Dzien");
+//             break;
+//         case LightManager::NIGHT:
+//             display.drawStr(28, 45, "Noc");
+//             break;
+//     }
+// }
+
 // wyświetlanie statusu świateł
 void drawLightStatus() {
     display.setFont(czcionka_mala);
 
-    switch (lightManager.getMode()) {
-        case LightManager::DAY:
-            display.drawStr(28, 45, "Dzien");
-            break;
-        case LightManager::NIGHT:
-            display.drawStr(28, 45, "Noc");
-            break;
+    if (lightManager.getControlMode() == LightManager::SMART_CONTROL) {
+        // Dla trybu Smart wyświetlamy "Dzien" lub "Noc"
+        switch (lightManager.getMode()) {
+            case LightManager::DAY:
+                display.drawStr(28, 45, "Dzien");
+                break;
+            case LightManager::NIGHT:
+                display.drawStr(28, 45, "Noc");
+                break;
+        }
+    } else {
+        // Dla trybu Sterownik wyświetlamy "Lampy" jeśli są włączone
+        if (lightManager.getMode() != LightManager::OFF) {
+            display.drawStr(28, 45, "Lampy");
+        }
     }
 }
 
@@ -2192,11 +2250,33 @@ void handleButtons() {
         }
 
         // Obsługa przycisku UP (zmiana asysty/światła)
+        // if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+        //     if (!upPressStartTime) {
+        //         upPressStartTime = currentTime;
+        //     } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
+        //         lightManager.cycleMode();
+        //         upLongPressExecuted = true;
+        //     }
         if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!upPressStartTime) {
                 upPressStartTime = currentTime;
             } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
-                lightManager.cycleMode();
+                // Długie naciśnięcie przycisku UP - sterowanie światłami
+                if (lightManager.getControlMode() == LightManager::SMART_CONTROL) {
+                    // Cykliczne przełączanie: dzień -> noc -> wyłączone
+                    lightManager.cycleMode();
+                } else {
+                    // Tryb sterownika: włącz/wyłącz światła
+                    if (lightManager.getMode() == LightManager::OFF) {
+                        // Włącz światła (wysyłając komendę UART do sterownika)
+                        lightManager.setMode(LightManager::DAY); // Tymczasowo ustawiam DAY jako "włączone" w trybie sterownika
+                        // TODO: Dodać wysyłanie komendy UART do sterownika KT
+                    } else {
+                        // Wyłącz światła
+                        lightManager.setMode(LightManager::OFF);
+                        // TODO: Dodać wysyłanie komendy UART do sterownika KT
+                    }
+                }
                 upLongPressExecuted = true;
             }
         } else if (upState && upPressStartTime) {
@@ -3370,14 +3450,10 @@ server.on("/api/lights/config", HTTP_GET, [](AsyncWebServerRequest *request) {
     lights["nightBlink"] = lightManager.getNightBlink();
     lights["blinkFrequency"] = lightManager.getBlinkFrequency();
     lights["currentMode"] = (int)lightManager.getMode();
+    lights["controlMode"] = (int)lightManager.getControlMode(); // Dodaj informację o trybie sterowania
     
     String response;
     serializeJson(doc, response);
-    
-    #ifdef DEBUG
-    Serial.printf("[LightsConfig] GET config: %s\n", response.c_str());
-    #endif
-    
     request->send(200, "application/json", response);
 });
 
@@ -3533,6 +3609,13 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         responseDoc["message"] = "Błąd podczas zapisu konfiguracji świateł";
     }
     
+    // W obsłudze POST do /api/lights/config
+    // Dodaj obsługę nowego pola controlMode
+    if (doc.containsKey("controlMode")) {
+        int controlMode = doc["controlMode"].as<int>();
+        lightManager.setControlMode((LightManager::ControlMode)controlMode);
+    }
+
     String responseStr;
     serializeJson(responseDoc, responseStr);
     #ifdef DEBUG
@@ -4095,7 +4178,10 @@ void setup() {
     // Sprawdź przyczynę wybudzenia
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
+    // Inicjalizacja UART dla Serial Monitor
     Serial.begin(115200);
+    // Inicjalizacja UART dla komunikacji z KT
+    Serial2.begin(CONTROLLER_UART_BAUD, SERIAL_8N1, CONTROLLER_RX_PIN, CONTROLLER_TX_PIN);
     
     #ifdef DEBUG
     Serial.println("\n=== Inicjalizacja systemu ===");
