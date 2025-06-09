@@ -71,6 +71,20 @@ const infoContent = {
       - Utrzymuj światła w czystości
       - Wymień uszkodzone elementy`
     },
+	
+	'light-control-info': {
+        title: 'Tryb sterowania światłami',
+        description: 
+		`Smart
+		Zaawansowane sterowanie świateł przez system e-Bike. 
+		Dostępne są opcje konfiguracji świateł dziennych, 
+		nocnych oraz opcji migania.
+        
+        Sterownik
+		Podstawowe sterowanie świateł przez kontroler. 
+		System e-Bike będzie tylko włączał/wyłączał światła, 
+		a kontroler będzie decydował o szczegółach ich działania`
+	},	
 
     'day-lights-info': {
         title: '☀️ Światła dzienne',
