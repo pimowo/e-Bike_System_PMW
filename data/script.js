@@ -883,6 +883,17 @@ function showNotification(message, type = 'info') {
         document.body.appendChild(notification);
     }
     
+    // Wymuś style - to jest kluczowa zmiana!
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.left = '50%';
+    notification.style.transform = 'translateX(-50%)';
+    notification.style.right = 'auto';  // Usuń stary styl
+    notification.style.bottom = 'auto'; // Usuń stary styl
+    notification.style.zIndex = '1000';
+    notification.style.width = 'auto';
+    notification.style.maxWidth = '80%';
+    
     // Ustaw typ powiadomienia
     notification.className = 'notification ' + type;
     notification.textContent = message;
