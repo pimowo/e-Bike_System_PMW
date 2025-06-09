@@ -323,6 +323,149 @@ public:
     }
 };
 
+// Klasa obsługująca czujnik temperatury
+class TemperatureSensor {
+    private:
+        static constexpr float INVALID_TEMP = -999.0f;
+        static constexpr float MIN_VALID_TEMP = -50.0f;
+        static constexpr float MAX_VALID_TEMP = 100.0f;
+        bool conversionRequested = false;
+        unsigned long lastRequestTime = 0;
+        DallasTemperature* airSensor;
+        DallasTemperature* controllerSensor;
+
+    public:
+        TemperatureSensor(DallasTemperature* air, DallasTemperature* controller) 
+            : airSensor(air), controllerSensor(controller) {}
+
+        void requestTemperature() {
+            if (millis() - lastRequestTime >= TEMP_REQUEST_INTERVAL) {
+                airSensor->requestTemperatures();
+                controllerSensor->requestTemperatures();
+                conversionRequested = true;
+                lastRequestTime = millis();
+            }
+        }
+
+        bool isValidTemperature(float temp) {
+            return temp >= MIN_VALID_TEMP && temp <= MAX_VALID_TEMP;
+        }
+
+        float readAirTemperature() {
+            if (!conversionRequested) return INVALID_TEMP;
+
+            if (millis() - lastRequestTime < DS18B20_CONVERSION_DELAY_MS) {
+                return INVALID_TEMP;  // Konwersja jeszcze trwa
+            }
+
+            float temp = airSensor->getTempCByIndex(0);
+            return isValidTemperature(temp) ? temp : INVALID_TEMP;
+        }
+
+        float readControllerTemperature() {
+            if (!conversionRequested) return INVALID_TEMP;
+
+            if (millis() - lastRequestTime < DS18B20_CONVERSION_DELAY_MS) {
+                return INVALID_TEMP;  // Konwersja jeszcze trwa
+            }
+
+            float temp = controllerSensor->getTempCByIndex(0);
+            return isValidTemperature(temp) ? temp : INVALID_TEMP;
+        }
+};
+
+// Klasa zarządzająca tempomatem
+class CruiseControl {
+private:
+    bool active = false;
+    float targetSpeed = 0.0f;
+    
+public:
+    void activate(float currentSpeed) {
+        if (currentSpeed >= 10.0f) {
+            active = true;
+            targetSpeed = currentSpeed;
+            DEBUG_PRINT("Tempomat aktywowany, prędkość: " + String(targetSpeed));
+        }
+    }
+    
+    void deactivate() {
+        if (active) {
+            active = false;
+            DEBUG_PRINT("Tempomat dezaktywowany");
+        }
+    }
+    
+    bool isActive() const {
+        return active;
+    }
+    
+    float getTargetSpeed() const {
+        return targetSpeed;
+    }
+    
+    // Funkcja sprawdzająca stan hamulca i reagująca
+    void checkBrakeState(bool brakeActive) {
+        if (brakeActive && active) {
+            deactivate();
+            DEBUG_PRINT("Tempomat wyłączony przez hamulec");
+        }
+    }
+};
+
+// Dodaj tę funkcję przed miejscem, gdzie chcesz jej użyć (najlepiej po deklaracjach klas)
+
+// Szablon funkcji do ładowania konfiguracji z pliku JSON
+template <typename T>
+bool loadJsonConfig(const char* filename, T& config, void (*parseFunction)(JsonDocument&, T&), bool createIfMissing = true) {
+    if (!LittleFS.exists(filename)) {
+        if (!createIfMissing) {
+            DEBUG_PRINT("Plik konfiguracyjny nie istnieje: " + String(filename));
+            return false;
+        }
+        
+        DEBUG_PRINT("Tworzę domyślny plik konfiguracyjny: " + String(filename));
+        File file = LittleFS.open(filename, "w");
+        if (!file) {
+            DEBUG_PRINT("Błąd otwarcia pliku do zapisu: " + String(filename));
+            return false;
+        }
+        
+        StaticJsonDocument<256> doc;
+        parseFunction(doc, config); // Ta funkcja powinna wypełnić doc danymi z config
+        if (serializeJson(doc, file) == 0) {
+            DEBUG_PRINT("Błąd zapisu do pliku: " + String(filename));
+            file.close();
+            return false;
+        }
+        file.close();
+        return true;
+    }
+    
+    File file = LittleFS.open(filename, "r");
+    if (!file) {
+        DEBUG_PRINT("Nie można otworzyć pliku: " + String(filename));
+        return false;
+    }
+    
+    StaticJsonDocument<256> doc;
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+    
+    if (error) {
+        DEBUG_PRINT("Błąd parsowania JSON: " + String(error.c_str()));
+        return false;
+    }
+    
+    parseFunction(doc, config);
+    return true;
+}
+
+// Przykładowa funkcja parsująca dla GeneralSettings:
+void parseGeneralSettings(JsonDocument& doc, GeneralSettings& settings) {
+    settings.wheelSize = doc["wheelSize"] | 26;
+}
+
 /********************************************************************
  * TYPY WYLICZENIOWE
  ********************************************************************/
@@ -580,96 +723,6 @@ class TimeoutHandler {
             if (!isRunning) return 0;
             return (millis() - startTime);
       }
-};
-
-// Klasa obsługująca czujnik temperatury
-class TemperatureSensor {
-    private:
-        static constexpr float INVALID_TEMP = -999.0f;
-        static constexpr float MIN_VALID_TEMP = -50.0f;
-        static constexpr float MAX_VALID_TEMP = 100.0f;
-        bool conversionRequested = false;
-        unsigned long lastRequestTime = 0;
-        DallasTemperature* airSensor;
-        DallasTemperature* controllerSensor;
-
-    public:
-        TemperatureSensor(DallasTemperature* air, DallasTemperature* controller) 
-            : airSensor(air), controllerSensor(controller) {}
-
-        void requestTemperature() {
-            if (millis() - lastRequestTime >= TEMP_REQUEST_INTERVAL) {
-                airSensor->requestTemperatures();
-                controllerSensor->requestTemperatures();
-                conversionRequested = true;
-                lastRequestTime = millis();
-            }
-        }
-
-        bool isValidTemperature(float temp) {
-            return temp >= MIN_VALID_TEMP && temp <= MAX_VALID_TEMP;
-        }
-
-        float readAirTemperature() {
-            if (!conversionRequested) return INVALID_TEMP;
-
-            if (millis() - lastRequestTime < DS18B20_CONVERSION_DELAY_MS) {
-                return INVALID_TEMP;  // Konwersja jeszcze trwa
-            }
-
-            float temp = airSensor->getTempCByIndex(0);
-            return isValidTemperature(temp) ? temp : INVALID_TEMP;
-        }
-
-        float readControllerTemperature() {
-            if (!conversionRequested) return INVALID_TEMP;
-
-            if (millis() - lastRequestTime < DS18B20_CONVERSION_DELAY_MS) {
-                return INVALID_TEMP;  // Konwersja jeszcze trwa
-            }
-
-            float temp = controllerSensor->getTempCByIndex(0);
-            return isValidTemperature(temp) ? temp : INVALID_TEMP;
-        }
-};
-
-// Klasa zarządzająca tempomatem
-class CruiseControl {
-private:
-    bool active = false;
-    float targetSpeed = 0.0f;
-    
-public:
-    void activate(float currentSpeed) {
-        if (currentSpeed >= 10.0f) {
-            active = true;
-            targetSpeed = currentSpeed;
-            DEBUG_PRINT("Tempomat aktywowany, prędkość: " + String(targetSpeed));
-        }
-    }
-    
-    void deactivate() {
-        if (active) {
-            active = false;
-            DEBUG_PRINT("Tempomat dezaktywowany");
-        }
-    }
-    
-    bool isActive() const {
-        return active;
-    }
-    
-    float getTargetSpeed() const {
-        return targetSpeed;
-    }
-    
-    // Funkcja sprawdzająca stan hamulca i reagująca
-    void checkBrakeState(bool brakeActive) {
-        if (brakeActive && active) {
-            deactivate();
-            DEBUG_PRINT("Tempomat wyłączony przez hamulec");
-        }
-    }
 };
 
 // void IRAM_ATTR cadence_ISR() {
@@ -1701,8 +1754,7 @@ void updateCadenceLogic() {
     brakeActive = !digitalRead(BRAKE_SENSOR_PIN);
 
     // Wyłącz tempomat jeśli hamulec jest aktywny
-    if (brakeActive && cruiseControlActive) {
-        //cruiseControlActive = false;
+    if (brakeActive) {
         cruiseControl.checkBrakeState(brakeActive);
         #ifdef DEBUG
         Serial.println("Dezaktywacja tempomatu przez hamulec");
@@ -4038,7 +4090,8 @@ void setup() {
         #endif
         // Wczytaj ustawienia z pliku
         loadBacklightSettingsFromFile();
-        loadGeneralSettingsFromFile();
+        //loadGeneralSettingsFromFile();
+        loadJsonConfig("/general_config.json", generalSettings, parseGeneralSettings);
         loadBluetoothConfigFromFile();
         
         if (!LittleFS.exists("/bluetooth_config.json")) {
@@ -4309,7 +4362,10 @@ void loop() {
             noInterrupts();
             // Kopiuj potrzebne dane z tablicy
             unsigned long localPulseTimes[CADENCE_SAMPLES_WINDOW];
-            memcpy(localPulseTimes, cadence_pulse_times, sizeof(localPulseTimes));
+            // memcpy(localPulseTimes, cadence_pulse_times, sizeof(localPulseTimes));
+            for (int i = 0; i < CADENCE_SAMPLES_WINDOW; i++) {
+                localPulseTimes[i] = cadence_pulse_times[i];
+            }
             unsigned long localLastPulseTime = cadence_last_pulse_time;
             cadenceDataUpdated = false;
             // Włącz przerwania z powrotem
