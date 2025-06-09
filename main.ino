@@ -408,13 +408,16 @@ bool legalMode = false;
 bool welcomeAnimationDone = false;
 bool displayActive = false;
 bool showingWelcome = false;
-bool cruiseControlActive = false;
+//bool cruiseControlActive = false;
 
 // Zmienne stanu ekranu
 MainScreen currentMainScreen = RANGE_SCREEN;
 int currentSubScreen = 0;
 bool inSubScreen = false;
 uint8_t displayBrightness = 16;  // Wartość od 0 do 255 (jasność wyświetlacza)
+// Współdzielone bufory tekstowe dla wyświetlacza
+char globalDisplayBuffer1[16]; // Ogólny bufor dla różnych operacji formatowania
+char globalDisplayBuffer2[16]; // Drugi bufor dla przypadków, gdy potrzebujemy dwóch na raz
 
 // Zmienne pomiarowe
 float speed_kmh;
@@ -455,6 +458,7 @@ unsigned long last_avg_max_update = 0;
 volatile uint8_t cadence_pulse_index = 0;
 const unsigned long AVG_MAX_UPDATE_INTERVAL = 5000; // 5s
 const unsigned long cadenceArrowTimeout = 1000; // czas wyświetlania strzałek w milisekundach (1 sekunda)
+volatile bool cadenceDataUpdated = false; // Flaga wskazująca, że dane zostały zaktualizowane przez ISR
 
 // Zmienne dla czujników ciśnienia kół
 float pressure_bar;           // przednie koło
@@ -519,6 +523,7 @@ OneWire oneWireAir(TEMP_AIR_PIN);
 OneWire oneWireController(TEMP_CONTROLLER_PIN);
 DallasTemperature sensorsAir(&oneWireAir);
 DallasTemperature sensorsController(&oneWireController);
+TemperatureSensor tempSensor(&sensorsAir, &sensorsController);
 
 // Obiekty BLE
 BLEClient* bleClient;
@@ -537,6 +542,7 @@ GeneralSettings generalSettings;
 BluetoothConfig bluetoothConfig;
 BmsData bmsData;
 LightManager lightManager(FrontPin, FrontDayPin, RearPin);
+CruiseControl cruiseControl;
 
 /********************************************************************
  * KLASY POMOCNICZE
@@ -627,6 +633,57 @@ class TemperatureSensor {
         }
 };
 
+// Klasa zarządzająca tempomatem
+class CruiseControl {
+private:
+    bool active = false;
+    float targetSpeed = 0.0f;
+    
+public:
+    void activate(float currentSpeed) {
+        if (currentSpeed >= 10.0f) {
+            active = true;
+            targetSpeed = currentSpeed;
+            DEBUG_PRINT("Tempomat aktywowany, prędkość: " + String(targetSpeed));
+        }
+    }
+    
+    void deactivate() {
+        if (active) {
+            active = false;
+            DEBUG_PRINT("Tempomat dezaktywowany");
+        }
+    }
+    
+    bool isActive() const {
+        return active;
+    }
+    
+    float getTargetSpeed() const {
+        return targetSpeed;
+    }
+    
+    // Funkcja sprawdzająca stan hamulca i reagująca
+    void checkBrakeState(bool brakeActive) {
+        if (brakeActive && active) {
+            deactivate();
+            DEBUG_PRINT("Tempomat wyłączony przez hamulec");
+        }
+    }
+};
+
+// void IRAM_ATTR cadence_ISR() {
+//     unsigned long now = millis();
+//     unsigned long minDelay = max(8, 200 / cadence_pulses_per_revolution); // Minimum 8ms
+    
+//     if (now - cadence_last_pulse_time > minDelay) {
+//         // Użyj indeksu cyklicznego zamiast przesuwania całej tablicy
+//         cadence_pulse_index = (cadence_pulse_index + 1) % CADENCE_SAMPLES_WINDOW;
+//         cadence_pulse_times[cadence_pulse_index] = now;
+//         cadence_last_pulse_time = now;
+//     }
+// }
+
 void IRAM_ATTR cadence_ISR() {
     unsigned long now = millis();
     unsigned long minDelay = max(8, 200 / cadence_pulses_per_revolution); // Minimum 8ms
@@ -636,6 +693,7 @@ void IRAM_ATTR cadence_ISR() {
         cadence_pulse_index = (cadence_pulse_index + 1) % CADENCE_SAMPLES_WINDOW;
         cadence_pulse_times[cadence_pulse_index] = now;
         cadence_last_pulse_time = now;
+        cadenceDataUpdated = true; // Ustaw flagę
     }
 }
 
@@ -717,6 +775,23 @@ bool saveOdometerValue(float value);
 
 // --- Funkcje BLE ---
 
+// Funkcja sprawdzająca poprawność formatu adresu MAC (XX:XX:XX:XX:XX:XX)
+bool validateMacAddress(const char* mac) {
+    if (!mac || strlen(mac) != 17) return false;
+    
+    // Format XX:XX:XX:XX:XX:XX
+    for (int i = 0; i < 17; i++) {
+        if (i % 3 == 2) {
+            // Pozycje 2, 5, 8, 11, 14 powinny zawierać dwukropek
+            if (mac[i] != ':') return false;
+        } else {
+            // Pozostałe pozycje powinny zawierać znaki hex
+            if (!isxdigit(mac[i])) return false;
+        }
+    }
+    return true;
+}
+
 // callback dla BLE
 void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic, 
                         uint8_t* pData, size_t length, bool isNotify) {
@@ -783,9 +858,12 @@ class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
         String deviceAddress = advertisedDevice.getAddress().toString().c_str();
         
         // Sprawdź czy to jeden z naszych czujników
-        bool isFrontSensor = (strcmp(deviceAddress.c_str(), bluetoothConfig.frontTpmsMac) == 0);
-        bool isRearSensor = (strcmp(deviceAddress.c_str(), bluetoothConfig.rearTpmsMac) == 0);
+        // bool isFrontSensor = (strcmp(deviceAddress.c_str(), bluetoothConfig.frontTpmsMac) == 0);
+        // bool isRearSensor = (strcmp(deviceAddress.c_str(), bluetoothConfig.rearTpmsMac) == 0);
         
+        bool isFrontSensor = (bluetoothConfig.frontTpmsMac[0] != '\0' && strcmp(deviceAddress.c_str(), bluetoothConfig.frontTpmsMac) == 0);
+        bool isRearSensor = (bluetoothConfig.rearTpmsMac[0] != '\0' && strcmp(deviceAddress.c_str(), bluetoothConfig.rearTpmsMac) == 0);
+
         // Jeśli to nie jest żaden z naszych czujników, ignorujemy
         if (!isFrontSensor && !isRearSensor) {
             return;
@@ -1283,44 +1361,99 @@ void saveBluetoothConfigToFile() {
 }
 
 // wczytywanie konfiguracji Bluetooth
+// void loadBluetoothConfigFromFile() {
+//     File file = LittleFS.open("/bluetooth_config.json", "r");
+//     if (!file) {
+//         #ifdef DEBUG
+//         Serial.println("Nie znaleziono pliku konfiguracji Bluetooth, używam domyślnych");
+//         #endif
+//         return;
+//     }
+
+//     StaticJsonDocument<256> doc; // Zwiększ rozmiar dokumentu
+//     DeserializationError error = deserializeJson(doc, file);
+    
+//     if (!error) {
+//         bluetoothConfig.bmsEnabled = doc["bmsEnabled"] | false;
+//         bluetoothConfig.tpmsEnabled = doc["tpmsEnabled"] | false;
+        
+//         // Dodaj obsługę MAC adresów
+//         if (doc.containsKey("bmsMac")) {
+//             strlcpy(bluetoothConfig.bmsMac, doc["bmsMac"], sizeof(bluetoothConfig.bmsMac));
+//         }
+        
+//         // if (doc.containsKey("frontTpmsMac")) {
+//         //     strlcpy(bluetoothConfig.frontTpmsMac, doc["frontTpmsMac"], sizeof(bluetoothConfig.frontTpmsMac));
+//         // }
+
+//         if (doc.containsKey("frontTpmsMac") && doc["frontTpmsMac"].is<const char*>()) {
+//             strlcpy(bluetoothConfig.frontTpmsMac, doc["frontTpmsMac"].as<const char*>(), sizeof(bluetoothConfig.frontTpmsMac));
+//         } else {
+//             // Domyślna wartość w przypadku błędu
+//             bluetoothConfig.frontTpmsMac[0] = '\0';
+//         }
+        
+//         if (doc.containsKey("rearTpmsMac")) {
+//             strlcpy(bluetoothConfig.rearTpmsMac, doc["rearTpmsMac"], sizeof(bluetoothConfig.rearTpmsMac));
+//         }
+//     }
+    
+//     file.close();
+// }
+
+// wczytywanie konfiguracji Bluetooth
 void loadBluetoothConfigFromFile() {
     File file = LittleFS.open("/bluetooth_config.json", "r");
     if (!file) {
-        #ifdef DEBUG
-        Serial.println("Nie znaleziono pliku konfiguracji Bluetooth, używam domyślnych");
-        #endif
+        DEBUG_PRINT("Nie znaleziono pliku konfiguracji Bluetooth, używam domyślnych");
         return;
     }
 
-    StaticJsonDocument<256> doc; // Zwiększ rozmiar dokumentu
+    StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, file);
+    file.close();
     
     if (!error) {
         bluetoothConfig.bmsEnabled = doc["bmsEnabled"] | false;
         bluetoothConfig.tpmsEnabled = doc["tpmsEnabled"] | false;
         
-        // Dodaj obsługę MAC adresów
-        if (doc.containsKey("bmsMac")) {
-            strlcpy(bluetoothConfig.bmsMac, doc["bmsMac"], sizeof(bluetoothConfig.bmsMac));
+        // BMS MAC
+        if (doc.containsKey("bmsMac") && doc["bmsMac"].is<const char*>()) {
+            const char* macStr = doc["bmsMac"].as<const char*>();
+            if (validateMacAddress(macStr)) {
+                strlcpy(bluetoothConfig.bmsMac, macStr, sizeof(bluetoothConfig.bmsMac));
+            } else {
+                DEBUG_PRINT("Nieprawidłowy format adresu MAC BMS");
+                bluetoothConfig.bmsMac[0] = '\0';
+            }
         }
         
-        // if (doc.containsKey("frontTpmsMac")) {
-        //     strlcpy(bluetoothConfig.frontTpmsMac, doc["frontTpmsMac"], sizeof(bluetoothConfig.frontTpmsMac));
-        // }
-
+        // Front TPMS MAC
         if (doc.containsKey("frontTpmsMac") && doc["frontTpmsMac"].is<const char*>()) {
-            strlcpy(bluetoothConfig.frontTpmsMac, doc["frontTpmsMac"].as<const char*>(), sizeof(bluetoothConfig.frontTpmsMac));
+            const char* macStr = doc["frontTpmsMac"].as<const char*>();
+            if (validateMacAddress(macStr)) {
+                strlcpy(bluetoothConfig.frontTpmsMac, macStr, sizeof(bluetoothConfig.frontTpmsMac));
+            } else {
+                DEBUG_PRINT("Nieprawidłowy format adresu MAC przedniego TPMS");
+                bluetoothConfig.frontTpmsMac[0] = '\0';
+            }
         } else {
-            // Domyślna wartość w przypadku błędu
             bluetoothConfig.frontTpmsMac[0] = '\0';
         }
         
-        if (doc.containsKey("rearTpmsMac")) {
-            strlcpy(bluetoothConfig.rearTpmsMac, doc["rearTpmsMac"], sizeof(bluetoothConfig.rearTpmsMac));
+        // Rear TPMS MAC
+        if (doc.containsKey("rearTpmsMac") && doc["rearTpmsMac"].is<const char*>()) {
+            const char* macStr = doc["rearTpmsMac"].as<const char*>();
+            if (validateMacAddress(macStr)) {
+                strlcpy(bluetoothConfig.rearTpmsMac, macStr, sizeof(bluetoothConfig.rearTpmsMac));
+            } else {
+                DEBUG_PRINT("Nieprawidłowy format adresu MAC tylnego TPMS");
+                bluetoothConfig.rearTpmsMac[0] = '\0';
+            }
+        } else {
+            bluetoothConfig.rearTpmsMac[0] = '\0';
         }
     }
-    
-    file.close();
 }
 
 // wczytywanie ustawień ogólnych
@@ -1371,6 +1504,43 @@ void drawVerticalLine() {
 }
 
 // rysowanie górnego paska
+// void drawTopBar() {
+//     static bool colonVisible = true;
+//     static unsigned long lastColonToggle = 0;
+//     const unsigned long COLON_TOGGLE_INTERVAL = 500;  // Miganie co 500ms (pół sekundy)
+
+//     display.setFont(czcionka_srednia);
+
+//     // Pobierz aktualny czas z RTC
+//     DateTime now = rtc.now();
+
+//     // Czas z migającym dwukropkiem
+//     char timeStr[6];
+//     if (colonVisible) {
+//         sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
+//     } else {
+//         sprintf(timeStr, "%02d %02d", now.hour(), now.minute());
+//     }
+//     display.drawStr(0, 10, timeStr);
+
+//     // Przełącz stan dwukropka co COLON_TOGGLE_INTERVAL
+//     if (millis() - lastColonToggle >= COLON_TOGGLE_INTERVAL) {
+//         colonVisible = !colonVisible;
+//         lastColonToggle = millis();
+//     }
+
+//     // Bateria
+//     char battStr[5];
+//     sprintf(battStr, "%d%%", battery_capacity_percent);
+//     display.drawStr(58, 10, battStr);
+
+//     // Napięcie
+//     char voltStr[6];
+//     sprintf(voltStr, "%.0fV", battery_voltage);
+//     display.drawStr(100, 10, voltStr);
+// }
+
+// rysowanie górnego paska
 void drawTopBar() {
     static bool colonVisible = true;
     static unsigned long lastColonToggle = 0;
@@ -1382,13 +1552,12 @@ void drawTopBar() {
     DateTime now = rtc.now();
 
     // Czas z migającym dwukropkiem
-    char timeStr[6];
     if (colonVisible) {
-        sprintf(timeStr, "%02d:%02d", now.hour(), now.minute());
+        sprintf(globalDisplayBuffer1, "%02d:%02d", now.hour(), now.minute());
     } else {
-        sprintf(timeStr, "%02d %02d", now.hour(), now.minute());
+        sprintf(globalDisplayBuffer1, "%02d %02d", now.hour(), now.minute());
     }
-    display.drawStr(0, 10, timeStr);
+    display.drawStr(0, 10, globalDisplayBuffer1);
 
     // Przełącz stan dwukropka co COLON_TOGGLE_INTERVAL
     if (millis() - lastColonToggle >= COLON_TOGGLE_INTERVAL) {
@@ -1397,14 +1566,12 @@ void drawTopBar() {
     }
 
     // Bateria
-    char battStr[5];
-    sprintf(battStr, "%d%%", battery_capacity_percent);
-    display.drawStr(58, 10, battStr);
+    sprintf(globalDisplayBuffer1, "%d%%", battery_capacity_percent);
+    display.drawStr(58, 10, globalDisplayBuffer1);
 
     // Napięcie
-    char voltStr[6];
-    sprintf(voltStr, "%.0fV", battery_voltage);
-    display.drawStr(100, 10, voltStr);
+    sprintf(globalDisplayBuffer2, "%.0fV", battery_voltage);
+    display.drawStr(100, 10, globalDisplayBuffer2);
 }
 
 // wyświetlanie statusu świateł
@@ -1426,7 +1593,9 @@ void drawAssistLevel() {
     display.setFont(czcionka_duza);
 
     // Wyświetl "T" gdy tempomat jest aktywny
-    if (cruiseControlActive) {
+    // if (cruiseControlActive) {
+    //     display.drawStr(2, 40, "T");
+    if (cruiseControl.isActive()) {
         display.drawStr(2, 40, "T");
     } else {
         // Wyświetlanie poziomu asysty
@@ -1533,7 +1702,8 @@ void updateCadenceLogic() {
 
     // Wyłącz tempomat jeśli hamulec jest aktywny
     if (brakeActive && cruiseControlActive) {
-        cruiseControlActive = false;
+        //cruiseControlActive = false;
+        cruiseControl.checkBrakeState(brakeActive);
         #ifdef DEBUG
         Serial.println("Dezaktywacja tempomatu przez hamulec");
         #endif
@@ -2114,16 +2284,26 @@ void handleButtons() {
                 downPressStartTime = currentTime;
             } else if (!downLongPressExecuted && (currentTime - downPressStartTime) > LONG_PRESS_TIME) {
                 // Długie przytrzymanie przycisku DOWN
+                // if (speed_kmh >= 10.0) {
+                //     // Prędkość >= 10 km/h - włącz tempomat
+                //     cruiseControlActive = !cruiseControlActive; // Przełącz stan tempomatu
+                //     assistLevelAsText = cruiseControlActive; // Pokaż "T" gdy tempomat aktywny
+                    
+                //     #ifdef DEBUG
+                //     Serial.print(cruiseControlActive ? "Aktywacja" : "Dezaktywacja");
+                //     Serial.println(" tempomatu");
+                //     #endif
+                    
+                //     downLongPressExecuted = true;
+
                 if (speed_kmh >= 10.0) {
                     // Prędkość >= 10 km/h - włącz tempomat
-                    cruiseControlActive = !cruiseControlActive; // Przełącz stan tempomatu
-                    assistLevelAsText = cruiseControlActive; // Pokaż "T" gdy tempomat aktywny
-                    
-                    #ifdef DEBUG
-                    Serial.print(cruiseControlActive ? "Aktywacja" : "Dezaktywacja");
-                    Serial.println(" tempomatu");
-                    #endif
-                    
+                    if (cruiseControl.isActive()) {
+                        cruiseControl.deactivate();
+                    } else {
+                        cruiseControl.activate(speed_kmh);
+                    }
+                    assistLevelAsText = cruiseControl.isActive(); // Pokaż "T" gdy tempomat aktywny
                     downLongPressExecuted = true;
                 } else if (speed_kmh < 8.0) {
                     // Prędkość < 8 km/h - włącz tryb prowadzenia roweru
@@ -2561,22 +2741,40 @@ bool isValidTemperature(float temp) {
 }
 
 // obsługa temperatury
+// void handleTemperature() {
+//     unsigned long currentMillis = millis();
+
+//     if (!conversionRequested && (currentMillis - lastTempRequest >= TEMP_REQUEST_INTERVAL)) {
+//         // Żądanie konwersji z obu czujników
+//         sensorsAir.requestTemperatures();
+//         sensorsController.requestTemperatures();
+//         conversionRequested = true;
+//         lastTempRequest = currentMillis;
+//     }
+
+//     if (conversionRequested && (currentMillis - lastTempRequest >= 750)) {
+//         // Odczyt z obu czujników
+//         currentTemp = sensorsAir.getTempCByIndex(0);
+//         temp_controller = sensorsController.getTempCByIndex(0);
+//         conversionRequested = false;
+//     }
+// }
+
 void handleTemperature() {
-    unsigned long currentMillis = millis();
-
-    if (!conversionRequested && (currentMillis - lastTempRequest >= TEMP_REQUEST_INTERVAL)) {
-        // Żądanie konwersji z obu czujników
-        sensorsAir.requestTemperatures();
-        sensorsController.requestTemperatures();
-        conversionRequested = true;
-        lastTempRequest = currentMillis;
+    // Zażądaj pomiaru temperatury (funkcja sama sprawdzi czy minął odpowiedni czas)
+    tempSensor.requestTemperature();
+    
+    // Odczytaj temperatury (funkcje same sprawdzą, czy konwersja się zakończyła)
+    float newAirTemp = tempSensor.readAirTemperature();
+    float newControllerTemp = tempSensor.readControllerTemperature();
+    
+    // Aktualizuj zmienne globalne tylko gdy mamy prawidłowe odczyty
+    if (newAirTemp != tempSensor.INVALID_TEMP) {
+        currentTemp = newAirTemp;
     }
-
-    if (conversionRequested && (currentMillis - lastTempRequest >= 750)) {
-        // Odczyt z obu czujników
-        currentTemp = sensorsAir.getTempCByIndex(0);
-        temp_controller = sensorsController.getTempCByIndex(0);
-        conversionRequested = false;
+    
+    if (newControllerTemp != tempSensor.INVALID_TEMP) {
+        temp_controller = newControllerTemp;
     }
 }
 
@@ -4060,18 +4258,75 @@ void loop() {
         static unsigned long last_rpm_calc = 0;
         const unsigned long rpm_calc_interval = 100; // co 100ms
 
-        if (now - last_rpm_calc >= rpm_calc_interval) {
+        // if (now - last_rpm_calc >= rpm_calc_interval) {
+        //     unsigned long dt_sum = 0;
+        //     int valid_intervals = 0;
+        //     for (int i = 0; i < CADENCE_SAMPLES_WINDOW - 1; i++) {
+        //         unsigned long dt = cadence_pulse_times[i] - cadence_pulse_times[i + 1];
+        //         if (dt > 0 && cadence_pulse_times[i + 1] != 0) {
+        //             dt_sum += dt;
+        //             valid_intervals++;
+        //         }
+        //     }
+        //     int rpm = 0;
+        //     if (valid_intervals > 0 && (now - cadence_pulse_times[0]) < 2000) {
+        //         float avg_period = (float)dt_sum / valid_intervals;
+        //         // Uwzględnij liczbę impulsów na jeden obrót
+        //         rpm = (60000.0 / avg_period) / cadence_pulses_per_revolution;
+        //     }
+        //     cadence_rpm = rpm;
+
+        //     // Histereza dla strzałki kadencji
+        //     switch (cadence_arrow_state) {
+        //         case ARROW_NONE:
+        //             // ZMIANA: Przy niskiej kadencji strzałka w dół (niższy bieg)
+        //             if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN)
+        //                 cadence_arrow_state = ARROW_DOWN;
+        //             // ZMIANA: Przy wysokiej kadencji strzałka w górę (wyższy bieg)
+        //             else if (cadence_rpm > CADENCE_OPTIMAL_MAX)
+        //                 cadence_arrow_state = ARROW_UP;
+        //             break;
+        //         case ARROW_DOWN: // Był ARROW_UP
+        //             if (cadence_rpm >= CADENCE_OPTIMAL_MIN + CADENCE_HYSTERESIS)
+        //                 cadence_arrow_state = ARROW_NONE;
+        //             break;
+        //         case ARROW_UP: // Był ARROW_DOWN
+        //             if (cadence_rpm <= CADENCE_OPTIMAL_MAX - CADENCE_HYSTERESIS)
+        //                 cadence_arrow_state = ARROW_NONE;
+        //             break;
+        //     }
+
+        //     // Liczenie średniej/maksymalnej kadencji
+        //     cadence_sum += cadence_rpm;
+        //     cadence_samples++;
+        //     if (cadence_rpm > cadence_max_rpm) cadence_max_rpm = cadence_rpm;
+
+        //     last_rpm_calc = now;
+        // }
+
+        if (now - last_rpm_calc >= rpm_calc_interval || cadenceDataUpdated) {
+            // Wyłącz przerwania na czas przetwarzania danych
+            noInterrupts();
+            // Kopiuj potrzebne dane z tablicy
+            unsigned long localPulseTimes[CADENCE_SAMPLES_WINDOW];
+            memcpy(localPulseTimes, cadence_pulse_times, sizeof(localPulseTimes));
+            unsigned long localLastPulseTime = cadence_last_pulse_time;
+            cadenceDataUpdated = false;
+            // Włącz przerwania z powrotem
+            interrupts();
+            
+            // Dalej używaj lokalnych kopii danych
             unsigned long dt_sum = 0;
             int valid_intervals = 0;
             for (int i = 0; i < CADENCE_SAMPLES_WINDOW - 1; i++) {
-                unsigned long dt = cadence_pulse_times[i] - cadence_pulse_times[i + 1];
-                if (dt > 0 && cadence_pulse_times[i + 1] != 0) {
+                unsigned long dt = localPulseTimes[i] - localPulseTimes[i + 1];
+                if (dt > 0 && localPulseTimes[i + 1] != 0) {
                     dt_sum += dt;
                     valid_intervals++;
                 }
             }
             int rpm = 0;
-            if (valid_intervals > 0 && (now - cadence_pulse_times[0]) < 2000) {
+            if (valid_intervals > 0 && (now - localLastPulseTime) < 2000) {
                 float avg_period = (float)dt_sum / valid_intervals;
                 // Uwzględnij liczbę impulsów na jeden obrót
                 rpm = (60000.0 / avg_period) / cadence_pulses_per_revolution;
