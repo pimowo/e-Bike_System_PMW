@@ -16,6 +16,11 @@ public:
     static const uint8_t DRL = 2;
     static const uint8_t REAR = 4;
     
+    enum ControlMode {
+        SMART_CONTROL,    // Sterowanie przez ESP32 (Smart)
+        CONTROLLER_CONTROL // Sterowanie przez sterownik KT
+    };
+
     // Tryby działania
     enum LightMode {
         OFF = 0,  // Światła wyłączone
@@ -66,6 +71,23 @@ public:
 
     String getModeString() const; // Zwraca nazwę aktualnego trybu jako string
     
+    // gettery i settery
+    ControlMode getControlMode() const {
+        return controlMode;
+    }
+    
+    void setControlMode(ControlMode mode) {
+        controlMode = mode;
+    }
+    
+    const char* getControlModeString() const {
+        switch (controlMode) {
+            case SMART_CONTROL: return "Smart";
+            case CONTROLLER_CONTROL: return "Sterownik";
+            default: return "Unknown";
+        }
+    }
+
 private:
     // Piny GPIO
     uint8_t frontPin;
@@ -77,6 +99,9 @@ private:
     bool drlState;
     bool rearState;
     
+    // Domyślnie sterowanie Smart
+    ControlMode controlMode = SMART_CONTROL; 
+
     // Tryb działania
     LightMode currentMode;
     
