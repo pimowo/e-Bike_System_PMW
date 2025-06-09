@@ -494,3 +494,19 @@ footer a:hover {
         overflow-y: auto;
     }
 }
+
+/* Dodaj do istniejącego pliku CSS */
+#smart-config-section {
+    transition: opacity 0.3s ease;
+    margin-top: 15px;
+}
+
+#smart-config-section.hidden {
+    display: none;
+    opacity: 0;
+}
+
+#smart-config-section.visible {
+    display: block;
+    opacity: 1;
+}
