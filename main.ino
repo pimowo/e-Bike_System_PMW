@@ -95,6 +95,7 @@ const char* LIGHT_CONFIG_FILE = "/light_config.json";
 // czujniki temperatury
 #define TEMP_AIR_PIN 15        // temperatutra powietrza (DS18B20)
 #define TEMP_CONTROLLER_PIN 4  // temperatura sterownika (DS18B20)
+//#define TEMP_MOTOR_PIN         // temperatura silnika (NTC10k)
 // kadencja
 #define CADENCE_SENSOR_PIN 27
 // hamulec
@@ -4677,6 +4678,7 @@ GPIO 32 ładowarka USB
 
 GPIO 15 temperatura powietrza
 GPIO 4 temperatura sterownika
+GPIO  temperatura silnika
 
 GPIO 26 czujnik hamulca
 GPIO 27 czujnik kadencji
