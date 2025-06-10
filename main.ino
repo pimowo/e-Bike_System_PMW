@@ -2647,28 +2647,28 @@ void printLightConfigFile() {
     if (LittleFS.exists("/light_config.json")) {
         File file = LittleFS.open("/light_config.json", "r");
         if (file) {
-            Serial.println("------------ ZAWARTOŚĆ PLIKU KONFIGURACYJNEGO ŚWIATEŁ -----------");
+            DEBUG_INFO("=== ZAWARTOSC PLIKU KONFIGURACYJNEGO SWIATEL ===");
             while (file.available()) {
                 Serial.write(file.read());
             }
-            Serial.println("\n------------------------------------------------------------------");
+
             file.close();
         } else {
-            Serial.println("Nie można otworzyć pliku konfiguracyjnego");
+            DEBUG_INFO("Nie można otworzyć pliku konfiguracyjnego");
         }
     } else {
-        Serial.println("Plik konfiguracyjny /light_config.json nie istnieje");
+        DEBUG_ERROR("Plik konfiguracyjny /light_config.json nie istnieje");
     }
     
     // Sprawdź też stary plik
     if (LittleFS.exists("/lights.json")) {
         File file = LittleFS.open("/lights.json", "r");
         if (file) {
-            Serial.println("------------ ZAWARTOŚĆ STAREGO PLIKU KONFIGURACYJNEGO -----------");
+            DEBUG_INFO("=== ZAWARTOSC STAREGO PLIKU KONFIGURACYJNEGO ===");
             while (file.available()) {
                 Serial.write(file.read());
             }
-            Serial.println("\n------------------------------------------------------------------");
+
             file.close();
         }
     }
@@ -3727,12 +3727,12 @@ bool testFileSystem() {
     DEBUG_INFO("Test zapisu pliku...");
     File testFile = LittleFS.open("/test_fs.txt", "w");
     if (!testFile) {
-        DEBUG_INFO("Nie mozna utworzyC pliku testowego");
+        DEBUG_ERROR("Nie mozna utworzyc pliku testowego");
         return false;
     }
     
     if (testFile.print("Test zapisu") == 0) {
-        DEBUG_INFO("Blad zapisu do pliku testowego");
+        DEBUG_ERROR("Blad zapisu do pliku testowego");
         testFile.close();
         return false;
     }
@@ -3743,7 +3743,7 @@ bool testFileSystem() {
     DEBUG_INFO("Test odczytu pliku...");
     testFile = LittleFS.open("/test_fs.txt", "r");
     if (!testFile) {
-        DEBUG_INFO("Nie mozna otworzyC pliku testowego do odczytu");
+        DEBUG_ERROR("Nie mozna otworzyc pliku testowego do odczytu");
         return false;
     }
     
