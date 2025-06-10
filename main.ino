@@ -3576,6 +3576,48 @@ void resetCadenceData() {
     preferences.end();
 }
 
+// wczytywanie ustawień podświetlenia
+void loadBacklightSettingsFromFile() {
+    File file = LittleFS.open(CONFIG_FILE, "r");
+    if (!file) {
+        DEBUG_LIGHT("Brak pliku konfiguracyjnego, używam ustawień domyślnych");
+        // Ustaw wartości domyślne
+        backlightSettings.Brightness = 70;
+        backlightSettings.dayBrightness = 100;
+        backlightSettings.nightBrightness = 50;
+        backlightSettings.autoMode = false;
+        // Zapisz domyślne ustawienia do pliku
+        saveBacklightSettingsToFile();
+        return;
+    }
+
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+
+    if (error) {
+        DEBUG_LIGHT("Błąd podczas parsowania JSON, używam ustawień domyślnych");
+        // Ustaw wartości domyślne
+        backlightSettings.Brightness = 70;          // Dodana linia ustawiająca domyślną jasność
+        backlightSettings.dayBrightness = 100;
+        backlightSettings.nightBrightness = 50;
+        backlightSettings.autoMode = false;
+        return;
+    }
+
+    // Wczytaj ustawienia
+    backlightSettings.Brightness = doc["brightness"] | 70;    // Dodana linia wczytująca jasność podstawową
+    backlightSettings.dayBrightness = doc["dayBrightness"] | 100;
+    backlightSettings.nightBrightness = doc["nightBrightness"] | 50;
+    backlightSettings.autoMode = doc["autoMode"] | false;
+
+    DEBUG_LIGHT("Wczytano ustawienia z pliku:");
+    DEBUG_LIGHT("Brightness: %d", backlightSettings.Brightness);        // Dodany log
+    DEBUG_LIGHT("Day Brightness: %d", backlightSettings.dayBrightness);
+    DEBUG_LIGHT("Night Brightness: %d", backlightSettings.nightBrightness);
+    DEBUG_LIGHT("Auto Mode: %d", backlightSettings.autoMode ? 1 : 0);
+}
+
 void initializeFileSystemAndSettings() {
     // Sprawdź system plików
     testFileSystem();
