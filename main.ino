@@ -1347,20 +1347,6 @@ void drawTopBar() {
     display.drawStr(100, 10, voltStr);
 }
 
-// // wyświetlanie statusu świateł
-// void drawLightStatus() {
-//     display.setFont(czcionka_mala);
-
-//     switch (lightManager.getMode()) {
-//         case LightManager::DAY:
-//             display.drawStr(28, 45, "Dzien");
-//             break;
-//         case LightManager::NIGHT:
-//             display.drawStr(28, 45, "Noc");
-//             break;
-//     }
-// }
-
 // wyświetlanie statusu świateł
 void drawLightStatus() {
     display.setFont(czcionka_mala);
@@ -1383,7 +1369,6 @@ void drawLightStatus() {
     }
 }
 
-// wyświetlanie poziomu wspomagania
 // wyświetlanie poziomu wspomagania
 void drawAssistLevel() {
     display.setFont(czcionka_duza);
@@ -2052,14 +2037,6 @@ void handleButtons() {
             resetTripStart = 0;
         }
 
-        // Obsługa przycisku UP (zmiana asysty/światła)
-        // if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
-        //     if (!upPressStartTime) {
-        //         upPressStartTime = currentTime;
-        //     } else if (!upLongPressExecuted && (currentTime - upPressStartTime) > LONG_PRESS_TIME) {
-        //         lightManager.cycleMode();
-        //         upLongPressExecuted = true;
-        //     }
         if (!upState && (currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
             if (!upPressStartTime) {
                 upPressStartTime = currentTime;
@@ -2412,7 +2389,7 @@ void setCadencePulsesPerRevolution(uint8_t pulses) {
 // tryb uśpienia
 void goToSleep() {
     DEBUG_INFO("Wchodze w tryb glebokiego uspienia (DEEP SLEEP)...");
-    //DEBUG_INFO("Aktualny tryb świateł: %d\n", (int)lightManager.getMode());
+    DEBUG_INFO("Aktualny tryb swiatel: %d", (int)lightManager.getMode());
 
     // Wyłącz wszystkie LEDy
     digitalWrite(FrontDayPin, LOW);
@@ -2440,169 +2417,6 @@ void goToSleep() {
     // Wejście w deep sleep
     esp_deep_sleep_start();
 }
-
-// ustawiania świateł
-// void setLights() {
-//     // Wyłącz wszystkie światła
-//     digitalWrite(FrontDayPin, LOW);
-//     digitalWrite(FrontPin, LOW);
-//     digitalWrite(RearPin, LOW);
-
-//     #ifdef DEBUG
-//     Serial.printf("setLights: lightMode=%d, configModeActive=%d\n", lightMode, configModeActive);
-//     #endif
-
-//     // Jeśli światła wyłączone (lightMode == 0) lub tryb konfiguracji jest aktywny, kończymy
-//     if (lightMode == 0 || configModeActive) {
-//         #ifdef DEBUG
-//         Serial.println("Światła wyłączone");
-//         #endif
-//         applyBacklightSettings(); // Aktualizuj jasność wyświetlacza
-//         return;
-//     }
-
-//     // Sprawdź, czy mruganie jest włączone dla trybu świateł (dotyczy tylko tylnego światła)
-//     bool shouldBlink = false;
-//     if (lightMode == 1 && lightSettings.dayBlink) { // tryb dzienny
-//         shouldBlink = true;
-//     } else if (lightMode == 2 && lightSettings.nightBlink) { // tryb nocny
-//         shouldBlink = true;
-//     }
-
-//     #ifdef DEBUG
-//     if (shouldBlink) {
-//         Serial.printf("Miganie aktywne, blinkState=%d\n", blinkState);
-//     }
-//     #endif
-
-//     // Zastosuj ustawienia zgodnie z trybem
-//     if (lightMode == 1) { // Tryb dzienny
-//         switch (lightSettings.dayLights) {
-//             case LightSettings::NONE:
-//                 // Wszystkie światła pozostają wyłączone
-//                 #ifdef DEBUG
-//                 Serial.println("Tryb dzienny: NONE");
-//                 #endif
-//                 break;
-//             case LightSettings::FRONT:
-//                 digitalWrite(FrontDayPin, HIGH);
-//                 #ifdef DEBUG
-//                 Serial.println("Tryb dzienny: FRONT");
-//                 #endif
-//                 break;
-//             case LightSettings::REAR:
-//                 // Tylne światło - z uwzględnieniem migania
-//                 if (!shouldBlink || blinkState) {
-//                     digitalWrite(RearPin, HIGH);
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb dzienny: REAR (włączone)");
-//                     #endif
-//                 } else {
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb dzienny: REAR (wyłączone - miganie)");
-//                     #endif
-//                 }
-//                 break;
-//             case LightSettings::BOTH:
-//                 digitalWrite(FrontDayPin, HIGH);
-//                 // Tylne światło - z uwzględnieniem migania
-//                 if (!shouldBlink || blinkState) {
-//                     digitalWrite(RearPin, HIGH);
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb dzienny: BOTH (tylne włączone)");
-//                     #endif
-//                 } else {
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb dzienny: BOTH (tylne wyłączone - miganie)");
-//                     #endif
-//                 }
-//                 break;
-//         }
-//     } else if (lightMode == 2) { // Tryb nocny
-//         switch (lightSettings.nightLights) {
-//             case LightSettings::NONE:
-//                 // Wszystkie światła pozostają wyłączone
-//                 #ifdef DEBUG
-//                 Serial.println("Tryb nocny: NONE");
-//                 #endif
-//                 break;
-//             case LightSettings::FRONT:
-//                 digitalWrite(FrontPin, HIGH);
-//                 #ifdef DEBUG
-//                 Serial.println("Tryb nocny: FRONT");
-//                 #endif
-//                 break;
-//             case LightSettings::REAR:
-//                 // Tylne światło - z uwzględnieniem migania
-//                 if (!shouldBlink || blinkState) {
-//                     digitalWrite(RearPin, HIGH);
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb nocny: REAR (włączone)");
-//                     #endif
-//                 } else {
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb nocny: REAR (wyłączone - miganie)");
-//                     #endif
-//                 }
-//                 break;
-//             case LightSettings::BOTH:
-//                 digitalWrite(FrontPin, HIGH);
-//                 // Tylne światło - z uwzględnieniem migania
-//                 if (!shouldBlink || blinkState) {
-//                     digitalWrite(RearPin, HIGH);
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb nocny: BOTH (tylne włączone)");
-//                     #endif
-//                 } else {
-//                     #ifdef DEBUG
-//                     Serial.println("Tryb nocny: BOTH (tylne wyłączone - miganie)");
-//                     #endif
-//                 }
-//                 break;
-//         }
-//     }
-    
-//     // Aktualizuj jasność wyświetlacza
-//     applyBacklightSettings();
-// }
-
-// ustawienia podświetlenia
-// void applyBacklightSettings() {
-//     int targetBrightness;
-    
-//     if (!backlightSettings.autoMode) {
-//         // Tryb manualny - użyj podstawowej jasności
-//         targetBrightness = backlightSettings.Brightness;
-//     } else {
-//         // Tryb auto - sprawdź stan świateł
-//         if (lightMode == 2) {  // Światła nocne
-//             targetBrightness = backlightSettings.nightBrightness;
-//         } else {  // Światła dzienne (lightMode == 1) lub wyłączone (lightMode == 0)
-//             targetBrightness = backlightSettings.dayBrightness;
-//         }
-//     }
-    
-//     // Nieliniowe mapowanie jasności
-//     // Używamy funkcji wykładniczej do lepszego rozłożenia jasności
-//     // Wzór: (x^2)/100 daje nam wartość od 0 do 100
-//     float normalized = (targetBrightness * targetBrightness) / 100.0;
-    
-//     // Mapujemy wartość na zakres 16-255
-//     // Minimum ustawiamy na 16, bo niektóre wyświetlacze OLED mogą się wyłączać przy niższych wartościach
-//     displayBrightness = map(normalized, 0, 100, 16, 255);
-    
-//     // Zastosuj jasność do wyświetlacza
-//     display.setContrast(displayBrightness);
-    
-//     #ifdef DEBUG
-//     Serial.print("Target brightness: ");
-//     Serial.print(targetBrightness);
-//     Serial.print("%, Normalized: ");
-//     Serial.print(normalized);
-//     Serial.print("%, Display brightness: ");
-//     Serial.println(displayBrightness);
-//     #endif
-// }
 
 void applyBacklightSettings() {
     int targetBrightness;
@@ -2698,95 +2512,6 @@ void handleTemperature() {
         conversionRequested = false;
     }
 }
-
-// zapisywanie trybu świateł
-// void saveLightMode() {
-//     #ifdef DEBUG
-//     Serial.printf("Zapisywanie trybu świateł: %d\n", lightMode);
-//     #endif
-
-//     if (!LittleFS.begin(false)) {
-//         #ifdef DEBUG
-//         Serial.println("Błąd montowania LittleFS przy zapisie trybu świateł");
-//         #endif
-//         return;
-//     }
-
-//     // Przygotuj dokument JSON
-//     StaticJsonDocument<64> doc;
-//     doc["lightMode"] = lightMode;
-
-//     // Otwórz plik do zapisu
-//     File file = LittleFS.open("/light_mode.json", "w");
-//     if (!file) {
-//         #ifdef DEBUG
-//         Serial.println("Nie można otworzyć pliku trybu świateł do zapisu");
-//         #endif
-//         return;
-//     }
-
-//     // Zapisz JSON do pliku
-//     if (serializeJson(doc, file) == 0) {
-//         #ifdef DEBUG
-//         Serial.println("Błąd podczas zapisu trybu świateł do pliku");
-//         #endif
-//     } else {
-//         #ifdef DEBUG
-//         Serial.println("Zapisano pomyślnie");
-//         #endif
-//     }
-
-//     file.close();
-
-//     #ifdef DEBUG
-//     Serial.printf("Zapisano tryb świateł: %d\n", lightMode);
-//     #endif
-// }
-
-// wczytywanie trybu świateł
-// void loadLightMode() {
-//     #ifdef DEBUG
-//     Serial.println("Wczytywanie trybu świateł");
-//     #endif
-
-//     // Domyślnie światła wyłączone
-//     int defaultLightMode = 0;
-    
-//     if (LittleFS.exists("/light_mode.json")) {
-//         File file = LittleFS.open("/light_mode.json", "r");
-//         if (file) {
-//             StaticJsonDocument<64> doc;
-//             DeserializationError error = deserializeJson(doc, file);
-//             file.close();
-
-//             if (!error && doc.containsKey("lightMode")) {
-//                 lightMode = doc["lightMode"] | defaultLightMode;
-//                 #ifdef DEBUG
-//                 Serial.printf("Wczytano tryb świateł: %d\n", lightMode);
-//                 #endif
-//             } else {
-//                 #ifdef DEBUG
-//                 Serial.println("Błąd podczas parsowania light_mode.json lub brak klucza lightMode");
-//                 Serial.println("Używam domyślnego trybu świateł (wyłączone)");
-//                 #endif
-//                 lightMode = defaultLightMode;
-//             }
-//         } else {
-//             #ifdef DEBUG
-//             Serial.println("Nie można otworzyć pliku light_mode.json");
-//             Serial.println("Używam domyślnego trybu świateł (wyłączone)");
-//             #endif
-//             lightMode = defaultLightMode;
-//         }
-//     } else {
-//         #ifdef DEBUG
-//         Serial.println("Plik light_mode.json nie istnieje, używam trybu domyślnego (wyłączone)");
-//         #endif
-//         lightMode = defaultLightMode;
-//         // Zapisz domyślny tryb
-//         saveLightMode();
-//     }
-// }
 
 // --- Funkcje konfiguracji systemu ---
 
@@ -3049,33 +2774,6 @@ void setupWebServer() {
         serializeJson(doc, response);
         request->send(200, "application/json", response);
     });
-
-    // Dodaj ten endpoint w funkcji setupWebServer()
-    // server.on("/api/reset-odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
-    //     bool success = false;
-        
-    //     // Utwórz nową instancję OdometerManager
-    //     OdometerManager tempOdometer;
-    //     success = tempOdometer.resetOdometer();
-        
-    //     // Odśwież główną instancję licznika (jeśli to konieczne)
-    //     odometer.initialize();
-        
-    //     #ifdef DEBUG
-    //     Serial.printf("Resetowanie licznika: %s\n", success ? "POWODZENIE" : "BŁĄD");
-    //     tempOdometer.debugPreferences();
-    //     #endif
-        
-    //     // Przygotuj odpowiedź JSON
-    //     StaticJsonDocument<128> doc;
-    //     doc["success"] = success;
-    //     doc["message"] = success ? "Licznik zresetowany" : "Błąd resetowania licznika";
-    //     doc["newValue"] = odometer.getRawTotal();
-        
-    //     String response;
-    //     serializeJson(doc, response);
-    //     request->send(200, "application/json", response);
-    // });
 
     // Dodaj endpoint do otrzymania informacji diagnostycznych
     server.on("/api/debug-odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -3357,9 +3055,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         responseDoc["status"] = "error";
         responseDoc["message"] = "Błąd podczas zapisu konfiguracji świateł";
     }
-    
-    // W obsłudze POST do /api/lights/config
-    // Dodaj obsługę nowego pola controlMode
+
     if (doc.containsKey("controlMode")) {
         int controlMode = doc["controlMode"].as<int>();
         lightManager.setControlMode((LightManager::ControlMode)controlMode);
@@ -3568,26 +3264,6 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         serializeJson(doc, response);
         request->send(200, "application/json", response);
     });
-
-    // server.on("/save-bluetooth-config", HTTP_POST, [](AsyncWebServerRequest *request) {
-    //     if (request->hasParam("body", true)) {
-    //         String json = request->getParam("body", true)->value();
-    //         StaticJsonDocument<64> doc;
-    //         DeserializationError error = deserializeJson(doc, json);
-
-    //         if (!error) {
-    //             bluetoothConfig.bmsEnabled = doc["bmsEnabled"] | false;
-    //             bluetoothConfig.tpmsEnabled = doc["tpmsEnabled"] | false;
-                
-    //             saveBluetoothConfigToFile();
-    //             request->send(200, "application/json", "{\"success\":true}");
-    //         } else {
-    //             request->send(400, "application/json", "{\"success\":false,\"error\":\"Invalid JSON\"}");
-    //         }
-    //     } else {
-    //         request->send(400, "application/json", "{\"success\":false,\"error\":\"No data\"}");
-    //     }
-    // });
 
     server.on("/save-bluetooth-config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
     [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
