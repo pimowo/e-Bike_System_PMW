@@ -69,10 +69,79 @@
 #include "LightManager.h"
 
 /********************************************************************
+ * SYSTEM LOGOWANIA Z POZIOMAMI
+ ********************************************************************/
+ 
+// Główny przełącznik debugowania - zakomentuj aby wyłączyć całe logowanie
+#define DEBUG
+
+// Definiuje poziomy logowania (ustaw 1 aby włączyć, 0 aby wyłączyć)
+#define DEBUG_ERROR_ENABLED   1  // Błędy krytyczne
+#define DEBUG_WARN_ENABLED    1  // Ostrzeżenia
+#define DEBUG_INFO_ENABLED    1  // Informacje ogólne
+#define DEBUG_LIGHT_ENABLED   1  // Logi dotyczące oświetlenia
+#define DEBUG_TEMP_ENABLED    1  // Logi czujników temperatury
+#define DEBUG_BLE_ENABLED     1  // Logi komunikacji Bluetooth
+#define DEBUG_DETAIL_ENABLED  1  // Szczegółowe logi
+
+// Makra do logowania z tagami
+#ifdef DEBUG
+    // Aktywne tylko gdy odpowiedni poziom jest włączony (1)
+    #if DEBUG_ERROR_ENABLED
+        #define DEBUG_ERROR(...) Serial.printf("[ERROR] " __VA_ARGS__); Serial.println()
+    #else
+        #define DEBUG_ERROR(...) ((void)0)
+    #endif
+    
+    #if DEBUG_WARN_ENABLED
+        #define DEBUG_WARN(...) Serial.printf("[WARN] " __VA_ARGS__); Serial.println()
+    #else
+        #define DEBUG_WARN(...) ((void)0)
+    #endif
+    
+    #if DEBUG_INFO_ENABLED
+        #define DEBUG_INFO(...) Serial.printf("[INFO] " __VA_ARGS__); Serial.println()
+    #else
+        #define DEBUG_INFO(...) ((void)0)
+    #endif
+    
+    #if DEBUG_LIGHT_ENABLED
+        #define DEBUG_LIGHT(...) Serial.printf("[LIGHT] " __VA_ARGS__); Serial.println()
+    #else
+        #define DEBUG_LIGHT(...) ((void)0)
+    #endif
+    
+    #if DEBUG_TEMP_ENABLED
+        #define DEBUG_TEMP(...) Serial.printf("[TEMP] " __VA_ARGS__); Serial.println()
+    #else
+        #define DEBUG_TEMP(...) ((void)0)
+    #endif
+    
+    #if DEBUG_BLE_ENABLED
+        #define DEBUG_BLE(...) Serial.printf("[BLE] " __VA_ARGS__); Serial.println()
+    #else
+        #define DEBUG_BLE(...) ((void)0)
+    #endif
+    
+    #if DEBUG_DETAIL_ENABLED
+        #define DEBUG_DETAIL(...) Serial.printf("[DETAIL] " __VA_ARGS__); Serial.println()
+    #else
+        #define DEBUG_DETAIL(...) ((void)0)
+    #endif
+#else
+    // Gdy DEBUG jest wyłączony, wszystkie makra są puste
+    #define DEBUG_ERROR(...) ((void)0)
+    #define DEBUG_WARN(...) ((void)0)
+    #define DEBUG_INFO(...) ((void)0)
+    #define DEBUG_LIGHT(...) ((void)0)
+    #define DEBUG_TEMP(...) ((void)0)
+    #define DEBUG_BLE(...) ((void)0)
+    #define DEBUG_DETAIL(...) ((void)0)
+#endif
+
+/********************************************************************
  * DEFINICJE I STAŁE GLOBALNE
  ********************************************************************/
-
-#define DEBUG
 
 // Wersja oprogramowania
 const char* VERSION = "10.6.25";
@@ -231,15 +300,11 @@ private:
     float currentTotal = 0;
 
     void saveToFile() {
-        #ifdef DEBUG
-        //Serial.println("Zapisywanie licznika do pliku...");
-        #endif
+        DEBUG_ERROR("Zapisywanie licznika do pliku...");
 
         File file = LittleFS.open(filename, "w");
         if (!file) {
-            #ifdef DEBUG
-            Serial.println("Błąd otwarcia pliku licznika do zapisu");
-            #endif
+            DEBUG_ERROR("Błąd otwarcia pliku licznika do zapisu");
             return;
         }
 
@@ -247,28 +312,20 @@ private:
         doc["total"] = currentTotal;
         
         if (serializeJson(doc, file) == 0) {
-            #ifdef DEBUG
-            Serial.println("Błąd zapisu do pliku licznika");
-            #endif
+            DEBUG_ERROR("Błąd zapisu do pliku licznika");
         } else {
-            #ifdef DEBUG
-            //Serial.printf("Zapisano licznik: %.2f\n", currentTotal);
-            #endif
+            DEBUG_ERROR("Zapisano licznik: %.2f\n", currentTotal);
         }
         
         file.close();
     }
 
     void loadFromFile() {
-        #ifdef DEBUG
-        Serial.println("Wczytywanie licznika z pliku...");
-        #endif
+        DEBUG_ERROR("Wczytywanie licznika z pliku...");
 
         File file = LittleFS.open(filename, "r");
         if (!file) {
-            #ifdef DEBUG
-            Serial.println("Brak pliku licznika - tworzę nowy");
-            #endif
+            DEBUG_ERROR("Brak pliku licznika - tworzę nowy");
             currentTotal = 0;
             saveToFile();
             return;
@@ -279,13 +336,9 @@ private:
         
         if (!error) {
             currentTotal = doc["total"] | 0.0f;
-            #ifdef DEBUG
-            Serial.printf("Wczytano licznik: %.2f\n", currentTotal);
-            #endif
+            DEBUG_ERROR("Wczytano licznik: %.2f\n", currentTotal);
         } else {
-            #ifdef DEBUG
-            Serial.println("Błąd odczytu pliku licznika");
-            #endif
+            DEBUG_ERROR("Błąd odczytu pliku licznika");
             currentTotal = 0;
         }
         
@@ -303,15 +356,11 @@ public:
 
     bool setInitialValue(float value) {
         if (value < 0) {
-            #ifdef DEBUG
-            Serial.println("Błędna wartość początkowa (ujemna)");
-            #endif
+            DEBUG_ERROR("Błędna wartość początkowa (ujemna)");
             return false;
         }
         
-        #ifdef DEBUG
-        Serial.printf("Ustawianie początkowej wartości licznika: %.2f\n", value);
-        #endif
+        DEBUG_ERROR("Ustawianie początkowej wartości licznika: %.2f\n", value);
 
         currentTotal = value;
         saveToFile();
@@ -320,9 +369,7 @@ public:
 
     void updateTotal(float newValue) {
         if (newValue > currentTotal) {
-            #ifdef DEBUG
-            //Serial.printf("Aktualizacja licznika z %.2f na %.2f\n", currentTotal, newValue);
-            #endif
+            //DEBUG_ERROR("Aktualizacja licznika z %.2f na %.2f\n", currentTotal, newValue);
 
             currentTotal = newValue;
             saveToFile();
@@ -879,14 +926,10 @@ class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
                     
                     // Dodaj informację o rodzaju czujnika
                     if (isFrontSensor) {
-                        #ifdef DEBUG
-                        Serial.println("Znaleziono dane z przedniego czujnika");
-                        #endif
+                        DEBUG_BLE("Znaleziono dane z przedniego czujnika");
                         sensorNumber = 0x80; // Wymuszamy przedni czujnik
                     } else if (isRearSensor) {
-                        #ifdef DEBUG
-                        Serial.println("Znaleziono dane z tylnego czujnika");
-                        #endif
+                        DEBUG_BLE("Znaleziono dane z tylnego czujnika");
                         sensorNumber = 0x81; // Wymuszamy tylny czujnik
                     }
                     
@@ -939,38 +982,28 @@ void updateBmsData() {
 // połączenie z BMS
 void connectToBms() {
     if (!bleClient->isConnected()) {
-        #ifdef DEBUG
-        Serial.println("Próba połączenia z BMS...");
-        #endif
+        DEBUG_BLE("Próba połączenia z BMS...");
 
         if (bleClient->connect(bmsMacAddress)) {
-            #ifdef DEBUG
-            Serial.println("Połączono z BMS");
-            #endif
+            DEBUG_BLE("Połączono z BMS");
 
             bleService = bleClient->getService("0000ff00-0000-1000-8000-00805f9b34fb");
             if (bleService == nullptr) {
-                #ifdef DEBUG
-                Serial.println("Nie znaleziono usługi BMS");
-                #endif
+                DEBUG_BLE("Nie znaleziono usługi BMS");
                 bleClient->disconnect();
                 return;
             }
 
             bleCharacteristicTx = bleService->getCharacteristic("0000ff02-0000-1000-8000-00805f9b34fb");
             if (bleCharacteristicTx == nullptr) {
-                #ifdef DEBUG
-                Serial.println("Nie znaleziono charakterystyki Tx");
-                #endif
+                DEBUG_BLE("Nie znaleziono charakterystyki Tx");
                 bleClient->disconnect();
                 return;
             }
 
             bleCharacteristicRx = bleService->getCharacteristic("0000ff01-0000-1000-8000-00805f9b34fb");
             if (bleCharacteristicRx == nullptr) {
-                #ifdef DEBUG
-                Serial.println("Nie znaleziono charakterystyki Rx");
-                #endif
+                DEBUG_BLE("Nie znaleziono charakterystyki Rx");
                 bleClient->disconnect();
                 return;
             }
@@ -978,29 +1011,21 @@ void connectToBms() {
             // Rejestracja funkcji obsługi powiadomień BLE
             if (bleCharacteristicRx->canNotify()) {
                 bleCharacteristicRx->registerForNotify(notificationCallback);
-                #ifdef DEBUG
-                Serial.println("Zarejestrowano powiadomienia dla Rx");
-                #endif
+                DEBUG_BLE("Zarejestrowano powiadomienia dla Rx");
             } else {
-                #ifdef DEBUG
-                Serial.println("Charakterystyka Rx nie obsługuje powiadomień");
-                #endif
+                DEBUG_BLE("Charakterystyka Rx nie obsługuje powiadomień");
                 bleClient->disconnect();
                 return;
             }
         } else {
-          #ifdef DEBUG
-          Serial.println("Nie udało się połączyć z BMS");
-          #endif
+          DEBUG_BLE("Nie udało się połączyć z BMS");
         }
     }
 }
 
 void saveTpmsAddresses() {
     if (!LittleFS.begin(false)) {
-        #ifdef DEBUG
-        Serial.println("Błąd montowania LittleFS przy zapisie adresów TPMS");
-        #endif
+        DEBUG_BLE("Błąd montowania LittleFS przy zapisie adresów TPMS");
         return;
     }
     
@@ -1017,32 +1042,27 @@ void saveTpmsAddresses() {
     
     File file = LittleFS.open("/tpms_config.json", "w");
     if (!file) {
-        #ifdef DEBUG
-        Serial.println("Nie można otworzyć pliku konfiguracji TPMS do zapisu");
-        #endif
+        DEBUG_BLE("Nie można otworzyć pliku konfiguracji TPMS do zapisu");
         return;
     }
     
     serializeJson(doc, file);
     file.close();
     
-    #ifdef DEBUG
-    Serial.println("Zapisano konfigurację TPMS");
-    #endif
+    DEBUG_BLE("Zapisano konfigurację TPMS");
 }
 
 // Dodaj do sekcji funkcji
 void updateTpmsData(const char* address, uint8_t sensorNumber, float pressure, float temperature, 
                   uint8_t batteryPercent, bool alarm) {
-    #ifdef DEBUG
-    Serial.print("Odebrano dane TPMS: ");
-    Serial.print("Adres="); Serial.print(address);
-    Serial.print(" Czujnik="); Serial.print(sensorNumber);
-    Serial.print(" Ciśnienie="); Serial.print(pressure);
-    Serial.print(" Temperatura="); Serial.print(temperature);
-    Serial.print(" Bateria="); Serial.print(batteryPercent);
-    Serial.print(" Alarm="); Serial.println(alarm ? "TAK" : "NIE");
-    #endif
+
+    DEBUG_BLE("Odebrano dane TPMS: ");
+    DEBUG_BLE("Adres="); Serial.print(address);
+    DEBUG_BLE(" Czujnik="); Serial.print(sensorNumber);
+    DEBUG_BLE(" Ciśnienie="); Serial.print(pressure);
+    DEBUG_BLE(" Temperatura="); Serial.print(temperature);
+    DEBUG_BLE(" Bateria="); Serial.print(batteryPercent);
+    DEBUG_BLE(" Alarm="); Serial.println(alarm ? "TAK" : "NIE");
     
     // Sprawdź, czy to przedni czy tylny czujnik na podstawie numeru czujnika lub adresu
     bool isFrontSensor = false;
@@ -1080,9 +1100,7 @@ void updateTpmsData(const char* address, uint8_t sensorNumber, float pressure, f
         pressure_temp = temperature;
         pressure_voltage = batteryPercent / 100.0; // Konwersja % na napięcie 0-1
         
-        #ifdef DEBUG
-        Serial.println("Zaktualizowano przedni czujnik");
-        #endif
+        DEBUG_BLE("Zaktualizowano przedni czujnik");
     } else if (isRearSensor) {
         rearTpms.pressure = pressure;
         rearTpms.temperature = temperature;
@@ -1097,22 +1115,18 @@ void updateTpmsData(const char* address, uint8_t sensorNumber, float pressure, f
         pressure_rear_temp = temperature;
         pressure_rear_voltage = batteryPercent / 100.0; // Konwersja % na napięcie 0-1
         
-        #ifdef DEBUG
-        Serial.println("Zaktualizowano tylny czujnik");
-        #endif
+        DEBUG_BLE("Zaktualizowano tylny czujnik");
     }
 }
 
 void startTpmsScan() {
     if (tpmsScanning || !bluetoothConfig.tpmsEnabled) return;
     
-    #ifdef DEBUG
-    Serial.println("Rozpoczynam nasłuchiwanie TPMS...");
-    Serial.print("Przedni czujnik MAC: ");
-    Serial.println(bluetoothConfig.frontTpmsMac);
-    Serial.print("Tylny czujnik MAC: ");
-    Serial.println(bluetoothConfig.rearTpmsMac);
-    #endif
+    DEBUG_BLE("Rozpoczynam nasłuchiwanie TPMS...");
+    DEBUG_BLE("Przedni czujnik MAC: ");
+    DEBUG_BLE(bluetoothConfig.frontTpmsMac);
+    DEBUG_BLE("Tylny czujnik MAC: ");
+    DEBUG_BLE(bluetoothConfig.rearTpmsMac);
     
     BLEScan* pBLEScan = BLEDevice::getScan();
     pBLEScan->setAdvertisedDeviceCallbacks(new TpmsAdvertisedDeviceCallbacks());
