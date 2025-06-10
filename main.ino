@@ -232,7 +232,7 @@ private:
     float currentTotal = 0;
 
     void saveToFile() {
-        DEBUG_ERROR("Zapisywanie licznika do pliku...");
+        DEBUG_INFO("Zapisywanie licznika do pliku...");
 
         File file = LittleFS.open(filename, "w");
         if (!file) {
@@ -246,18 +246,18 @@ private:
         if (serializeJson(doc, file) == 0) {
             DEBUG_ERROR("Błąd zapisu do pliku licznika");
         } else {
-            DEBUG_ERROR("Zapisano licznik: %.2f\n", currentTotal);
+            DEBUG_INFO("Zapisano licznik: %.2f\n", currentTotal);
         }
         
         file.close();
     }
 
     void loadFromFile() {
-        DEBUG_ERROR("Wczytywanie licznika z pliku...");
+        DEBUG_INFO("Wczytywanie licznika z pliku...");
 
         File file = LittleFS.open(filename, "r");
         if (!file) {
-            DEBUG_ERROR("Brak pliku licznika - tworzę nowy");
+            DEBUG_INFO("Brak pliku licznika - tworzę nowy");
             currentTotal = 0;
             saveToFile();
             return;
@@ -268,9 +268,9 @@ private:
         
         if (!error) {
             currentTotal = doc["total"] | 0.0f;
-            DEBUG_ERROR("Wczytano licznik: %.2f\n", currentTotal);
+            DEBUG_INFO("Wczytano licznik: %.2f\n", currentTotal);
         } else {
-            DEBUG_ERROR("Błąd odczytu pliku licznika");
+            DEBUG_ERROR("BLAd odczytu pliku licznika");
             currentTotal = 0;
         }
         
@@ -288,11 +288,11 @@ public:
 
     bool setInitialValue(float value) {
         if (value < 0) {
-            DEBUG_ERROR("Błędna wartość początkowa (ujemna)");
+            DEBUG_ERROR("Bledna wartoSC poczatkowa (ujemna)");
             return false;
         }
         
-        DEBUG_ERROR("Ustawianie początkowej wartości licznika: %.2f\n", value);
+        DEBUG_ERROR("Ustawianie poczatkowej wartosci licznika: %.2f\n", value);
 
         currentTotal = value;
         saveToFile();
@@ -301,7 +301,7 @@ public:
 
     void updateTotal(float newValue) {
         if (newValue > currentTotal) {
-            //DEBUG_ERROR("Aktualizacja licznika z %.2f na %.2f\n", currentTotal, newValue);
+            DEBUG_INFO("Aktualizacja licznika z %.2f na %.2f\n", currentTotal, newValue);
 
             currentTotal = newValue;
             saveToFile();
@@ -985,16 +985,15 @@ void saveTpmsAddresses() {
 }
 
 // Dodaj do sekcji funkcji
-void updateTpmsData(const char* address, uint8_t sensorNumber, float pressure, float temperature, 
-                  uint8_t batteryPercent, bool alarm) {
+void updateTpmsData(const char* address, uint8_t sensorNumber, float pressure, float temperature, uint8_t batteryPercent, bool alarm) {
 
     DEBUG_BLE("Odebrano dane TPMS: ");
-    DEBUG_BLE("Adres="); Serial.print(address);
-    DEBUG_BLE(" Czujnik="); Serial.print(sensorNumber);
-    DEBUG_BLE(" Ciśnienie="); Serial.print(pressure);
-    DEBUG_BLE(" Temperatura="); Serial.print(temperature);
-    DEBUG_BLE(" Bateria="); Serial.print(batteryPercent);
-    DEBUG_BLE(" Alarm="); Serial.println(alarm ? "TAK" : "NIE");
+    DEBUG_BLE("Adres=%s", address);
+    DEBUG_BLE("Czujnik=%d", sensorNumber);
+    DEBUG_BLE("Ciśnienie=%.2f", pressure);
+    DEBUG_BLE("Temperatura=%.2f", temperature);
+    DEBUG_BLE("Bateria=%d", batteryPercent);
+    DEBUG_BLE("Alarm=%s", alarm ? "TAK" : "NIE");
     
     // Sprawdź, czy to przedni czy tylny czujnik na podstawie numeru czujnika lub adresu
     bool isFrontSensor = false;
@@ -2510,7 +2509,7 @@ void setCadencePulsesPerRevolution(uint8_t pulses) {
         preferences.end();
         DEBUG_INFO("Ustawiono %d impulsów na obrót korby\n", pulses);
     } else {
-        DEBUG_INFO("Bledna wartosc dla impulsow na obrot (dozwolony zakres: 1-24)");
+        DEBUG_ERROR("Bledna wartosc dla impulsow na obrot (dozwolony zakres: 1-24)");
     }
 }
 
@@ -3810,7 +3809,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
 // --- Funkcje systemu plików ---
 
 bool testFileSystem() {
-    blinkFrequency:("\n--- Diagnostyka systemu plikow ---");
+    DEBUG_INFO("\n--- Diagnostyka systemu plikow ---");
     
     if (!LittleFS.begin(false)) {
         DEBUG_INFO("Blad montowania LittleFS - proba formatowania");
