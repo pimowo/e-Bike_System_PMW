@@ -301,7 +301,7 @@ public:
 
     void updateTotal(float newValue) {
         if (newValue > currentTotal) {
-            DEBUG_INFO("Aktualizacja licznika z %.2f na %.2f", currentTotal, newValue);
+            //DEBUG_INFO("Aktualizacja licznika z %.2f na %.2f", currentTotal, newValue);
 
             currentTotal = newValue;
             saveToFile();
@@ -2794,7 +2794,7 @@ void handleTemperature() {
 void loadSettings() {
     File configFile = LittleFS.open("/config.json", "r");
     if (!configFile) {
-        DEBUG_INFO("Failed to open config file");
+        DEBUG_INFO("Nie udalo sie otworzyc pliku konfiguracyjnego");
         return;
     }
 
@@ -2802,7 +2802,7 @@ void loadSettings() {
     DeserializationError error = deserializeJson(doc, configFile);
 
     if (error) {
-        DEBUG_INFO("Failed to parse config file");
+        DEBUG_INFO("Nie udalo sie przetworzyc pliku konfiguracyjnego");
         return;
     }
 
@@ -2903,12 +2903,12 @@ void saveSettings() {
 
     File configFile = LittleFS.open("/config.json", "w");
     if (!configFile) {
-        DEBUG_INFO("Failed to open config file for writing");
+        DEBUG_INFO("Nie udalo sie otworzyc pliku konfiguracyjnego do zapisu");
         return;
     }
 
     if (serializeJson(doc, configFile) == 0) {
-        DEBUG_INFO("Failed to write config file");
+        DEBUG_INFO("Nie udalo sie zapisac pliku konfiguracyjnego");
     }
 
     configFile.close();
@@ -2960,18 +2960,18 @@ const char* getLightModeString(LightSettings::LightMode mode) {
 // Funkcja do pobierania wartości licznika
 float getOdometerValue() {
     if (!LittleFS.begin(false)) {
-        Serial.println("Error mounting LittleFS");
+        DEBUG_ERROR("Blad montowania LittleFS");
         return 0.0;
     }
     
     if (!LittleFS.exists("/odometer.json")) {
-        Serial.println("Odometer file not found");
+        DEBUG_ERROR("Nie znaleziono pliku licznika");
         return 0.0;
     }
     
     File file = LittleFS.open("/odometer.json", "r");
     if (!file) {
-        Serial.println("Failed to open odometer file for reading");
+        DEBUG_ERROR("Nie udalo sie otworzyc pliku licznika do odczytu");
         return 0.0;
     }
     
@@ -2980,7 +2980,7 @@ float getOdometerValue() {
     file.close();
     
     if (error) {
-        Serial.println("Failed to parse odometer file");
+        DEBUG_ERROR("Nie udalo sie przetworzyc pliku licznika");
         return 0.0;
     }
     
@@ -2990,7 +2990,7 @@ float getOdometerValue() {
 // Funkcja do zapisywania wartości licznika
 bool saveOdometerValue(float value) {
     if (!LittleFS.begin(false)) {
-        Serial.println("Error mounting LittleFS");
+        DEBUG_ERROR("Blad montowania LittleFS");
         return false;
     }
     
@@ -3001,7 +3001,7 @@ bool saveOdometerValue(float value) {
     
     File file = LittleFS.open("/odometer.json", "w");
     if (!file) {
-        Serial.println("Failed to open odometer file for writing");
+        DEBUG_ERROR("Nie udalo sie otworzyc pliku licznika do zapisu");
         return false;
     }
     
@@ -3012,7 +3012,7 @@ bool saveOdometerValue(float value) {
     file.close();
     
     if (bytes == 0) {
-        Serial.println("Failed to write odometer file");
+        DEBUG_ERROR("Nie udalo sie zapisac pliku licznika");
         return false;
     }
     
@@ -3685,14 +3685,10 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
     ws.onEvent([](AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len) {
         switch (type) {
             case WS_EVT_CONNECT:
-                #ifdef DEBUG
-                Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-                #endif
+                DEBUG_INFO("Klient WebSocket #%u polaczony z %s\n", client->id(), client->remoteIP().toString().c_str());
                 break;
             case WS_EVT_DISCONNECT:
-                #ifdef DEBUG
-                Serial.printf("WebSocket client #%u disconnected\n", client->id());
-                #endif
+                DEBUG_INFO("Klient WebSocket #%u rozlaczony\n", client->id());
                 break;
         }
     });
@@ -3705,7 +3701,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
 // --- Funkcje systemu plików ---
 
 bool testFileSystem() {
-    DEBUG_INFO("\n--- Diagnostyka systemu plikow ---");
+    DEBUG_INFO("=== Diagnostyka systemu plikow ===");
     
     if (!LittleFS.begin(false)) {
         DEBUG_INFO("Blad montowania LittleFS - proba formatowania");
@@ -3776,14 +3772,14 @@ bool testFileSystem() {
         return false;
     }
     
-    Serial.println("\nLista plikow:");
+    DEBUG_INFO("=== Lista plikow ===");
     File entry = root.openNextFile();
     while (entry) {
-        DEBUG_INFO("  %s (%d bajtow)\n", entry.name(), entry.size());
+        DEBUG_INFO("  %s (%d bajtow)", entry.name(), entry.size());
         entry = root.openNextFile();
     }
     
-    Serial.println("\nTest systemu plikow zakonczony pomyslnie");
+    DEBUG_INFO("Test systemu plikow zakonczony pomyslnie");
     return true;
 }
 
@@ -3791,47 +3787,33 @@ bool testFileSystem() {
 // Lepsza obsługa błędów w funkcji initLittleFS
 bool initLittleFS() {
     if (!LittleFS.begin(false)) { // Najpierw spróbuj bez formatowania
-        #ifdef DEBUG
-        Serial.println("LittleFS Mount Failed - próba formatowania");
-        #endif
+        DEBUG_ERROR("Blad montowania LittleFS - proba formatowania");
         
         if (!LittleFS.format()) {
-            #ifdef DEBUG
-            Serial.println("LittleFS Format Failed");
-            #endif
+            DEBUG_ERROR("Blad formatowania LittleFS");
             return false;
         }
         
         if (!LittleFS.begin()) {
-            #ifdef DEBUG
-            Serial.println("LittleFS Mount Failed After Format");
-            #endif
+            DEBUG_ERROR("Blad montowania LittleFS po formatowaniu");
             return false;
         }
     }
     
-    #ifdef DEBUG
-    Serial.println("LittleFS Mounted Successfully");
-    #endif
+    DEBUG_INFO("LittleFS zamontowany pomyslnie");
     return true;
 }
 
 // listowanie plików
 void listFiles() {
-    #ifdef DEBUG
-    Serial.println("Files in LittleFS:");
-    #endif
+    DEBUG_INFO("Pliki w LittleFS:");
     File root = LittleFS.open("/");
     if (!root) {
-        #ifdef DEBUG
-        Serial.println("- Failed to open directory");
-        #endif
+        DEBUG_ERROR("- Nie udalo sie otworzyc katalogu");
         return;
     }
     if (!root.isDirectory()) {
-        #ifdef DEBUG
-        Serial.println(" - Not a directory");
-        #endif
+        DEBUG_ERROR(" - To nie jest katalog");
         return;
     }
 
@@ -3857,9 +3839,7 @@ void listFiles() {
 // wczytywanie konfiguracji
 bool loadConfig() {
     if(!LittleFS.exists("/config.json")) {
-        #ifdef DEBUG
-        Serial.println("Creating default config file...");
-        #endif
+        DEBUG_INFO("Tworzenie domyslnego pliku konfiguracyjnego...");
         // Tworzymy domyślną konfigurację
         StaticJsonDocument<512> defaultConfig;
         defaultConfig["version"] = "1.0.0";
@@ -3868,9 +3848,7 @@ bool loadConfig() {
         
         File configFile = LittleFS.open("/config.json", "w");
         if(!configFile) {
-            #ifdef DEBUG
-            Serial.println("Failed to create config file");
-            #endif
+            DEBUG_ERROR("Nie udalo sie utworzyc pliku konfiguracyjnego");
             return false;
         }
         serializeJson(defaultConfig, configFile);
@@ -3880,15 +3858,11 @@ bool loadConfig() {
     // Czytamy konfigurację
     File configFile = LittleFS.open("/config.json", "r");
     if(!configFile) {
-        #ifdef DEBUG
-        Serial.println("Failed to open config file");
-        #endif
+        DEBUG_ERROR("Nie udalo sie otworzyc pliku konfiguracyjnego");
         return false;
     }
     
-    #ifdef DEBUG
-    Serial.println("Config file loaded successfully");
-    #endif
+    DEBUG_INFO("Plik konfiguracyjny wczytany pomyslnie");
     return true;
 }
 
@@ -3942,14 +3916,10 @@ void initializeTemperatureSensors() {
 
 void initializeRTC() {
     if (!rtc.begin()) {
-        #ifdef DEBUG
-        Serial.println("Nie znaleziono RTC");
-        #endif
+        DEBUG_ERROR("Nie znaleziono RTC");
         delay(1000); // Krótkie opóźnienie przed kontynuacją
     } else if (rtc.lostPower()) {
-        #ifdef DEBUG
-        Serial.println("RTC utracił zasilanie, ustawiam aktualny czas");
-        #endif
+        DEBUG_ERROR("RTC utracil zasilanie, ustawiam aktualny czas");
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 }
@@ -4000,15 +3970,11 @@ void initializeFileSystemAndSettings() {
 
     // Inicjalizacja LittleFS i wczytanie ustawień
     if (!LittleFS.begin(true)) {
-        #ifdef DEBUG
-        Serial.println("Błąd montowania LittleFS");
-        #endif
+        DEBUG_ERROR("Blad montowania LittleFS");
         return;
     } 
     
-    #ifdef DEBUG
-    Serial.println("LittleFS zamontowany pomyślnie");
-    #endif
+    DEBUG_INFO("LittleFS zamontowany pomyslnie");
     
     // Wczytaj ustawienia z plików
     loadBacklightSettingsFromFile();
@@ -4017,9 +3983,7 @@ void initializeFileSystemAndSettings() {
     
     // Sprawdź i utwórz konfigurację Bluetooth jeśli nie istnieje
     if (!LittleFS.exists("/bluetooth_config.json")) {
-        #ifdef DEBUG
-        Serial.println("Tworzę domyślny plik konfiguracyjny Bluetooth");
-        #endif
+        DEBUG_BLE("Tworze domyslny plik konfiguracyjny Bluetooth");
         createDefaultBluetoothConfig();
     }
 
@@ -4039,18 +4003,12 @@ void createDefaultBluetoothConfig() {
 
 void cleanupOldOdometer() {
     if (LittleFS.exists("/odometer.json")) {
-        #ifdef DEBUG
-        Serial.println("Usuwanie starego pliku licznika...");
-        #endif
+        DEBUG_INFO("Usuwanie starego pliku licznika...");
         
         if (LittleFS.remove("/odometer.json")) {
-            #ifdef DEBUG
-            Serial.println("Stary plik licznika usunięty");
-            #endif
+            DEBUG_INFO("Stary plik licznika usuniety");
         } else {
-            #ifdef DEBUG
-            Serial.println("Nie udało się usunąć starego pliku licznika");
-            #endif
+            DEBUG_ERROR("Nie udalo sie usunac starego pliku licznika");
         }
     }
 }
@@ -4066,7 +4024,7 @@ void initializeOdometer() {
         }
     }
 
-    DEBUG_INFO("Stan licznika: %s, Wartosc: %.2f\n", odometer.isValid() ? "OK" : "BLAD", odometer.getRawTotal());
+    DEBUG_INFO("Stan licznika: %s, Wartosc: %.2f", odometer.isValid() ? "OK" : "BLAD", odometer.getRawTotal());
 }
 
 void initializeBluetooth() {
@@ -4093,10 +4051,10 @@ void resetTpmsData() {
 }
 
 void printSystemInfo() {
-    DEBUG_INFO("\n=== Informacje o systemie ===");
-    DEBUG_INFO("Pamiec: %d KB calosc, %d KB wolne\n", ESP.getHeapSize()/1024, ESP.getFreeHeap()/1024);
-    DEBUG_INFO("PSRAM: %d KB całosc, %d KB wolne\n", ESP.getPsramSize()/1024, ESP.getFreePsram()/1024);
-    DEBUG_INFO("Flash: %d MB, Szkic: %d KB\n", ESP.getFlashChipSize()/(1024*1024), ESP.getSketchSize()/1024);
+    DEBUG_INFO("=== Informacje o systemie ===");
+    DEBUG_INFO("Pamiec: %d KB calosc, %d KB wolne", ESP.getHeapSize()/1024, ESP.getFreeHeap()/1024);
+    DEBUG_INFO("PSRAM: %d KB całosc, %d KB wolne", ESP.getPsramSize()/1024, ESP.getFreePsram()/1024);
+    DEBUG_INFO("Flash: %d MB, Szkic: %d KB", ESP.getFlashChipSize()/(1024*1024), ESP.getSketchSize()/1024);
 }
 
 void handleInitialSetButton() {
@@ -4130,15 +4088,13 @@ void setup() {
     Serial.begin(115200);
     Serial2.begin(CONTROLLER_UART_BAUD, SERIAL_8N1, CONTROLLER_RX_PIN, CONTROLLER_TX_PIN);
     
-    #ifdef DEBUG_INFO_ENABLED
-    DEBUG_INFO("\n=== Inicjalizacja systemu ===");
+    DEBUG_INFO("=== Inicjalizacja systemu ===");
     DEBUG_INFO("Przyczyna wybudzenia: ");
     switch(wakeup_reason) {
         case ESP_SLEEP_WAKEUP_EXT0: DEBUG_INFO("Przycisk SET"); break;
         case ESP_SLEEP_WAKEUP_UNDEFINED: DEBUG_INFO("Normalne uruchomienie"); break;
         default: DEBUG_INFO("Inna (%d)\n", wakeup_reason);
     }
-    #endif
     
     // Inicjalizacja podstawowych komponentów
     Wire.begin();
@@ -4178,9 +4134,8 @@ void setup() {
     // Diagnostyka NVS (tylko w trybie DEBUG)
     nvs_stats_t nvs_stats;
     if (nvs_get_stats(NULL, &nvs_stats) == ESP_OK) {
-        DEBUG_INFO("\n=== Statystyki NVS ===");
-        DEBUG_INFO("Uzyte/Wolne/Calkowite wpisy: %d/%d/%d\n", 
-                      nvs_stats.used_entries, nvs_stats.free_entries, nvs_stats.total_entries);
+        DEBUG_INFO("=== Statystyki NVS ===");
+        DEBUG_INFO("Wpisy uzyte/wolne/calkowite: %d/%d/%d", nvs_stats.used_entries, nvs_stats.free_entries, nvs_stats.total_entries);
     }
 
     // Inicjalizacja czujników temperatury
