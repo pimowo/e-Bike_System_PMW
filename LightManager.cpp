@@ -44,73 +44,69 @@ LightManager::LightManager(uint8_t frontPin, uint8_t drlPin, uint8_t rearPin) :
     lastBlinkTime(0),
     configMode(false)
 {
-    // Ustaw piny jako wyjścia
+    // Ustaw piny jako wyjscia
     pinMode(frontPin, OUTPUT);
     pinMode(drlPin, OUTPUT);
     pinMode(rearPin, OUTPUT);
     
-    // Wyłącz wszystkie światła na start
+    // Wylacz wszystkie swiatla na start
     digitalWrite(frontPin, LOW);
     digitalWrite(drlPin, LOW);
     digitalWrite(rearPin, LOW);
     
-    // Wczytaj konfigurację
+    // Wczytaj konfiguracje
     if (!loadConfig()) {
-        // Domyślna konfiguracja jeśli nie udało się wczytać
+        // Domyslna konfiguracja jesli nie udalo sie wczytac
         dayConfig = DRL | REAR;
         nightConfig = FRONT | REAR;
         dayBlink = true;
         nightBlink = false;
         blinkFrequency = 500;
-        saveConfig();  // Zapisz domyślną konfigurację
+        saveConfig();  // Zapisz domyslna konfiguracje
     }
     
-    #ifdef DEBUG
-    Serial.println("[LightManager] Initialized with pins");
-    Serial.printf("[LightManager] Day config: %s, blink: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
-    Serial.printf("[LightManager] Night config: %s, blink: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
-    #endif
+    DEBUG_LIGHT("Zainicjalizowano z pinami");
+    DEBUG_LIGHT("Konfiguracja dzienna: %s, miganie: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
+    DEBUG_LIGHT("Konfiguracja nocna: %s, miganie: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
 }
 
-// Inicjalizacja - przypisanie pinów GPIO
+// Inicjalizacja - przypisanie pinow GPIO
 void LightManager::begin(uint8_t frontPin, uint8_t drlPin, uint8_t rearPin) {
     this->frontPin = frontPin;
     this->drlPin = drlPin;
     this->rearPin = rearPin;
     
-    // Ustaw piny jako wyjścia
+    // Ustaw piny jako wyjscia
     pinMode(frontPin, OUTPUT);
     pinMode(drlPin, OUTPUT);
     pinMode(rearPin, OUTPUT);
     
-    // Wyłącz wszystkie światła na start
+    // Wylacz wszystkie swiatla na start
     digitalWrite(frontPin, LOW);
     digitalWrite(drlPin, LOW);
     digitalWrite(rearPin, LOW);
     
-    // Wczytaj konfigurację
+    // Wczytaj konfiguracje
     if (!loadConfig()) {
-        // Domyślna konfiguracja jeśli nie udało się wczytać
+        // Domyslna konfiguracja jesli nie udalo sie wczytac
         dayConfig = DRL | REAR;
         nightConfig = FRONT | REAR;
         dayBlink = true;
         nightBlink = false;
         blinkFrequency = 500;
-        saveConfig();  // Zapisz domyślną konfigurację
+        saveConfig();  // Zapisz domyslna konfiguracje
     }
     
     #ifdef DEBUG
-    Serial.println("[LightManager] Initialized");
-    Serial.printf("[LightManager] Day config: %s, blink: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
-    Serial.printf("[LightManager] Night config: %s, blink: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
+    DEBUG_LIGHT("Zainicjalizowano");
+    DEBUG_LIGHT("Konfiguracja dzienna: %s, miganie: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
+    DEBUG_LIGHT("Konfiguracja nocna: %s, miganie: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
     #endif
 }
 
 // Ustawianie trybu
 void LightManager::setMode(LightMode mode) {
-    #ifdef DEBUG
-    Serial.printf("[LightManager] Setting mode %d\n", mode);
-    #endif
+    DEBUG_LIGHT("Ustawianie trybu %d\n", mode);
     
     if (mode >= OFF && mode <= NIGHT) {
         currentMode = mode;
@@ -120,18 +116,13 @@ void LightManager::setMode(LightMode mode) {
 
 // Settery
 void LightManager::setDayConfig(uint8_t config, bool blink) {
-    #ifdef DEBUG
-    Serial.printf("[LightManager] Ustawianie dayConfig: przed=0x%02X, po=0x%02X, blink: %d\n", 
-                 dayConfig, config, blink);
-    Serial.printf("[LightManager] REAR włączone? %s\n", (config & REAR) ? "TAK" : "NIE");
-    #endif
+    DEBUG_LIGHT("Ustawianie konfiguracji dziennej: przed=0x%02X, po=0x%02X, miganie: %d\n", dayConfig, config, blink);
+    DEBUG_LIGHT("REAR wlaczone? %s\n", (config & REAR) ? "TAK" : "NIE");
     
     dayConfig = config;
     dayBlink = blink;
     
-    #ifdef DEBUG
-    Serial.printf("[LightManager] Set day config: %s, blink: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
-    #endif
+    DEBUG_LIGHT("Ustawiono konfiguracje dzienna: %s, miganie: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
     
     if (currentMode == DAY) {
         updateLights();
@@ -139,18 +130,13 @@ void LightManager::setDayConfig(uint8_t config, bool blink) {
 }
 
 void LightManager::setNightConfig(uint8_t config, bool blink) {
-    #ifdef DEBUG
-    Serial.printf("[LightManager] Ustawianie nightConfig: przed=0x%02X, po=0x%02X, blink: %d\n", 
-                 nightConfig, config, blink);
-    Serial.printf("[LightManager] REAR włączone? %s\n", (config & REAR) ? "TAK" : "NIE");
-    #endif
-    
+    DEBUG_LIGHT("Ustawianie konfiguracji nocnej: przed=0x%02X, po=0x%02X, miganie: %d\n", nightConfig, config, blink);
+    DEBUG_LIGHT("REAR wlaczone? %s\n", (config & REAR) ? "TAK" : "NIE");
+        
     nightConfig = config;
     nightBlink = blink;
     
-    #ifdef DEBUG
-    Serial.printf("[LightManager] Set night config: %s, blink: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
-    #endif
+    DEBUG_LIGHT("Ustawiono konfiguracje nocna: %s, miganie: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
     
     if (currentMode == NIGHT) {
         updateLights();
@@ -161,17 +147,13 @@ void LightManager::setBlinkFrequency(uint16_t frequency) {
     if (frequency >= 100 && frequency <= 2000) {
         blinkFrequency = frequency;
         
-        #ifdef DEBUG
-        Serial.printf("[LightManager] Set blink frequency: %d ms\n", blinkFrequency);
-        #endif
+        DEBUG_LIGHT("Ustawiono czestotliwosc migania: %d ms\n", blinkFrequency);
     }
 }
 
-// Przełączanie trybów
+// Przelaczanie trybow
 void LightManager::cycleMode() {
-    #ifdef DEBUG
-    Serial.println("[LightManager] Cycling mode");
-    #endif
+    DEBUG_LIGHT("Przelaczanie trybu");
     
     switch (currentMode) {
         case OFF:
@@ -191,11 +173,9 @@ void LightManager::cycleMode() {
 void LightManager::activateConfigMode() {
     configMode = true;
     
-    #ifdef DEBUG
-    Serial.println("[LightManager] Config mode activated");
-    #endif
+    DEBUG_LIGHT("Tryb konfiguracji aktywowany");
     
-    // Włącz wszystkie światła
+    // Wlacz wszystkie swiatla
     digitalWrite(frontPin, HIGH);
     digitalWrite(drlPin, HIGH);
     digitalWrite(rearPin, HIGH);
@@ -207,22 +187,20 @@ void LightManager::activateConfigMode() {
 void LightManager::deactivateConfigMode() {
     configMode = false;
     
-    #ifdef DEBUG
-    Serial.println("[LightManager] Config mode deactivated");
-    #endif
-    
-    // Wróć do normalnego stanu
+    DEBUG_LIGHT("Tryb konfiguracji dezaktywowany");
+        
+    // Wroc do normalnego stanu
     updateLights();
 }
 
-// Aktualizacja stanu świateł
+// Aktualizacja stanu swiatel
 void LightManager::updateLights() {
-    if (configMode) return; // W trybie konfiguracji nie aktualizujemy świateł
+    if (configMode) return; // W trybie konfiguracji nie aktualizujemy swiatel
     
     uint8_t currentConfig = NONE;
     bool shouldBlink = false;
     
-    // Wybierz konfigurację w zależności od trybu
+    // Wybierz konfiguracje w zaleznosci od trybu
     if (currentMode == DAY) {
         currentConfig = dayConfig;
         shouldBlink = dayBlink;
@@ -230,13 +208,13 @@ void LightManager::updateLights() {
         currentConfig = nightConfig;
         shouldBlink = nightBlink;
     } else {
-        // W trybie OFF wyłącz wszystko
+        // W trybie OFF wylacz wszystko
         frontState = false;
         drlState = false;
         rearState = false;
     }
     
-    // Ustaw stany świateł na podstawie konfiguracji
+    // Ustaw stany swiatel na podstawie konfiguracji
     if (currentMode != OFF) {
         frontState = (currentConfig & FRONT) != 0;
         drlState = (currentConfig & DRL) != 0;
@@ -248,96 +226,81 @@ void LightManager::updateLights() {
     digitalWrite(drlPin, drlState ? HIGH : LOW);
     //digitalWrite(rearPin, rearState ? HIGH : LOW);
     
-    // Dla tylnego światła, jeśli ma migać, stan będzie aktualizowany w update()
+    // Dla tylnego swiatla, jesli ma migac, stan bedzie aktualizowany w update()
     if (!shouldBlink) {
         digitalWrite(rearPin, rearState ? HIGH : LOW);
     }
     
-    #ifdef DEBUG
     if (currentMode != OFF) {
-        Serial.printf("[LightManager] Lights updated: front=%d, drl=%d, rear=%d, blink=%d\n", 
-            frontState, drlState, rearState, shouldBlink);
+        DEBUG_LIGHT("Swiatla zaktualizowane: przednie=%d, swiatlo dzienne=%d, tylne=%d, miganie=%d\n", frontState, drlState, rearState, shouldBlink);
     } else {
-        Serial.println("[LightManager] All lights turned off");
+        DEBUG_LIGHT("Wszystkie swiatla wylaczone");
     }
-    #endif
 }
 
-// Przetworzyć stan - wywołaj w pętli loop
+// Przetworzyc stan - wywolaj w petli loop
 void LightManager::update() {
     if (configMode) return; // W trybie konfiguracji nie przetwarzamy migania
     
     bool shouldBlink = false;
     
-    // Sprawdź, czy powinniśmy migać w zależności od trybu
+    // Sprawdz, czy powinnismy migac w zaleznosci od trybu
     if (currentMode == DAY) {
         shouldBlink = dayBlink;
     } else if (currentMode == NIGHT) {
         shouldBlink = nightBlink;
     }
     
-    // Jeśli powinniśmy migać i tylne światło jest włączone
+    // Jesli powinnismy migac i tylne swiatlo jest wlaczone
     if (shouldBlink && rearState) {
         unsigned long currentTime = millis();
         
-        // Czas na zmianę stanu migania
+        // Czas na zmiane stanu migania
         if (currentTime - lastBlinkTime >= blinkFrequency) {
             lastBlinkTime = currentTime;
             blinkState = !blinkState;
             digitalWrite(rearPin, blinkState ? HIGH : LOW);
             
-            #ifdef DEBUG
-            Serial.printf("[LightManager] Rear light blink: %d\n", blinkState);
-            #endif
+            DEBUG_LIGHT("Miganie tylnego swiatla: %d\n", blinkState);
         }
     } else if (rearState) {
-        // Jeśli nie migamy, ale światło ma być włączone
+        // Jesli nie migamy, ale swiatlo ma byc wlaczone
         digitalWrite(rearPin, HIGH);
     } else {
-        // Światło wyłączone
+        // Swiatlo wylaczone
         digitalWrite(rearPin, LOW);
     }
 }
 
-// Zapisz konfigurację
+// Zapisz konfiguracje
 bool LightManager::saveConfig() {
-    #ifdef DEBUG
-    Serial.println("[LightManager] Zapisywanie konfiguracji...");
-    Serial.printf("[LightManager] dayConfig: 0x%02X (%s)\n", dayConfig, getConfigString(dayConfig).c_str());
-    Serial.printf("[LightManager] nightConfig: 0x%02X (%s)\n", nightConfig, getConfigString(nightConfig).c_str());
-    Serial.printf("[LightManager] dayBlink: %d, nightBlink: %d\n", dayBlink, nightBlink);
-    Serial.printf("[LightManager] blinkFrequency: %d\n", blinkFrequency);
+    DEBUG_LIGHT("Zapisywanie konfiguracji...");
+    DEBUG_LIGHT("Konfiguracja dzienna: 0x%02X (%s)\n", dayConfig, getConfigString(dayConfig).c_str());
+    DEBUG_LIGHT("Konfiguracja nocna: 0x%02X (%s)\n", nightConfig, getConfigString(nightConfig).c_str());
+    DEBUG_LIGHT("Miganie dzienne: %d, Miganie nocne: %d\n", dayBlink, nightBlink);
+    DEBUG_LIGHT("Czestotliwosc migania: %d\n", blinkFrequency);
     
-    // Sprawdź poszczególne bity
-    Serial.printf("[LightManager] dayConfig - FRONT: %d, DRL: %d, REAR: %d\n", 
-                 (dayConfig & FRONT) != 0, (dayConfig & DRL) != 0, (dayConfig & REAR) != 0);
-    Serial.printf("[LightManager] nightConfig - FRONT: %d, DRL: %d, REAR: %d\n", 
-                 (nightConfig & FRONT) != 0, (nightConfig & DRL) != 0, (nightConfig & REAR) != 0);
-    #endif
-    
+    // Sprawdz poszczegolne bity
+    DEBUG_LIGHT("Konfiguracja dzienna - FRONT: %d, DRL: %d, REAR: %d\n", (dayConfig & FRONT) != 0, (dayConfig & DRL) != 0, (dayConfig & REAR) != 0);
+    DEBUG_LIGHT("Konfiguracja nocna - FRONT: %d, DRL: %d, REAR: %d\n", (nightConfig & FRONT) != 0, (nightConfig & DRL) != 0, (nightConfig & REAR) != 0);
+        
     if (!LittleFS.begin(false)) {
-        #ifdef DEBUG
-        Serial.println("[LightManager] Error mounting LittleFS");
-        #endif
+        DEBUG_LIGHT("Blad montowania LittleFS");
         return false;
     }
     
-    // Dla bezpieczeństwa usuń istniejący plik
+    // Dla bezpieczenstwa usun istniejacy plik
     if (LittleFS.exists("/light_config.json")) {
         if (!LittleFS.remove("/light_config.json")) {
-            #ifdef DEBUG
-            Serial.println("[LightManager] Nie udało się usunąć istniejącego pliku konfiguracyjnego");
-            #endif
+            DEBUG_LIGHT("Nie udalo sie usunac istniejacego pliku konfiguracyjnego");
             // Kontynuujemy mimo to
         }
     }
     
-    // Otwórz plik do zapisu
+    // Otworz plik do zapisu
     File configFile = LittleFS.open("/light_config.json", "w");
     if (!configFile) {
-        #ifdef DEBUG
-        Serial.println("[LightManager] Failed to open config file for writing");
-        #endif
+        DEBUG_LIGHT("Nie mozna otworzyc pliku konfiguracyjnego do zapisu");
         return false;
     }
     
@@ -354,52 +317,42 @@ bool LightManager::saveConfig() {
     configFile.close();
     
     if (bytes == 0) {
-        #ifdef DEBUG
-        Serial.println("[LightManager] Failed to write config to file");
-        #endif
+        DEBUG_LIGHT("Nie udalo sie zapisac konfiguracji do pliku");
         return false;
     }
     
-    #ifdef DEBUG
-    Serial.printf("[LightManager] Config saved successfully (%d bytes)\n", bytes);
+    #ifdef DEBUG_LIGHT_ENABLED
+    DEBUG_LIGHT("Konfiguracja zapisana pomyslnie (%d bajtow)\n", bytes);
     
-    // Dla pewności odczytaj zapisany plik i sprawdź jego zawartość
+    // Dla pewnosci odczytaj zapisany plik i sprawdz jego zawartosc
     File readFile = LittleFS.open("/light_config.json", "r");
     if (readFile) {
         String content = readFile.readString();
         readFile.close();
-        Serial.printf("[LightManager] Zapisana zawartość pliku: %s\n", content.c_str());
+        DEBUG_LIGHT("Zapisana zawartosc pliku: %s\n", content.c_str());
     }
     #endif
     
     return true;
 }
 
-// Wczytaj konfigurację
+// Wczytaj konfiguracje
 bool LightManager::loadConfig() {
-    #ifdef DEBUG
-    Serial.println("[LightManager] Wczytywanie konfiguracji...");
-    #endif
-    
+    DEBUG_LIGHT("Wczytywanie konfiguracji...");
+        
     if (!LittleFS.begin(false)) {
-        #ifdef DEBUG
-        Serial.println("[LightManager] Error mounting LittleFS");
-        #endif
+        DEBUG_LIGHT("Blad montowania LittleFS");
         return false;
     }
     
     if (!LittleFS.exists("/light_config.json")) {
-        #ifdef DEBUG
-        Serial.println("[LightManager] Config file not found");
-        #endif
+        DEBUG_LIGHT("Nie znaleziono pliku konfiguracyjnego");
         return false;
     }
     
     File configFile = LittleFS.open("/light_config.json", "r");
     if (!configFile) {
-        #ifdef DEBUG
-        Serial.println("[LightManager] Failed to open config file for reading");
-        #endif
+        DEBUG_LIGHT("Nie mozna otworzyc pliku konfiguracyjnego do odczytu");
         return false;
     }
     
@@ -408,50 +361,48 @@ bool LightManager::loadConfig() {
     configFile.close();
     
     if (error) {
-        #ifdef DEBUG
-        Serial.printf("[LightManager] Failed to parse config file: %s\n", error.c_str());
-        #endif
+        DEBUG_LIGHT("Blad parsowania pliku konfiguracyjnego: %s\n", error.c_str());
         return false;
     }
     
-    // UWAGA: Zmienione użycie operatora | na sprawdzenie, czy wartość istnieje
-    // Wczytaj konfigurację tylko jeśli istnieje, w przeciwnym razie użyj wartości domyślnych
+    // UWAGA: Zmienione uzycie operatora | na sprawdzenie, czy wartosc istnieje
+    // Wczytaj konfiguracje tylko jesli istnieje, w przeciwnym razie uzyj wartosci domyslnych
     if (doc.containsKey("dayConfig")) {
         dayConfig = doc["dayConfig"];
     } else {
-        dayConfig = DRL | REAR; // Wartość domyślna
+        dayConfig = DRL | REAR; // Wartosc domyslna
     }
     
     if (doc.containsKey("nightConfig")) {
         nightConfig = doc["nightConfig"];
     } else {
-        nightConfig = FRONT | REAR; // Wartość domyślna
+        nightConfig = FRONT | REAR; // Wartosc domyslna
     }
     
     if (doc.containsKey("dayBlink")) {
         dayBlink = doc["dayBlink"];
     } else {
-        dayBlink = true; // Wartość domyślna
+        dayBlink = true; // Wartosc domyslna
     }
     
     if (doc.containsKey("nightBlink")) {
         nightBlink = doc["nightBlink"];
     } else {
-        nightBlink = false; // Wartość domyślna
+        nightBlink = false; // Wartosc domyslna
     }
     
     if (doc.containsKey("blinkFrequency")) {
         blinkFrequency = doc["blinkFrequency"];
     } else {
-        blinkFrequency = 500; // Wartość domyślna
+        blinkFrequency = 500; // Wartosc domyslna
     }
     
-    #ifdef DEBUG
-    Serial.println("[LightManager] Wczytana konfiguracja:");
-    Serial.printf("[LightManager] dayConfig: 0x%02X (%s)\n", dayConfig, getConfigString(dayConfig).c_str());
-    Serial.printf("[LightManager] nightConfig: 0x%02X (%s)\n", nightConfig, getConfigString(nightConfig).c_str());
-    Serial.printf("[LightManager] dayBlink: %d, nightBlink: %d\n", dayBlink, nightBlink);
-    Serial.printf("[LightManager] blinkFrequency: %d\n", blinkFrequency);
+    #ifdef DEBUG_LIGHT_ENABLED
+    DEBUG_LIGHT("Wczytana konfiguracja:");
+    DEBUG_LIGHT("Konfiguracja dzienna: 0x%02X (%s)\n", dayConfig, getConfigString(dayConfig).c_str());
+    DEBUG_LIGHT("Konfiguracja nocna: 0x%02X (%s)\n", nightConfig, getConfigString(nightConfig).c_str());
+    DEBUG_LIGHT("Miganie dzienne: %d, Miganie nocne: %d\n", dayBlink, nightBlink);
+    DEBUG_LIGHT("Czestotliwosc migania: %d\n", blinkFrequency);
     #endif
     
     return true;
@@ -459,10 +410,8 @@ bool LightManager::loadConfig() {
 
 // Konwersja config (uint8_t) na string
 String LightManager::getConfigString(uint8_t config) const {
-    #ifdef DEBUG
-    Serial.printf("[LightManager] getConfigString - wejściowa wartość: 0x%02X\n", config);
-    #endif
-
+    DEBUG_LIGHT("getConfigString - wartsc wejsciowa: 0x%02X\n", config);
+    
     if (config == NONE) return "NONE";
     
     String result = "";
@@ -478,10 +427,8 @@ String LightManager::getConfigString(uint8_t config) const {
         result += "REAR";
     }
     
-    #ifdef DEBUG
-    Serial.printf("[LightManager] getConfigString - rezultat: %s\n", result.c_str());
-    #endif
-    
+    DEBUG_LIGHT("getConfigString - rezultat: %s\n", result.c_str());
+        
     return result;
 }
 
@@ -489,101 +436,79 @@ String LightManager::getConfigString(uint8_t config) const {
 String LightManager::getModeString() const {
     switch (currentMode) {
         case OFF:
-            return "OFF";
+            return "WYLACZONE";
         case DAY:
-            return "DAY";
+            return "DZIEN";
         case NIGHT:
-            return "NIGHT";
+            return "NOC";
         default:
-            return "UNKNOWN";
+            return "NIEZNANY";
     }
 }
 
 // Konwersja string na config (uint8_t)
 uint8_t LightManager::parseConfigString(const char* configStr) {
-    #ifdef DEBUG
-    Serial.printf("[LightManager] parseConfigString - wejściowy string: '%s'\n", configStr);
-    #endif
-    
+    DEBUG_LIGHT("parseConfigString - wejsciowy string: '%s'\n", configStr);
+        
     String configString(configStr); // Konwertujemy const char* na String dla wygody
     uint8_t result = NONE;
     
     if (strcmp(configStr, "NONE") == 0) {
-        #ifdef DEBUG
-        Serial.println("[LightManager] Wykryto konfigurację NONE (0x00)");
-        #endif
+        DEBUG_LIGHT("Wykryto konfiguracje NONE (0x00)");
         return NONE;
     }
     
-    // Sprawdź czy string zawiera '+'
+    // Sprawdz czy string zawiera '+'
     if (strchr(configStr, '+') != NULL) {
-        // Podziel string na części
-        char* copy = strdup(configStr); // Stwórz kopię, bo strtok modyfikuje string
+        // Podziel string na czesci
+        char* copy = strdup(configStr); // Stworz kopie, bo strtok modyfikuje string
         char* token = strtok(copy, "+");
         
         while (token != NULL) {
-            // Usuń białe znaki
+            // Usun biale znaki
             while (*token == ' ') token++;
             char* end = token + strlen(token) - 1;
             while (end > token && *end == ' ') end--;
             *(end + 1) = '\0';
             
-            #ifdef DEBUG
-            Serial.printf("[LightManager] Analizuję token: '%s'\n", token);
-            #endif
-            
+            DEBUG_LIGHT("Analizuje token: '%s'\n", token);
+                        
             if (strcmp(token, "FRONT") == 0) {
-                #ifdef DEBUG
-                Serial.println("[LightManager] Dodaję flagę FRONT (0x01)");
-                #endif
+                DEBUG_LIGHT("Dodaje flage FRONT (0x01)");
                 result |= FRONT;
             }
             else if (strcmp(token, "DRL") == 0) {
-                #ifdef DEBUG
-                Serial.println("[LightManager] Dodaję flagę DRL (0x02)");
-                #endif
+                DEBUG_LIGHT("Dodaje flage DRL (0x02)");
                 result |= DRL;
             }
             else if (strcmp(token, "REAR") == 0) {
-                #ifdef DEBUG
-                Serial.println("[LightManager] Dodaję flagę REAR (0x04)");
-                #endif
+                DEBUG_LIGHT("Dodaje flage REAR (0x04)");
                 result |= REAR;
             }
             
             token = strtok(NULL, "+");
         }
         
-        free(copy); // Zwolnij pamięć
+        free(copy); // Zwolnij pamiec
     } else {
-        // Pojedyncza wartość
-        #ifdef DEBUG
-        Serial.printf("[LightManager] Analizuję pojedynczą wartość: '%s'\n", configStr);
-        #endif
-        
+        // Pojedyncza wartosc
+        DEBUG_LIGHT("Analizuje pojedyncza wartosc: '%s'\n", configStr);
+                
         if (strcmp(configStr, "FRONT") == 0) {
-            #ifdef DEBUG
-            Serial.println("[LightManager] Ustawiam flagę FRONT (0x01)");
-            #endif
+            DEBUG_LIGHT("Ustawiam flage FRONT (0x01)");
             result |= FRONT;
         }
         else if (strcmp(configStr, "DRL") == 0) {
-            #ifdef DEBUG
-            Serial.println("[LightManager] Ustawiam flagę DRL (0x02)");
-            #endif
+            DEBUG_LIGHT("Ustawiam flage DRL (0x02)");
             result |= DRL;
         }
         else if (strcmp(configStr, "REAR") == 0) {
-            #ifdef DEBUG
-            Serial.println("[LightManager] Ustawiam flagę REAR (0x04)");
-            #endif
+            DEBUG_LIGHT("Ustawiam flage REAR (0x04)");
             result |= REAR;
         }
     }
     
-    #ifdef DEBUG
-    Serial.printf("[LightManager] parseConfigString - rezultat: 0x%02X\n", result);
-    #endif
+    DEBUG_LIGHT("parseConfigString - rezultat: 0x%02X\n", result);
     
     return result;
 }
