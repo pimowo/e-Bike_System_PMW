@@ -236,7 +236,7 @@ private:
 
         File file = LittleFS.open(filename, "w");
         if (!file) {
-            DEBUG_ERROR("Błąd otwarcia pliku licznika do zapisu");
+            DEBUG_ERROR("Blad otwarcia pliku licznika do zapisu");
             return;
         }
 
@@ -244,9 +244,9 @@ private:
         doc["total"] = currentTotal;
         
         if (serializeJson(doc, file) == 0) {
-            DEBUG_ERROR("Błąd zapisu do pliku licznika");
+            DEBUG_ERROR("Blad zapisu do pliku licznika");
         } else {
-            DEBUG_INFO("Zapisano licznik: %.2f\n", currentTotal);
+            DEBUG_INFO("Zapisano licznik: %.2f", currentTotal);
         }
         
         file.close();
@@ -257,7 +257,7 @@ private:
 
         File file = LittleFS.open(filename, "r");
         if (!file) {
-            DEBUG_INFO("Brak pliku licznika - tworzę nowy");
+            DEBUG_INFO("Brak pliku licznika - tworze nowy");
             currentTotal = 0;
             saveToFile();
             return;
@@ -268,9 +268,9 @@ private:
         
         if (!error) {
             currentTotal = doc["total"] | 0.0f;
-            DEBUG_INFO("Wczytano licznik: %.2f\n", currentTotal);
+            DEBUG_INFO("Wczytano licznik: %.2f", currentTotal);
         } else {
-            DEBUG_ERROR("BLAd odczytu pliku licznika");
+            DEBUG_ERROR("Blad odczytu pliku licznika");
             currentTotal = 0;
         }
         
@@ -288,11 +288,11 @@ public:
 
     bool setInitialValue(float value) {
         if (value < 0) {
-            DEBUG_ERROR("Bledna wartoSC poczatkowa (ujemna)");
+            DEBUG_ERROR("Bledna wartosc poczatkowa (ujemna)");
             return false;
         }
         
-        DEBUG_ERROR("Ustawianie poczatkowej wartosci licznika: %.2f\n", value);
+        DEBUG_INFO("Ustawianie poczatkowej wartosci licznika: %.2f", value);
 
         currentTotal = value;
         saveToFile();
@@ -301,7 +301,7 @@ public:
 
     void updateTotal(float newValue) {
         if (newValue > currentTotal) {
-            DEBUG_INFO("Aktualizacja licznika z %.2f na %.2f\n", currentTotal, newValue);
+            DEBUG_INFO("Aktualizacja licznika z %.2f na %.2f", currentTotal, newValue);
 
             currentTotal = newValue;
             saveToFile();
@@ -1053,9 +1053,9 @@ void updateTpmsData(const char* address, uint8_t sensorNumber, float pressure, f
 void startTpmsScan() {
     if (tpmsScanning || !bluetoothConfig.tpmsEnabled) return;
     
-    DEBUG_BLE("Rozpoczynam nasłuchiwanie TPMS...");
-    DEBUG_BLE("Przedni czujnik MAC: ", bluetoothConfig.frontTpmsMac);
-    DEBUG_BLE("Tylny czujnik MAC: ", bluetoothConfig.rearTpmsMac);
+    DEBUG_BLE("Rozpoczynam nasluchiwanie TPMS...");
+    DEBUG_BLE("Przedni czujnik MAC: %s", bluetoothConfig.frontTpmsMac);
+    DEBUG_BLE("Tylny czujnik MAC: %s", bluetoothConfig.rearTpmsMac);
     
     BLEScan* pBLEScan = BLEDevice::getScan();
     pBLEScan->setAdvertisedDeviceCallbacks(new TpmsAdvertisedDeviceCallbacks());
@@ -1100,110 +1100,6 @@ void checkTpmsTimeout() {
 }
 
 // --- Funkcje konfiguracji ---
-
-// zapis ustawień świateł
-// void saveLightSettings() {
-//     #ifdef DEBUG
-//     Serial.println("Zapisywanie ustawień świateł");
-//     #endif
-
-//     // Przygotuj dokument JSON
-//     StaticJsonDocument<256> doc;
-    
-//     // Zapisz ustawienia
-//     doc["dayLights"] = lightSettings.dayLights;
-//     doc["nightLights"] = lightSettings.nightLights;
-//     doc["dayBlink"] = lightSettings.dayBlink;
-//     doc["nightBlink"] = lightSettings.nightBlink;
-//     doc["blinkFrequency"] = lightSettings.blinkFrequency;
-
-//     // Otwórz plik do zapisu
-//     File file = LittleFS.open("/lights.json", "w");
-//     if (!file) {
-//         #ifdef DEBUG
-//         Serial.println("Błąd otwarcia pliku do zapisu");
-//         #endif
-//         return;
-//     }
-
-//     // Zapisz JSON do pliku
-//     if (serializeJson(doc, file) == 0) {
-//         #ifdef DEBUG
-//         Serial.println("Błąd podczas zapisu do pliku");
-//         #endif
-//     }
-
-//     file.close();
-
-//     #ifdef DEBUG
-//     Serial.println("Ustawienia świateł zapisane");
-//     Serial.print("dayLights: "); Serial.println(lightSettings.dayLights);
-//     Serial.print("nightLights: "); Serial.println(lightSettings.nightLights);
-//     #endif
-
-//     // Od razu zastosuj nowe ustawienia
-//     setLights();
-// }
-
-// wczytywanie ustawień świateł
-// void loadLightSettings() {
-//     #ifdef DEBUG
-//     Serial.println("Wczytywanie ustawień świateł");
-//     #endif
-
-//     if (LittleFS.exists("/lights.json")) {
-//         File file = LittleFS.open("/lights.json", "r");
-//         if (file) {
-//             StaticJsonDocument<512> doc;
-//             DeserializationError error = deserializeJson(doc, file);
-//             file.close();
-
-//             if (!error) {
-//                 const char* dayLightsStr = doc["dayLights"] | "FRONT";
-//                 const char* nightLightsStr = doc["nightLights"] | "BOTH";
-
-//                 // Konwersja stringów na enum
-//                 if (strcmp(dayLightsStr, "FRONT") == 0) 
-//                     lightSettings.dayLights = LightSettings::FRONT;
-//                 else if (strcmp(dayLightsStr, "REAR") == 0) 
-//                     lightSettings.dayLights = LightSettings::REAR;
-//                 else if (strcmp(dayLightsStr, "BOTH") == 0) 
-//                     lightSettings.dayLights = LightSettings::BOTH;
-//                 else 
-//                     lightSettings.dayLights = LightSettings::NONE;
-
-//                 if (strcmp(nightLightsStr, "FRONT") == 0) 
-//                     lightSettings.nightLights = LightSettings::FRONT;
-//                 else if (strcmp(nightLightsStr, "REAR") == 0) 
-//                     lightSettings.nightLights = LightSettings::REAR;
-//                 else if (strcmp(nightLightsStr, "BOTH") == 0) 
-//                     lightSettings.nightLights = LightSettings::BOTH;
-//                 else 
-//                     lightSettings.nightLights = LightSettings::NONE;
-
-//                 lightSettings.dayBlink = doc["dayBlink"] | false;
-//                 lightSettings.nightBlink = doc["nightBlink"] | false;
-//                 // W funkcji loadLightSettings (około linii 1210):
-//                 lightSettings.blinkFrequency = doc["blinkFrequency"] | 500;
-
-//                 #ifdef DEBUG
-//                 Serial.println("Wczytane ustawienia migania:");
-//                 Serial.print("dayBlink: "); Serial.println(lightSettings.dayBlink ? "ON" : "OFF");
-//                 Serial.print("nightBlink: "); Serial.println(lightSettings.nightBlink ? "ON" : "OFF");
-//                 Serial.print("blinkFrequency: "); Serial.println(lightSettings.blinkFrequency);
-//                 #endif
-           
-//             }
-//         }
-//     } else {
-//         // Ustawienia domyślne
-//         lightSettings.dayLights = LightSettings::FRONT;
-//         lightSettings.nightLights = LightSettings::BOTH;
-//         lightSettings.dayBlink = false;
-//         lightSettings.nightBlink = false;
-//         lightSettings.blinkFrequency = 500;
-//     }
-// }
 
 void setLights() {}
 void saveLightSettings() {}
@@ -1300,9 +1196,9 @@ void loadBacklightSettingsFromFile() {
     backlightSettings.autoMode = doc["autoMode"] | false;
 
     DEBUG_LIGHT("Wczytano ustawienia z pliku:");
-    DEBUG_LIGHT("Day Brightness: ", backlightSettings.dayBrightness);
-    DEBUG_LIGHT("Night Brightness: ", backlightSettings.nightBrightness);
-    DEBUG_LIGHT("Auto Mode: ", backlightSettings.autoMode);
+    DEBUG_LIGHT("Day Brightness: %d", backlightSettings.dayBrightness);
+    DEBUG_LIGHT("Night Brightness: %d", backlightSettings.nightBrightness);
+    DEBUG_LIGHT("Auto Mode: %d", backlightSettings.autoMode ? 1 : 0);
 }
 
 // zapis ustawień ogólnych
@@ -1397,7 +1293,7 @@ void loadGeneralSettingsFromFile() {
 
     generalSettings.wheelSize = doc["wheelSize"] | 26; // Domyślnie 26 cali jeśli nie znaleziono
 
-    DEBUG_INFO("Loaded wheel size: ", generalSettings.wheelSize);
+    DEBUG_INFO("Loaded wheel size: %d", generalSettings.wheelSize);
 }
 
 // --- Funkcje wyświetlacza ---
@@ -2507,7 +2403,7 @@ void setCadencePulsesPerRevolution(uint8_t pulses) {
         preferences.begin("cadence", false);
         preferences.putUChar("pulses", pulses);
         preferences.end();
-        DEBUG_INFO("Ustawiono %d impulsów na obrót korby\n", pulses);
+        DEBUG_INFO("Ustawiono %d impulsow na obrot korby", pulses);
     } else {
         DEBUG_ERROR("Bledna wartosc dla impulsow na obrot (dozwolony zakres: 1-24)");
     }
@@ -2736,9 +2632,9 @@ void applyBacklightSettings() {
     display.setContrast(displayBrightness);
     
     #if DEBUG_INFO_ENABLED
-    DEBUG_INFO("Target brightness: ", targetBrightness);
-    DEBUG_INFO("Normalized: ", normalized);
-    DEBUG_INFO("Display brightness: ", displayBrightness);
+    DEBUG_INFO("Target brightness: %d", targetBrightness);
+    DEBUG_INFO("Normalized: %.2f", normalized);
+    DEBUG_INFO("Display brightness: %d", displayBrightness);
     #endif
 }
 
@@ -4198,12 +4094,9 @@ void resetTpmsData() {
 
 void printSystemInfo() {
     DEBUG_INFO("\n=== Informacje o systemie ===");
-    DEBUG_INFO("Pamiec: %d KB calosc, %d KB wolne\n", 
-                   ESP.getHeapSize()/1024, ESP.getFreeHeap()/1024);
-    DEBUG_INFO("PSRAM: %d KB całosc, %d KB wolne\n", 
-                   ESP.getPsramSize()/1024, ESP.getFreePsram()/1024);
-    DEBUG_INFO("Flash: %d MB, Szkic: %d KB\n", 
-                   ESP.getFlashChipSize()/(1024*1024), ESP.getSketchSize()/1024);
+    DEBUG_INFO("Pamiec: %d KB calosc, %d KB wolne\n", ESP.getHeapSize()/1024, ESP.getFreeHeap()/1024);
+    DEBUG_INFO("PSRAM: %d KB całosc, %d KB wolne\n", ESP.getPsramSize()/1024, ESP.getFreePsram()/1024);
+    DEBUG_INFO("Flash: %d MB, Szkic: %d KB\n", ESP.getFlashChipSize()/(1024*1024), ESP.getSketchSize()/1024);
 }
 
 void handleInitialSetButton() {
@@ -4318,284 +4211,6 @@ void setup() {
     // Obsługa przycisku SET po wybudzeniu
     handleInitialSetButton();
 }
-
-// // SETUP
-// void setup() { 
-//     // Sprawdź przyczynę wybudzenia
-//     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-
-//     // Inicjalizacja UART dla Serial Monitor
-//     Serial.begin(115200);
-//     // Inicjalizacja UART dla komunikacji z KT
-//     Serial2.begin(CONTROLLER_UART_BAUD, SERIAL_8N1, CONTROLLER_RX_PIN, CONTROLLER_TX_PIN);
-    
-//     #ifdef DEBUG
-//     Serial.println("\n=== Inicjalizacja systemu ===");
-//     Serial.print("Przyczyna wybudzenia: ");
-//     switch(wakeup_reason) {
-//         case ESP_SLEEP_WAKEUP_EXT0: Serial.println("Przycisk SET"); break;
-//         case ESP_SLEEP_WAKEUP_UNDEFINED: Serial.println("Normalne uruchomienie"); break;
-//         default: Serial.printf("Inna (%d)\n", wakeup_reason);
-//     }
-//     #endif
-    
-//     // Inicjalizacja podstawowych komponentów
-//     Wire.begin();
-//     display.begin();
-//     display.setFontDirection(0);
-//     display.clearBuffer();
-//     display.sendBuffer();
-    
-//     // Konfiguracja pinu przycisku SET (niezbędnego do wybudzenia)
-//     pinMode(BTN_SET, INPUT_PULLUP);
-
-//     // Jeśli nie zostaliśmy wybudzeni przez przycisk, natychmiast przechodzimy do trybu uśpienia
-//     if (wakeup_reason != ESP_SLEEP_WAKEUP_EXT0) {
-//         #ifdef DEBUG
-//         Serial.println("Normalne uruchomienie - przechodzę do trybu uśpienia");
-//         Serial.flush(); // Upewnij się, że dane zostały wysłane
-//         #endif
-        
-//         // Natychmiast przechodzimy do trybu uśpienia
-//         goToSleep();
-//         // Ten kod nigdy nie zostanie wykonany, ponieważ esp_deep_sleep_start() nie wraca
-//         return;
-//     }
-    
-//     // Od tego momentu wiemy, że zostaliśmy wybudzeni przez przycisk SET
-    
-//     // Najpierw wyczyść NVS
-//     esp_err_t err = nvs_flash_erase();
-//     if (err != ESP_OK) {
-//         #ifdef DEBUG
-//         Serial.printf("Błąd podczas czyszczenia NVS: %d\n", err);
-//         #endif
-//     }
-    
-//     // Inicjalizacja NVS
-//     err = nvs_flash_init();
-//     if (err != ESP_OK) {
-//         #ifdef DEBUG
-//         Serial.printf("Błąd podczas inicjalizacji NVS: %d\n", err);
-//         #endif
-//         return;
-//     }
-    
-//     #ifdef DEBUG
-//     Serial.println("NVS zainicjalizowane pomyślnie");
-    
-//     // Sprawdź statystyki NVS
-//     nvs_stats_t nvs_stats;
-//     err = nvs_get_stats(NULL, &nvs_stats);
-//     if (err == ESP_OK) {
-//         Serial.println("\n=== Statystyki NVS ===");
-//         Serial.printf("Użyte wpisy: %d\n", nvs_stats.used_entries);
-//         Serial.printf("Wolne wpisy: %d\n", nvs_stats.free_entries);
-//         Serial.printf("Całkowita liczba wpisów: %d\n", nvs_stats.total_entries);
-//         Serial.println("===================\n");
-//     }
-//     #endif
-
-//     // Poczekaj chwilę przed dalszą inicjalizacją
-//     delay(100);
-
-//     // Inicjalizacja DS18B20
-//     sensorsAir.begin();
-//     sensorsController.begin();
-//     sensorsAir.setWaitForConversion(false);      // Tryb nieblokujący
-//     sensorsController.setWaitForConversion(false);// Tryb nieblokujący
-//     sensorsAir.setResolution(12);                // Najwyższa rozdzielczość
-//     sensorsController.setResolution(12);         // Najwyższa rozdzielczość
-    
-//     // Pierwsze żądanie pomiaru
-//     sensorsAir.requestTemperatures();
-//     sensorsController.requestTemperatures();
-
-//     // Inicjalizacja RTC
-//     if (!rtc.begin()) {
-//         #ifdef DEBUG
-//         Serial.println("Couldn't find RTC");
-//         #endif
-//         while (1);
-//     }
-
-//     if (rtc.lostPower()) {
-//         #ifdef DEBUG
-//         Serial.println("RTC lost power, lets set the time!");
-//         #endif
-//         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-//     }
-
-//     // Konfiguracja pozostałych pinów przycisków
-//     pinMode(BTN_UP, INPUT_PULLUP);
-//     pinMode(BTN_DOWN, INPUT_PULLUP);
-
-//     // Konfiguracja pinów LED
-//     pinMode(FrontDayPin, OUTPUT);
-//     pinMode(FrontPin, OUTPUT);
-//     pinMode(RearPin, OUTPUT);
-    
-//     // Inicjalizacja menedżera świateł
-//     lightManager.begin(FrontPin, FrontDayPin, RearPin);
-
-//     // Ustawienie trybu OFF (wyłącz światła po włączeniu ESP)
-//     lightManager.setMode(LightManager::OFF);
-
-//     // hamulec
-//     pinMode(BRAKE_SENSOR_PIN, INPUT_PULLUP);
-
-//     // kadencja
-//     pinMode(CADENCE_SENSOR_PIN, INPUT_PULLUP);
-//     attachInterrupt(digitalPinToInterrupt(CADENCE_SENSOR_PIN), cadence_ISR, FALLING);
-
-//     // zeruj licznik kadencji przy starcie
-//     cadence_rpm = 0;
-//     cadence_avg_rpm = 0;
-//     cadence_max_rpm = 0;
-//     cadence_sum = 0;
-//     cadence_samples = 0;
-
-//     preferences.begin("cadence", false);
-//     cadence_pulses_per_revolution = preferences.getUChar("pulses", 1); // Domyślnie 1
-//     preferences.end();
-
-//     // Ładowarka USB
-//     pinMode(UsbPin, OUTPUT);
-//     digitalWrite(UsbPin, LOW);
-
-//     // Sprawdź system plików
-//     testFileSystem();
-
-//     // Inicjalizacja LittleFS i wczytanie ustawień
-//     if (!LittleFS.begin(true)) {
-//         #ifdef DEBUG
-//         Serial.println("Błąd montowania LittleFS");
-//         #endif
-//     } else {
-//         #ifdef DEBUG
-//         Serial.println("LittleFS zamontowany pomyślnie");
-//         #endif
-//         // Wczytaj ustawienia z pliku
-//         loadBacklightSettingsFromFile();
-//         loadGeneralSettingsFromFile();
-//         loadBluetoothConfigFromFile();
-        
-//         File file = LittleFS.open("/bluetooth_config.json", "r");
-//         if (!file) {
-//             #ifdef DEBUG
-//             Serial.println("Tworzę domyślny plik konfiguracyjny Bluetooth");
-//             #endif
-//             bluetoothConfig.bmsEnabled = false;
-//             bluetoothConfig.tpmsEnabled = false;
-//             strcpy(bluetoothConfig.bmsMac, "");
-//             strcpy(bluetoothConfig.frontTpmsMac, "");
-//             strcpy(bluetoothConfig.rearTpmsMac, "");
-//             saveBluetoothConfigToFile();
-//         } else {
-//             file.close();
-//         }
-//     }
-
-//     if (LittleFS.exists("/odometer.json")) {
-//         Serial.println("Usuwanie starego pliku licznika...");
-//         if (LittleFS.remove("/odometer.json")) {
-//             Serial.println("Stary plik licznika usunięty");
-//         } else {
-//             Serial.println("Nie udało się usunąć starego pliku licznika");
-//         }
-//     }
-
-//     // Inicjalizacja licznika kilometrów z użyciem Preferences
-//     if (!odometer.isValid()) {
-//         Serial.println("Inicjalizacja licznika...");
-//         //odometer.initialize();
-//         if (!odometer.isValid()) {
-//             Serial.println("Błąd inicjalizacji licznika!");
-//         } else {
-//             Serial.println("Licznik zainicjalizowany pomyślnie");
-//         }
-//     }
-
-//     Serial.println("Stan licznika po inicjalizacji:");
-//     Serial.printf("Zainicjalizowany: %s\n", odometer.isValid() ? "TAK" : "NIE");
-//     Serial.printf("Wartość: %.2f\n", odometer.getRawTotal());
-
-//     // Inicjalizacja licznika
-//     #ifdef DEBUG
-//     Serial.println("Stan licznika po inicjalizacji:");
-//     Serial.print("Zainicjalizowany: ");
-//     Serial.println(odometer.isValid() ? "TAK" : "NIE");
-//     Serial.print("Wartość: ");
-//     Serial.println(odometer.getRawTotal());
-//     #endif
-
-//     // Inicjalizacja BLE
-//     if (bluetoothConfig.bmsEnabled || bluetoothConfig.tpmsEnabled) {
-//         BLEDevice::init("e-Bike System PMW");
-        
-//         if (bluetoothConfig.bmsEnabled) {
-//             bleClient = BLEDevice::createClient();
-//             connectToBms();
-//         }
-        
-//         if (bluetoothConfig.tpmsEnabled) {
-//             // Inicjalizacja struktur TPMS z zerowymi wartościami
-//             memset(&frontTpms, 0, sizeof(frontTpms));
-//             memset(&rearTpms, 0, sizeof(rearTpms));
-//             frontTpms.isActive = false;
-//             rearTpms.isActive = false;
-            
-//             loadTpmsAddresses();
-//             // Rozpocznij skanowanie TPMS
-//             startTpmsScan();
-//         }
-//     }
-
-//     // Zastosuj wczytane ustawienia
-//     setLights();  
-//     applyBacklightSettings();
-
-//     #ifdef DEBUG
-//         Serial.println("\n--- Memory Info ---");
-//         Serial.printf("Total heap: %d\n", ESP.getHeapSize());
-//         Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
-//         Serial.printf("Total PSRAM: %d\n", ESP.getPsramSize());
-//         Serial.printf("Free PSRAM: %d\n", ESP.getFreePsram());
-        
-//         Serial.println("\n--- Flash Info ---");
-//         Serial.printf("Flash size: %d\n", ESP.getFlashChipSize());
-//         Serial.printf("Sketch size: %d\n", ESP.getSketchSize());
-//         Serial.printf("Free sketch space: %d\n", ESP.getFreeSketchSpace());
-        
-//         Serial.println("\n--- Partition Info ---");
-//         esp_partition_iterator_t pi = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, NULL);
-//         while (pi != NULL) {
-//             const esp_partition_t* partition = esp_partition_get(pi);
-//             Serial.printf("Partition '%s': size %d\n", partition->label, partition->size);
-//             pi = esp_partition_next(pi);
-//         }
-//         esp_partition_iterator_release(pi);
-//         Serial.println("-------------------\n");
-//     #endif
-
-//     // Obsługa przycisku SET po wybudzeniu
-//     unsigned long startTime = millis();
-//     while (!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
-//         if ((millis() - startTime) > SET_LONG_PRESS) {
-//             displayActive = true;
-//             showingWelcome = true;
-//             messageStartTime = millis();
-//             if (!welcomeAnimationDone) {
-//                 showWelcomeMessage();  // Pokaż animację powitania
-//             }                
-//             while (!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
-//                 delay(10);
-//             }
-//             break;
-//         }
-//         delay(10);
-//     }
-// }
 
 // Implementacja funkcji loop
 void loop() {
