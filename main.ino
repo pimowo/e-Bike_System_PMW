@@ -3116,7 +3116,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         String response;
         serializeJson(doc, response);
         
-        DEBUG_INFO("Wysylam aktualny czas: " + response);
+        DEBUG_INFO("Wysylam aktualny czas: %s", response.c_str());
         
         request->send(200, "application/json", response);
     });
@@ -3804,8 +3804,10 @@ void setup() {
     setLights();  
     applyBacklightSettings();
 
-    DEBUG_INFO_FUNC(printSystemInfo());
-
+    #if DEBUG_INFO_ENABLED
+    printSystemInfo();
+    #endif
+    
     // Obsługa przycisku SET po wybudzeniu
     handleInitialSetButton();
 }
