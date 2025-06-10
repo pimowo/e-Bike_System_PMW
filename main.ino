@@ -75,7 +75,7 @@
 #define DEBUG
 
 // Wersja oprogramowania
-const char* VERSION = "9.6.25";
+const char* VERSION = "10.6.25";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -4174,14 +4174,226 @@ void initializeDefaultSettings() {
 
 // --- Główne funkcje programu ---
 
-// SETUP
+// Funkcje pomocnicze do setup()
+
+void initializeTemperatureSensors() {
+    // Inicjalizacja DS18B20
+    sensorsAir.begin();
+    sensorsController.begin();
+    // Ustawienie trybu nieblokującego
+    sensorsAir.setWaitForConversion(false);
+    sensorsController.setWaitForConversion(false);
+    // Ustawienie najwyższej rozdzielczości
+    sensorsAir.setResolution(12);
+    sensorsController.setResolution(12);
+    
+    // Pierwsze żądanie pomiaru
+    sensorsAir.requestTemperatures();
+    sensorsController.requestTemperatures();
+}
+
+void initializeRTC() {
+    if (!rtc.begin()) {
+        #ifdef DEBUG
+        Serial.println("Nie znaleziono RTC");
+        #endif
+        delay(1000); // Krótkie opóźnienie przed kontynuacją
+    } else if (rtc.lostPower()) {
+        #ifdef DEBUG
+        Serial.println("RTC utracił zasilanie, ustawiam aktualny czas");
+        #endif
+        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    }
+}
+
+void initializePins() {
+    // Przyciski
+    pinMode(BTN_UP, INPUT_PULLUP);
+    pinMode(BTN_DOWN, INPUT_PULLUP);
+
+    // Światła
+    pinMode(FrontDayPin, OUTPUT);
+    pinMode(FrontPin, OUTPUT);
+    pinMode(RearPin, OUTPUT);
+    
+    // Inicjalizacja menedżera świateł
+    lightManager.begin(FrontPin, FrontDayPin, RearPin);
+    lightManager.setMode(LightManager::OFF); // Wyłącz światła po włączeniu ESP
+    
+    // Hamulec
+    pinMode(BRAKE_SENSOR_PIN, INPUT_PULLUP);
+
+    // Kadencja
+    pinMode(CADENCE_SENSOR_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(CADENCE_SENSOR_PIN), cadence_ISR, FALLING);
+    resetCadenceData();
+
+    // Ładowarka USB
+    pinMode(UsbPin, OUTPUT);
+    digitalWrite(UsbPin, LOW);
+}
+
+void resetCadenceData() {
+    cadence_rpm = 0;
+    cadence_avg_rpm = 0;
+    cadence_max_rpm = 0;
+    cadence_sum = 0;
+    cadence_samples = 0;
+
+    // Wczytaj liczbę impulsów na obrót z pamięci preferences
+    preferences.begin("cadence", false);
+    cadence_pulses_per_revolution = preferences.getUChar("pulses", 1); // Domyślnie 1
+    preferences.end();
+}
+
+void initializeFileSystemAndSettings() {
+    // Sprawdź system plików
+    testFileSystem();
+
+    // Inicjalizacja LittleFS i wczytanie ustawień
+    if (!LittleFS.begin(true)) {
+        #ifdef DEBUG
+        Serial.println("Błąd montowania LittleFS");
+        #endif
+        return;
+    } 
+    
+    #ifdef DEBUG
+    Serial.println("LittleFS zamontowany pomyślnie");
+    #endif
+    
+    // Wczytaj ustawienia z plików
+    loadBacklightSettingsFromFile();
+    loadGeneralSettingsFromFile();
+    loadBluetoothConfigFromFile();
+    
+    // Sprawdź i utwórz konfigurację Bluetooth jeśli nie istnieje
+    if (!LittleFS.exists("/bluetooth_config.json")) {
+        #ifdef DEBUG
+        Serial.println("Tworzę domyślny plik konfiguracyjny Bluetooth");
+        #endif
+        createDefaultBluetoothConfig();
+    }
+
+    // Obsługa licznika
+    cleanupOldOdometer();
+    initializeOdometer();
+}
+
+void createDefaultBluetoothConfig() {
+    bluetoothConfig.bmsEnabled = false;
+    bluetoothConfig.tpmsEnabled = false;
+    strcpy(bluetoothConfig.bmsMac, "");
+    strcpy(bluetoothConfig.frontTpmsMac, "");
+    strcpy(bluetoothConfig.rearTpmsMac, "");
+    saveBluetoothConfigToFile();
+}
+
+void cleanupOldOdometer() {
+    if (LittleFS.exists("/odometer.json")) {
+        #ifdef DEBUG
+        Serial.println("Usuwanie starego pliku licznika...");
+        #endif
+        
+        if (LittleFS.remove("/odometer.json")) {
+            #ifdef DEBUG
+            Serial.println("Stary plik licznika usunięty");
+            #endif
+        } else {
+            #ifdef DEBUG
+            Serial.println("Nie udało się usunąć starego pliku licznika");
+            #endif
+        }
+    }
+}
+
+void initializeOdometer() {
+    if (!odometer.isValid()) {
+        #ifdef DEBUG
+        Serial.println("Inicjalizacja licznika...");
+        #endif
+        
+        if (!odometer.isValid()) {
+            #ifdef DEBUG
+            Serial.println("Błąd inicjalizacji licznika!");
+            #endif
+        } else {
+            #ifdef DEBUG
+            Serial.println("Licznik zainicjalizowany pomyślnie");
+            #endif
+        }
+    }
+
+    #ifdef DEBUG
+    Serial.printf("Stan licznika: %s, Wartość: %.2f\n", 
+                  odometer.isValid() ? "OK" : "BŁĄD", 
+                  odometer.getRawTotal());
+    #endif
+}
+
+void initializeBluetooth() {
+    BLEDevice::init("e-Bike System PMW");
+    
+    if (bluetoothConfig.bmsEnabled) {
+        bleClient = BLEDevice::createClient();
+        connectToBms();
+    }
+    
+    if (bluetoothConfig.tpmsEnabled) {
+        // Inicjalizacja struktur TPMS
+        resetTpmsData();
+        loadTpmsAddresses();
+        startTpmsScan();
+    }
+}
+
+void resetTpmsData() {
+    memset(&frontTpms, 0, sizeof(frontTpms));
+    memset(&rearTpms, 0, sizeof(rearTpms));
+    frontTpms.isActive = false;
+    rearTpms.isActive = false;
+}
+
+void printSystemInfo() {
+    Serial.println("\n=== Informacje o systemie ===");
+    Serial.printf("Pamięć: %d KB całość, %d KB wolne\n", 
+                   ESP.getHeapSize()/1024, ESP.getFreeHeap()/1024);
+    Serial.printf("PSRAM: %d KB całość, %d KB wolne\n", 
+                   ESP.getPsramSize()/1024, ESP.getFreePsram()/1024);
+    Serial.printf("Flash: %d MB, Szkic: %d KB\n", 
+                   ESP.getFlashChipSize()/(1024*1024), ESP.getSketchSize()/1024);
+    Serial.println("=============================\n");
+}
+
+void handleInitialSetButton() {
+    unsigned long startTime = millis();
+    while (!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
+        if ((millis() - startTime) > SET_LONG_PRESS) {
+            displayActive = true;
+            showingWelcome = true;
+            messageStartTime = millis();
+            
+            if (!welcomeAnimationDone) {
+                showWelcomeMessage();  // Pokaż animację powitania
+            }
+            
+            // Czekaj na puszczenie przycisku
+            while (!digitalRead(BTN_SET)) {
+                delay(10);
+            }
+            break;
+        }
+        delay(10);
+    }
+}
+
+// SETUP - zoptymalizowana wersja
 void setup() { 
     // Sprawdź przyczynę wybudzenia
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
-    // Inicjalizacja UART dla Serial Monitor
+    // Inicjalizacja UART dla Serial Monitor i komunikacji z KT
     Serial.begin(115200);
-    // Inicjalizacja UART dla komunikacji z KT
     Serial2.begin(CONTROLLER_UART_BAUD, SERIAL_8N1, CONTROLLER_RX_PIN, CONTROLLER_TX_PIN);
     
     #ifdef DEBUG
@@ -4208,18 +4420,15 @@ void setup() {
     if (wakeup_reason != ESP_SLEEP_WAKEUP_EXT0) {
         #ifdef DEBUG
         Serial.println("Normalne uruchomienie - przechodzę do trybu uśpienia");
-        Serial.flush(); // Upewnij się, że dane zostały wysłane
+        Serial.flush();
         #endif
-        
-        // Natychmiast przechodzimy do trybu uśpienia
         goToSleep();
-        // Ten kod nigdy nie zostanie wykonany, ponieważ esp_deep_sleep_start() nie wraca
-        return;
+        return; // Ten kod nigdy nie zostanie wykonany
     }
     
     // Od tego momentu wiemy, że zostaliśmy wybudzeni przez przycisk SET
     
-    // Najpierw wyczyść NVS
+    // Inicjalizacja NVS (połączone operacje czyszczenia i inicjalizacji)
     esp_err_t err = nvs_flash_erase();
     if (err != ESP_OK) {
         #ifdef DEBUG
@@ -4227,9 +4436,7 @@ void setup() {
         #endif
     }
     
-    // Inicjalizacja NVS
-    err = nvs_flash_init();
-    if (err != ESP_OK) {
+    if ((err = nvs_flash_init()) != ESP_OK) {
         #ifdef DEBUG
         Serial.printf("Błąd podczas inicjalizacji NVS: %d\n", err);
         #endif
@@ -4239,171 +4446,31 @@ void setup() {
     #ifdef DEBUG
     Serial.println("NVS zainicjalizowane pomyślnie");
     
-    // Sprawdź statystyki NVS
+    // Diagnostyka NVS (tylko w trybie DEBUG)
     nvs_stats_t nvs_stats;
-    err = nvs_get_stats(NULL, &nvs_stats);
-    if (err == ESP_OK) {
+    if (nvs_get_stats(NULL, &nvs_stats) == ESP_OK) {
         Serial.println("\n=== Statystyki NVS ===");
-        Serial.printf("Użyte wpisy: %d\n", nvs_stats.used_entries);
-        Serial.printf("Wolne wpisy: %d\n", nvs_stats.free_entries);
-        Serial.printf("Całkowita liczba wpisów: %d\n", nvs_stats.total_entries);
+        Serial.printf("Użyte/Wolne/Całkowite wpisy: %d/%d/%d\n", 
+                      nvs_stats.used_entries, nvs_stats.free_entries, nvs_stats.total_entries);
         Serial.println("===================\n");
     }
     #endif
 
-    // Poczekaj chwilę przed dalszą inicjalizacją
-    delay(100);
-
-    // Inicjalizacja DS18B20
-    sensorsAir.begin();
-    sensorsController.begin();
-    sensorsAir.setWaitForConversion(false);      // Tryb nieblokujący
-    sensorsController.setWaitForConversion(false);// Tryb nieblokujący
-    sensorsAir.setResolution(12);                // Najwyższa rozdzielczość
-    sensorsController.setResolution(12);         // Najwyższa rozdzielczość
+    // Inicjalizacja czujników temperatury
+    initializeTemperatureSensors();
     
-    // Pierwsze żądanie pomiaru
-    sensorsAir.requestTemperatures();
-    sensorsController.requestTemperatures();
-
     // Inicjalizacja RTC
-    if (!rtc.begin()) {
-        #ifdef DEBUG
-        Serial.println("Couldn't find RTC");
-        #endif
-        while (1);
-    }
+    initializeRTC();
 
-    if (rtc.lostPower()) {
-        #ifdef DEBUG
-        Serial.println("RTC lost power, lets set the time!");
-        #endif
-        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    }
-
-    // Konfiguracja pozostałych pinów przycisków
-    pinMode(BTN_UP, INPUT_PULLUP);
-    pinMode(BTN_DOWN, INPUT_PULLUP);
-
-    // Konfiguracja pinów LED
-    pinMode(FrontDayPin, OUTPUT);
-    pinMode(FrontPin, OUTPUT);
-    pinMode(RearPin, OUTPUT);
+    // Inicjalizacja pinów
+    initializePins();
     
-    // Inicjalizacja menedżera świateł
-    lightManager.begin(FrontPin, FrontDayPin, RearPin);
+    // Inicjalizacja systemu plików i wczytanie ustawień
+    initializeFileSystemAndSettings();
 
-    // Ustawienie trybu OFF (wyłącz światła po włączeniu ESP)
-    lightManager.setMode(LightManager::OFF);
-
-    // hamulec
-    pinMode(BRAKE_SENSOR_PIN, INPUT_PULLUP);
-
-    // kadencja
-    pinMode(CADENCE_SENSOR_PIN, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(CADENCE_SENSOR_PIN), cadence_ISR, FALLING);
-
-    // zeruj licznik kadencji przy starcie
-    cadence_rpm = 0;
-    cadence_avg_rpm = 0;
-    cadence_max_rpm = 0;
-    cadence_sum = 0;
-    cadence_samples = 0;
-
-    preferences.begin("cadence", false);
-    cadence_pulses_per_revolution = preferences.getUChar("pulses", 1); // Domyślnie 1
-    preferences.end();
-
-    // Ładowarka USB
-    pinMode(UsbPin, OUTPUT);
-    digitalWrite(UsbPin, LOW);
-
-    // Sprawdź system plików
-    testFileSystem();
-
-    // Inicjalizacja LittleFS i wczytanie ustawień
-    if (!LittleFS.begin(true)) {
-        #ifdef DEBUG
-        Serial.println("Błąd montowania LittleFS");
-        #endif
-    } else {
-        #ifdef DEBUG
-        Serial.println("LittleFS zamontowany pomyślnie");
-        #endif
-        // Wczytaj ustawienia z pliku
-        loadBacklightSettingsFromFile();
-        loadGeneralSettingsFromFile();
-        loadBluetoothConfigFromFile();
-        
-        File file = LittleFS.open("/bluetooth_config.json", "r");
-        if (!file) {
-            #ifdef DEBUG
-            Serial.println("Tworzę domyślny plik konfiguracyjny Bluetooth");
-            #endif
-            bluetoothConfig.bmsEnabled = false;
-            bluetoothConfig.tpmsEnabled = false;
-            strcpy(bluetoothConfig.bmsMac, "");
-            strcpy(bluetoothConfig.frontTpmsMac, "");
-            strcpy(bluetoothConfig.rearTpmsMac, "");
-            saveBluetoothConfigToFile();
-        } else {
-            file.close();
-        }
-    }
-
-    if (LittleFS.exists("/odometer.json")) {
-        Serial.println("Usuwanie starego pliku licznika...");
-        if (LittleFS.remove("/odometer.json")) {
-            Serial.println("Stary plik licznika usunięty");
-        } else {
-            Serial.println("Nie udało się usunąć starego pliku licznika");
-        }
-    }
-
-    // Inicjalizacja licznika kilometrów z użyciem Preferences
-    if (!odometer.isValid()) {
-        Serial.println("Inicjalizacja licznika...");
-        //odometer.initialize();
-        if (!odometer.isValid()) {
-            Serial.println("Błąd inicjalizacji licznika!");
-        } else {
-            Serial.println("Licznik zainicjalizowany pomyślnie");
-        }
-    }
-
-    Serial.println("Stan licznika po inicjalizacji:");
-    Serial.printf("Zainicjalizowany: %s\n", odometer.isValid() ? "TAK" : "NIE");
-    Serial.printf("Wartość: %.2f\n", odometer.getRawTotal());
-
-    // Inicjalizacja licznika
-    #ifdef DEBUG
-    Serial.println("Stan licznika po inicjalizacji:");
-    Serial.print("Zainicjalizowany: ");
-    Serial.println(odometer.isValid() ? "TAK" : "NIE");
-    Serial.print("Wartość: ");
-    Serial.println(odometer.getRawTotal());
-    #endif
-
-    // Inicjalizacja BLE
+    // Inicjalizacja BLE jeśli potrzebne
     if (bluetoothConfig.bmsEnabled || bluetoothConfig.tpmsEnabled) {
-        BLEDevice::init("e-Bike System PMW");
-        
-        if (bluetoothConfig.bmsEnabled) {
-            bleClient = BLEDevice::createClient();
-            connectToBms();
-        }
-        
-        if (bluetoothConfig.tpmsEnabled) {
-            // Inicjalizacja struktur TPMS z zerowymi wartościami
-            memset(&frontTpms, 0, sizeof(frontTpms));
-            memset(&rearTpms, 0, sizeof(rearTpms));
-            frontTpms.isActive = false;
-            rearTpms.isActive = false;
-            
-            loadTpmsAddresses();
-            // Rozpocznij skanowanie TPMS
-            startTpmsScan();
-        }
+        initializeBluetooth();
     }
 
     // Zastosuj wczytane ustawienia
@@ -4411,46 +4478,290 @@ void setup() {
     applyBacklightSettings();
 
     #ifdef DEBUG
-        Serial.println("\n--- Memory Info ---");
-        Serial.printf("Total heap: %d\n", ESP.getHeapSize());
-        Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
-        Serial.printf("Total PSRAM: %d\n", ESP.getPsramSize());
-        Serial.printf("Free PSRAM: %d\n", ESP.getFreePsram());
-        
-        Serial.println("\n--- Flash Info ---");
-        Serial.printf("Flash size: %d\n", ESP.getFlashChipSize());
-        Serial.printf("Sketch size: %d\n", ESP.getSketchSize());
-        Serial.printf("Free sketch space: %d\n", ESP.getFreeSketchSpace());
-        
-        Serial.println("\n--- Partition Info ---");
-        esp_partition_iterator_t pi = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, NULL);
-        while (pi != NULL) {
-            const esp_partition_t* partition = esp_partition_get(pi);
-            Serial.printf("Partition '%s': size %d\n", partition->label, partition->size);
-            pi = esp_partition_next(pi);
-        }
-        esp_partition_iterator_release(pi);
-        Serial.println("-------------------\n");
+    printSystemInfo();
     #endif
 
     // Obsługa przycisku SET po wybudzeniu
-    unsigned long startTime = millis();
-    while (!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
-        if ((millis() - startTime) > SET_LONG_PRESS) {
-            displayActive = true;
-            showingWelcome = true;
-            messageStartTime = millis();
-            if (!welcomeAnimationDone) {
-                showWelcomeMessage();  // Pokaż animację powitania
-            }                
-            while (!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
-                delay(10);
-            }
-            break;
-        }
-        delay(10);
-    }
+    handleInitialSetButton();
 }
+
+// // SETUP
+// void setup() { 
+//     // Sprawdź przyczynę wybudzenia
+//     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+
+//     // Inicjalizacja UART dla Serial Monitor
+//     Serial.begin(115200);
+//     // Inicjalizacja UART dla komunikacji z KT
+//     Serial2.begin(CONTROLLER_UART_BAUD, SERIAL_8N1, CONTROLLER_RX_PIN, CONTROLLER_TX_PIN);
+    
+//     #ifdef DEBUG
+//     Serial.println("\n=== Inicjalizacja systemu ===");
+//     Serial.print("Przyczyna wybudzenia: ");
+//     switch(wakeup_reason) {
+//         case ESP_SLEEP_WAKEUP_EXT0: Serial.println("Przycisk SET"); break;
+//         case ESP_SLEEP_WAKEUP_UNDEFINED: Serial.println("Normalne uruchomienie"); break;
+//         default: Serial.printf("Inna (%d)\n", wakeup_reason);
+//     }
+//     #endif
+    
+//     // Inicjalizacja podstawowych komponentów
+//     Wire.begin();
+//     display.begin();
+//     display.setFontDirection(0);
+//     display.clearBuffer();
+//     display.sendBuffer();
+    
+//     // Konfiguracja pinu przycisku SET (niezbędnego do wybudzenia)
+//     pinMode(BTN_SET, INPUT_PULLUP);
+
+//     // Jeśli nie zostaliśmy wybudzeni przez przycisk, natychmiast przechodzimy do trybu uśpienia
+//     if (wakeup_reason != ESP_SLEEP_WAKEUP_EXT0) {
+//         #ifdef DEBUG
+//         Serial.println("Normalne uruchomienie - przechodzę do trybu uśpienia");
+//         Serial.flush(); // Upewnij się, że dane zostały wysłane
+//         #endif
+        
+//         // Natychmiast przechodzimy do trybu uśpienia
+//         goToSleep();
+//         // Ten kod nigdy nie zostanie wykonany, ponieważ esp_deep_sleep_start() nie wraca
+//         return;
+//     }
+    
+//     // Od tego momentu wiemy, że zostaliśmy wybudzeni przez przycisk SET
+    
+//     // Najpierw wyczyść NVS
+//     esp_err_t err = nvs_flash_erase();
+//     if (err != ESP_OK) {
+//         #ifdef DEBUG
+//         Serial.printf("Błąd podczas czyszczenia NVS: %d\n", err);
+//         #endif
+//     }
+    
+//     // Inicjalizacja NVS
+//     err = nvs_flash_init();
+//     if (err != ESP_OK) {
+//         #ifdef DEBUG
+//         Serial.printf("Błąd podczas inicjalizacji NVS: %d\n", err);
+//         #endif
+//         return;
+//     }
+    
+//     #ifdef DEBUG
+//     Serial.println("NVS zainicjalizowane pomyślnie");
+    
+//     // Sprawdź statystyki NVS
+//     nvs_stats_t nvs_stats;
+//     err = nvs_get_stats(NULL, &nvs_stats);
+//     if (err == ESP_OK) {
+//         Serial.println("\n=== Statystyki NVS ===");
+//         Serial.printf("Użyte wpisy: %d\n", nvs_stats.used_entries);
+//         Serial.printf("Wolne wpisy: %d\n", nvs_stats.free_entries);
+//         Serial.printf("Całkowita liczba wpisów: %d\n", nvs_stats.total_entries);
+//         Serial.println("===================\n");
+//     }
+//     #endif
+
+//     // Poczekaj chwilę przed dalszą inicjalizacją
+//     delay(100);
+
+//     // Inicjalizacja DS18B20
+//     sensorsAir.begin();
+//     sensorsController.begin();
+//     sensorsAir.setWaitForConversion(false);      // Tryb nieblokujący
+//     sensorsController.setWaitForConversion(false);// Tryb nieblokujący
+//     sensorsAir.setResolution(12);                // Najwyższa rozdzielczość
+//     sensorsController.setResolution(12);         // Najwyższa rozdzielczość
+    
+//     // Pierwsze żądanie pomiaru
+//     sensorsAir.requestTemperatures();
+//     sensorsController.requestTemperatures();
+
+//     // Inicjalizacja RTC
+//     if (!rtc.begin()) {
+//         #ifdef DEBUG
+//         Serial.println("Couldn't find RTC");
+//         #endif
+//         while (1);
+//     }
+
+//     if (rtc.lostPower()) {
+//         #ifdef DEBUG
+//         Serial.println("RTC lost power, lets set the time!");
+//         #endif
+//         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+//     }
+
+//     // Konfiguracja pozostałych pinów przycisków
+//     pinMode(BTN_UP, INPUT_PULLUP);
+//     pinMode(BTN_DOWN, INPUT_PULLUP);
+
+//     // Konfiguracja pinów LED
+//     pinMode(FrontDayPin, OUTPUT);
+//     pinMode(FrontPin, OUTPUT);
+//     pinMode(RearPin, OUTPUT);
+    
+//     // Inicjalizacja menedżera świateł
+//     lightManager.begin(FrontPin, FrontDayPin, RearPin);
+
+//     // Ustawienie trybu OFF (wyłącz światła po włączeniu ESP)
+//     lightManager.setMode(LightManager::OFF);
+
+//     // hamulec
+//     pinMode(BRAKE_SENSOR_PIN, INPUT_PULLUP);
+
+//     // kadencja
+//     pinMode(CADENCE_SENSOR_PIN, INPUT_PULLUP);
+//     attachInterrupt(digitalPinToInterrupt(CADENCE_SENSOR_PIN), cadence_ISR, FALLING);
+
+//     // zeruj licznik kadencji przy starcie
+//     cadence_rpm = 0;
+//     cadence_avg_rpm = 0;
+//     cadence_max_rpm = 0;
+//     cadence_sum = 0;
+//     cadence_samples = 0;
+
+//     preferences.begin("cadence", false);
+//     cadence_pulses_per_revolution = preferences.getUChar("pulses", 1); // Domyślnie 1
+//     preferences.end();
+
+//     // Ładowarka USB
+//     pinMode(UsbPin, OUTPUT);
+//     digitalWrite(UsbPin, LOW);
+
+//     // Sprawdź system plików
+//     testFileSystem();
+
+//     // Inicjalizacja LittleFS i wczytanie ustawień
+//     if (!LittleFS.begin(true)) {
+//         #ifdef DEBUG
+//         Serial.println("Błąd montowania LittleFS");
+//         #endif
+//     } else {
+//         #ifdef DEBUG
+//         Serial.println("LittleFS zamontowany pomyślnie");
+//         #endif
+//         // Wczytaj ustawienia z pliku
+//         loadBacklightSettingsFromFile();
+//         loadGeneralSettingsFromFile();
+//         loadBluetoothConfigFromFile();
+        
+//         File file = LittleFS.open("/bluetooth_config.json", "r");
+//         if (!file) {
+//             #ifdef DEBUG
+//             Serial.println("Tworzę domyślny plik konfiguracyjny Bluetooth");
+//             #endif
+//             bluetoothConfig.bmsEnabled = false;
+//             bluetoothConfig.tpmsEnabled = false;
+//             strcpy(bluetoothConfig.bmsMac, "");
+//             strcpy(bluetoothConfig.frontTpmsMac, "");
+//             strcpy(bluetoothConfig.rearTpmsMac, "");
+//             saveBluetoothConfigToFile();
+//         } else {
+//             file.close();
+//         }
+//     }
+
+//     if (LittleFS.exists("/odometer.json")) {
+//         Serial.println("Usuwanie starego pliku licznika...");
+//         if (LittleFS.remove("/odometer.json")) {
+//             Serial.println("Stary plik licznika usunięty");
+//         } else {
+//             Serial.println("Nie udało się usunąć starego pliku licznika");
+//         }
+//     }
+
+//     // Inicjalizacja licznika kilometrów z użyciem Preferences
+//     if (!odometer.isValid()) {
+//         Serial.println("Inicjalizacja licznika...");
+//         //odometer.initialize();
+//         if (!odometer.isValid()) {
+//             Serial.println("Błąd inicjalizacji licznika!");
+//         } else {
+//             Serial.println("Licznik zainicjalizowany pomyślnie");
+//         }
+//     }
+
+//     Serial.println("Stan licznika po inicjalizacji:");
+//     Serial.printf("Zainicjalizowany: %s\n", odometer.isValid() ? "TAK" : "NIE");
+//     Serial.printf("Wartość: %.2f\n", odometer.getRawTotal());
+
+//     // Inicjalizacja licznika
+//     #ifdef DEBUG
+//     Serial.println("Stan licznika po inicjalizacji:");
+//     Serial.print("Zainicjalizowany: ");
+//     Serial.println(odometer.isValid() ? "TAK" : "NIE");
+//     Serial.print("Wartość: ");
+//     Serial.println(odometer.getRawTotal());
+//     #endif
+
+//     // Inicjalizacja BLE
+//     if (bluetoothConfig.bmsEnabled || bluetoothConfig.tpmsEnabled) {
+//         BLEDevice::init("e-Bike System PMW");
+        
+//         if (bluetoothConfig.bmsEnabled) {
+//             bleClient = BLEDevice::createClient();
+//             connectToBms();
+//         }
+        
+//         if (bluetoothConfig.tpmsEnabled) {
+//             // Inicjalizacja struktur TPMS z zerowymi wartościami
+//             memset(&frontTpms, 0, sizeof(frontTpms));
+//             memset(&rearTpms, 0, sizeof(rearTpms));
+//             frontTpms.isActive = false;
+//             rearTpms.isActive = false;
+            
+//             loadTpmsAddresses();
+//             // Rozpocznij skanowanie TPMS
+//             startTpmsScan();
+//         }
+//     }
+
+//     // Zastosuj wczytane ustawienia
+//     setLights();  
+//     applyBacklightSettings();
+
+//     #ifdef DEBUG
+//         Serial.println("\n--- Memory Info ---");
+//         Serial.printf("Total heap: %d\n", ESP.getHeapSize());
+//         Serial.printf("Free heap: %d\n", ESP.getFreeHeap());
+//         Serial.printf("Total PSRAM: %d\n", ESP.getPsramSize());
+//         Serial.printf("Free PSRAM: %d\n", ESP.getFreePsram());
+        
+//         Serial.println("\n--- Flash Info ---");
+//         Serial.printf("Flash size: %d\n", ESP.getFlashChipSize());
+//         Serial.printf("Sketch size: %d\n", ESP.getSketchSize());
+//         Serial.printf("Free sketch space: %d\n", ESP.getFreeSketchSpace());
+        
+//         Serial.println("\n--- Partition Info ---");
+//         esp_partition_iterator_t pi = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, NULL);
+//         while (pi != NULL) {
+//             const esp_partition_t* partition = esp_partition_get(pi);
+//             Serial.printf("Partition '%s': size %d\n", partition->label, partition->size);
+//             pi = esp_partition_next(pi);
+//         }
+//         esp_partition_iterator_release(pi);
+//         Serial.println("-------------------\n");
+//     #endif
+
+//     // Obsługa przycisku SET po wybudzeniu
+//     unsigned long startTime = millis();
+//     while (!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
+//         if ((millis() - startTime) > SET_LONG_PRESS) {
+//             displayActive = true;
+//             showingWelcome = true;
+//             messageStartTime = millis();
+//             if (!welcomeAnimationDone) {
+//                 showWelcomeMessage();  // Pokaż animację powitania
+//             }                
+//             while (!digitalRead(BTN_SET)) {  // Czekaj na puszczenie przycisku
+//                 delay(10);
+//             }
+//             break;
+//         }
+//         delay(10);
+//     }
+// }
 
 // Implementacja funkcji loop
 void loop() {
@@ -4648,7 +4959,6 @@ void loop() {
             battery_capacity_wh = 14.5 - (random(20) / 10.0);
             battery_capacity_percent = (battery_capacity_percent <= 0) ? 100 : battery_capacity_percent - 1;
             battery_voltage = (battery_voltage <= 42.0) ? 50.0 : battery_voltage - 0.1;
-            //assistMode = (assistMode + 1) % 5;
             lastUpdate = currentTime;
             static float speed_sum = 0;
             static int speed_count = 0;
