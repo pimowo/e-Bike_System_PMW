@@ -3723,20 +3723,20 @@ bool testFileSystem() {
         }
     }
     
-    DEBUG_INFO("Calkowita przestrzen: %d bajtow\n", LittleFS.totalBytes());
-    DEBUG_INFO("Uzyta przestrzen: %d bajtow\n", LittleFS.usedBytes());
-    DEBUG_INFO("Wolna przestrzen: %d bajtow\n", LittleFS.totalBytes() - LittleFS.usedBytes());
+    DEBUG_INFO("Calkowita przestrzen: %d bajtow", LittleFS.totalBytes());
+    DEBUG_INFO("Uzyta przestrzen: %d bajtow", LittleFS.usedBytes());
+    DEBUG_INFO("Wolna przestrzen: %d bajtow", LittleFS.totalBytes() - LittleFS.usedBytes());
     
     // Test zapisu
     DEBUG_INFO("Test zapisu pliku...");
     File testFile = LittleFS.open("/test_fs.txt", "w");
     if (!testFile) {
-        DEBUG_INFO("Nie moZna utworzyC pliku testowego");
+        DEBUG_INFO("Nie mozna utworzyC pliku testowego");
         return false;
     }
     
     if (testFile.print("Test zapisu") == 0) {
-        DEBUG_INFO("BLAd zapisu do pliku testowego");
+        DEBUG_INFO("Blad zapisu do pliku testowego");
         testFile.close();
         return false;
     }
@@ -3747,7 +3747,7 @@ bool testFileSystem() {
     DEBUG_INFO("Test odczytu pliku...");
     testFile = LittleFS.open("/test_fs.txt", "r");
     if (!testFile) {
-        DEBUG_INFO("Nie moZna otworzyC pliku testowego do odczytu");
+        DEBUG_INFO("Nie mozna otworzyC pliku testowego do odczytu");
         return false;
     }
     
