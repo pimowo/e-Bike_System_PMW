@@ -232,7 +232,7 @@ private:
     float currentTotal = 0;
 
     void saveToFile() {
-        DEBUG_INFO("Zapisywanie licznika do pliku...");
+        //DEBUG_INFO("Zapisywanie licznika do pliku...");
 
         File file = LittleFS.open(filename, "w");
         if (!file) {
@@ -246,7 +246,7 @@ private:
         if (serializeJson(doc, file) == 0) {
             DEBUG_ERROR("Blad zapisu do pliku licznika");
         } else {
-            DEBUG_INFO("Zapisano licznik: %.2f", currentTotal);
+            //DEBUG_INFO("Zapisano licznik: %.2f", currentTotal);
         }
         
         file.close();
@@ -4053,7 +4053,7 @@ void resetTpmsData() {
 void printSystemInfo() {
     DEBUG_INFO("=== Informacje o systemie ===");
     DEBUG_INFO("Pamiec: %d KB calosc, %d KB wolne", ESP.getHeapSize()/1024, ESP.getFreeHeap()/1024);
-    DEBUG_INFO("PSRAM: %d KB całosc, %d KB wolne", ESP.getPsramSize()/1024, ESP.getFreePsram()/1024);
+    DEBUG_INFO("PSRAM: %d KB caLosc, %d KB wolne", ESP.getPsramSize()/1024, ESP.getFreePsram()/1024);
     DEBUG_INFO("Flash: %d MB, Szkic: %d KB", ESP.getFlashChipSize()/(1024*1024), ESP.getSketchSize()/1024);
 }
 
