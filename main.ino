@@ -65,79 +65,11 @@
 #include <Preferences.h>      // Biblioteka do stałej pamięci ESP32
 #include <nvs_flash.h>
 
-// --- Własne biblioteki ---
+// --- Komunikaty ---
+#include "DebugUtils.h"
+
+// --- Oświetlenie ---
 #include "LightManager.h"
-
-/********************************************************************
- * SYSTEM LOGOWANIA Z POZIOMAMI
- ********************************************************************/
- 
-// Główny przełącznik debugowania - zakomentuj aby wyłączyć całe logowanie
-#define DEBUG
-
-// Definiuje poziomy logowania (ustaw 1 aby włączyć, 0 aby wyłączyć)
-#define DEBUG_ERROR_ENABLED   1  // Błędy krytyczne
-#define DEBUG_WARN_ENABLED    1  // Ostrzeżenia
-#define DEBUG_INFO_ENABLED    1  // Informacje ogólne
-#define DEBUG_LIGHT_ENABLED   1  // Logi dotyczące oświetlenia
-#define DEBUG_TEMP_ENABLED    1  // Logi czujników temperatury
-#define DEBUG_BLE_ENABLED     1  // Logi komunikacji Bluetooth
-#define DEBUG_DETAIL_ENABLED  1  // Szczegółowe logi
-
-// Makra do logowania z tagami
-#ifdef DEBUG
-    // Aktywne tylko gdy odpowiedni poziom jest włączony (1)
-    #if DEBUG_ERROR_ENABLED
-        #define DEBUG_ERROR(...) Serial.printf("[ERROR] " __VA_ARGS__); Serial.println()
-    #else
-        #define DEBUG_ERROR(...) ((void)0)
-    #endif
-    
-    #if DEBUG_WARN_ENABLED
-        #define DEBUG_WARN(...) Serial.printf("[WARN] " __VA_ARGS__); Serial.println()
-    #else
-        #define DEBUG_WARN(...) ((void)0)
-    #endif
-    
-    #if DEBUG_INFO_ENABLED
-        #define DEBUG_INFO(...) Serial.printf("[INFO] " __VA_ARGS__); Serial.println()
-    #else
-        #define DEBUG_INFO(...) ((void)0)
-    #endif
-    
-    #if DEBUG_LIGHT_ENABLED
-        #define DEBUG_LIGHT(...) Serial.printf("[LIGHT] " __VA_ARGS__); Serial.println()
-    #else
-        #define DEBUG_LIGHT(...) ((void)0)
-    #endif
-    
-    #if DEBUG_TEMP_ENABLED
-        #define DEBUG_TEMP(...) Serial.printf("[TEMP] " __VA_ARGS__); Serial.println()
-    #else
-        #define DEBUG_TEMP(...) ((void)0)
-    #endif
-    
-    #if DEBUG_BLE_ENABLED
-        #define DEBUG_BLE(...) Serial.printf("[BLE] " __VA_ARGS__); Serial.println()
-    #else
-        #define DEBUG_BLE(...) ((void)0)
-    #endif
-    
-    #if DEBUG_DETAIL_ENABLED
-        #define DEBUG_DETAIL(...) Serial.printf("[DETAIL] " __VA_ARGS__); Serial.println()
-    #else
-        #define DEBUG_DETAIL(...) ((void)0)
-    #endif
-#else
-    // Gdy DEBUG jest wyłączony, wszystkie makra są puste
-    #define DEBUG_ERROR(...) ((void)0)
-    #define DEBUG_WARN(...) ((void)0)
-    #define DEBUG_INFO(...) ((void)0)
-    #define DEBUG_LIGHT(...) ((void)0)
-    #define DEBUG_TEMP(...) ((void)0)
-    #define DEBUG_BLE(...) ((void)0)
-    #define DEBUG_DETAIL(...) ((void)0)
-#endif
 
 /********************************************************************
  * DEFINICJE I STAŁE GLOBALNE
@@ -1123,10 +1055,8 @@ void startTpmsScan() {
     if (tpmsScanning || !bluetoothConfig.tpmsEnabled) return;
     
     DEBUG_BLE("Rozpoczynam nasłuchiwanie TPMS...");
-    DEBUG_BLE("Przedni czujnik MAC: ");
-    DEBUG_BLE(bluetoothConfig.frontTpmsMac);
-    DEBUG_BLE("Tylny czujnik MAC: ");
-    DEBUG_BLE(bluetoothConfig.rearTpmsMac);
+    DEBUG_BLE("Przedni czujnik MAC: ", bluetoothConfig.frontTpmsMac);
+    DEBUG_BLE("Tylny czujnik MAC: ", bluetoothConfig.rearTpmsMac);
     
     BLEScan* pBLEScan = BLEDevice::getScan();
     pBLEScan->setAdvertisedDeviceCallbacks(new TpmsAdvertisedDeviceCallbacks());
@@ -1145,15 +1075,11 @@ void stopTpmsScan() {
     pBLEScan->stop();
     tpmsScanning = false;
     
-    #ifdef DEBUG
-    Serial.println("Zatrzymano skanowanie TPMS");
-    #endif
+    DEBUG_BLE("Zatrzymano skanowanie TPMS");
 }
 
 void loadTpmsAddresses() {
-    #ifdef DEBUG
-    Serial.println("Funkcja loadTpmsAddresses() jeszcze nie jest zaimplementowana");
-    #endif
+    DEBUG_BLE("Funkcja loadTpmsAddresses() jeszcze nie jest zaimplementowana");
     // Na razie pusta implementacja
     // Docelowo będzie wczytywać adresy czujników z pliku konfiguracyjnego
 }
@@ -1164,16 +1090,12 @@ void checkTpmsTimeout() {
     
     // Sprawdź, czy czujniki nie wysłały danych przez dłuższy czas
     if (frontTpms.isActive && (currentTime - frontTpms.lastUpdate > TPMS_TIMEOUT)) {
-        #ifdef DEBUG
-        Serial.println("Przedni czujnik nie odpowiada - oznaczam jako nieaktywny");
-        #endif
+        DEBUG_BLE("Przedni czujnik nie odpowiada - oznaczam jako nieaktywny");
         frontTpms.isActive = false;
     }
     
     if (rearTpms.isActive && (currentTime - rearTpms.lastUpdate > TPMS_TIMEOUT)) {
-        #ifdef DEBUG
-        Serial.println("Tylny czujnik nie odpowiada - oznaczam jako nieaktywny");
-        #endif
+        DEBUG_BLE("Tylny czujnik nie odpowiada - oznaczam jako nieaktywny");
         rearTpms.isActive = false;
     }
 }
@@ -1323,9 +1245,7 @@ void setDisplayBrightness(uint8_t brightness) {
 void saveBacklightSettingsToFile() {
     File file = LittleFS.open(CONFIG_FILE, "w");
     if (!file) {
-        #ifdef DEBUG
-        Serial.println("Nie można otworzyć pliku do zapisu");
-        #endif
+        DEBUG_LIGHT("Nie można otworzyć pliku do zapisu");
         return;
     }
 
@@ -1336,13 +1256,9 @@ void saveBacklightSettingsToFile() {
 
     // Zapisz JSON do pliku
     if (serializeJson(doc, file)) {
-        #ifdef DEBUG
-        Serial.println("Zapisano ustawienia do pliku");
-        #endif
+        DEBUG_LIGHT("Zapisano ustawienia do pliku");
     } else {
-        #ifdef DEBUG
-        Serial.println("Błąd podczas zapisu do pliku");
-        #endif
+        DEBUG_LIGHT("Błąd podczas zapisu do pliku");
     }
     
     file.close();
@@ -1355,9 +1271,7 @@ void saveBacklightSettingsToFile() {
 void loadBacklightSettingsFromFile() {
     File file = LittleFS.open(CONFIG_FILE, "r");
     if (!file) {
-        #ifdef DEBUG
-        Serial.println("Brak pliku konfiguracyjnego, używam ustawień domyślnych");
-        #endif
+        DEBUG_LIGHT("Brak pliku konfiguracyjnego, używam ustawień domyślnych");
         // Ustaw wartości domyślne
         backlightSettings.Brightness = 70;
         backlightSettings.dayBrightness = 100;
@@ -1373,9 +1287,7 @@ void loadBacklightSettingsFromFile() {
     file.close();
 
     if (error) {
-        #ifdef DEBUG
-        Serial.println("Błąd podczas parsowania JSON, używam ustawień domyślnych");
-        #endif
+        DEBUG_LIGHT("Błąd podczas parsowania JSON, używam ustawień domyślnych");
         // Ustaw wartości domyślne
         backlightSettings.dayBrightness = 100;
         backlightSettings.nightBrightness = 50;
@@ -1388,21 +1300,17 @@ void loadBacklightSettingsFromFile() {
     backlightSettings.nightBrightness = doc["nightBrightness"] | 50;
     backlightSettings.autoMode = doc["autoMode"] | false;
 
-    #ifdef DEBUG
-    Serial.println("Wczytano ustawienia z pliku:");
-    Serial.print("Day Brightness: "); Serial.println(backlightSettings.dayBrightness);
-    Serial.print("Night Brightness: "); Serial.println(backlightSettings.nightBrightness);
-    Serial.print("Auto Mode: "); Serial.println(backlightSettings.autoMode);
-    #endif
+    DEBUG_LIGHT("Wczytano ustawienia z pliku:");
+    DEBUG_LIGHT("Day Brightness: ", backlightSettings.dayBrightness);
+    DEBUG_LIGHT("Night Brightness: ", backlightSettings.nightBrightness);
+    DEBUG_LIGHT("Auto Mode: ", backlightSettings.autoMode);
 }
 
 // zapis ustawień ogólnych
 void saveGeneralSettingsToFile() {
     File file = LittleFS.open("/general_config.json", "w");
     if (!file) {
-        #ifdef DEBUG
-        Serial.println("Nie można otworzyć pliku ustawień ogólnych do zapisu");
-        #endif
+        DEBUG_INFO("Nie można otworzyć pliku ustawień ogólnych do zapisu");
         return;
     }
 
@@ -1410,9 +1318,7 @@ void saveGeneralSettingsToFile() {
     doc["wheelSize"] = generalSettings.wheelSize;
 
     if (serializeJson(doc, file) == 0) {
-        #ifdef DEBUG
-        Serial.println("Błąd podczas zapisu ustawień ogólnych");
-        #endif
+        DEBUG_INFO("Błąd podczas zapisu ustawień ogólnych");
     }
 
     file.close();
@@ -1422,9 +1328,7 @@ void saveGeneralSettingsToFile() {
 void saveBluetoothConfigToFile() {
     File file = LittleFS.open("/bluetooth_config.json", "w");
     if (!file) {
-        #ifdef DEBUG
-        Serial.println("Nie można otworzyć pliku konfiguracji Bluetooth");
-        #endif
+        DEBUG_BLE("Nie można otworzyć pliku konfiguracji Bluetooth");
         return;
     }
 
@@ -1443,9 +1347,7 @@ void saveBluetoothConfigToFile() {
 void loadBluetoothConfigFromFile() {
     File file = LittleFS.open("/bluetooth_config.json", "r");
     if (!file) {
-        #ifdef DEBUG
-        Serial.println("Nie znaleziono pliku konfiguracji Bluetooth, używam domyślnych");
-        #endif
+        DEBUG_BLE("Nie znaleziono pliku konfiguracji Bluetooth, używam domyślnych");
         return;
     }
 
@@ -1477,9 +1379,7 @@ void loadBluetoothConfigFromFile() {
 void loadGeneralSettingsFromFile() {
     File file = LittleFS.open("/general_config.json", "r");
     if (!file) {
-        #ifdef DEBUG
-        Serial.println("Nie znaleziono pliku ustawień ogólnych, używam domyślnych");
-        #endif
+        DEBUG_INFO("Nie znaleziono pliku ustawień ogólnych, używam domyślnych");
         generalSettings.wheelSize = 26; // Wartość domyślna
         saveGeneralSettingsToFile(); // Zapisz domyślne ustawienia
         return;
@@ -1490,9 +1390,7 @@ void loadGeneralSettingsFromFile() {
     file.close();
 
     if (error) {
-        #ifdef DEBUG
-        Serial.println("Błąd podczas parsowania JSON ustawień ogólnych");
-        #endif
+        DEBUG_INFO("Błąd podczas parsowania JSON ustawień ogólnych");
         generalSettings.wheelSize = 26; // Wartość domyślna
         saveGeneralSettingsToFile(); // Zapisz domyślne ustawienia
         return;
@@ -1500,10 +1398,7 @@ void loadGeneralSettingsFromFile() {
 
     generalSettings.wheelSize = doc["wheelSize"] | 26; // Domyślnie 26 cali jeśli nie znaleziono
 
-    #ifdef DEBUG
-    Serial.print("Loaded wheel size: ");
-    Serial.println(generalSettings.wheelSize);
-    #endif
+    DEBUG_INFO("Loaded wheel size: ", generalSettings.wheelSize);
 }
 
 // --- Funkcje wyświetlacza ---
@@ -1707,9 +1602,7 @@ void updateCadenceLogic() {
     // Wyłącz tempomat jeśli hamulec jest aktywny
     if (brakeActive && cruiseControlActive) {
         cruiseControlActive = false;
-        #ifdef DEBUG
-        Serial.println("Dezaktywacja tempomatu przez hamulec");
-        #endif
+        DEBUG_INFO("Dezaktywacja tempomatu przez hamulec");
     }
 
     unsigned long now = millis();
@@ -2314,10 +2207,11 @@ void handleButtons() {
                     cruiseControlActive = !cruiseControlActive; // Przełącz stan tempomatu
                     assistLevelAsText = cruiseControlActive; // Pokaż "T" gdy tempomat aktywny
                     
-                    #ifdef DEBUG
-                    Serial.print(cruiseControlActive ? "Aktywacja" : "Dezaktywacja");
-                    Serial.println(" tempomatu");
-                    #endif
+                    if (cruiseControlActive) {
+                        DEBUG_INFO("Aktywacja tempomatu");
+                    } else {
+                        DEBUG_INFO("Dezaktywacja tempomatu");
+                    }
                     
                     downLongPressExecuted = true;
                 } else if (speed_kmh < 8.0) {
@@ -2325,9 +2219,7 @@ void handleButtons() {
                     walkAssistActive = true;
                     showWalkAssistMode(true);  // Wyślij bufor, żeby od razu pokazać ekran
                     
-                    #ifdef DEBUG
-                    Serial.println("Aktywacja trybu prowadzenia roweru");
-                    #endif
+                    DEBUG_INFO("Aktywacja trybu prowadzenia roweru");
                     
                     downLongPressExecuted = true;
                 }
@@ -2337,9 +2229,7 @@ void handleButtons() {
             if (walkAssistActive) {
                 // Wyłącz tryb prowadzenia roweru gdy przycisk DOWN jest puszczony
                 walkAssistActive = false;
-                #ifdef DEBUG
-                Serial.println("Dezaktywacja trybu prowadzenia roweru");
-                #endif
+                DEBUG_INFO("Dezaktywacja trybu prowadzenia roweru");
             }
             
             // UWAGA: Usunięto wyłączanie tempomatu przyciskiem DOWN - teraz tylko hamulec może go wyłączyć
@@ -2466,22 +2356,16 @@ void activateConfigMode() {
 
     // 1. Inicjalizacja LittleFS
     if (!LittleFS.begin(true)) {
-        #ifdef DEBUG
-        Serial.println("Błąd montowania LittleFS");
-        #endif
+        DEBUG_INFO("Błąd montowania LittleFS");
         return;
     }
-    #ifdef DEBUG
-    Serial.println("LittleFS zainicjalizowany");
-    #endif
+    DEBUG_INFO("LittleFS zainicjalizowany");
 
     // 2. Włączenie WiFi w trybie AP
     WiFi.mode(WIFI_AP);
     WiFi.softAP("e-Bike System PMW", "#mamrower");
-    #ifdef DEBUG
-    Serial.println("Tryb AP aktywny");
-    #endif
-
+    DEBUG_INFO("Tryb AP aktywny");
+    
     // 3. Konfiguracja serwera - najpierw pliki statyczne
     server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
     
@@ -2497,25 +2381,17 @@ void activateConfigMode() {
     server.on("/api/reset-filesystem", HTTP_GET, [](AsyncWebServerRequest *request) {
         bool success = false;
         
-        #ifdef DEBUG
-        Serial.println("Próba resetowania systemu plików");
-        #endif
+        DEBUG_INFO("Próba resetowania systemu plików");
         
         if (LittleFS.format()) {
             if (LittleFS.begin(false)) {
                 success = true;
-                #ifdef DEBUG
-                Serial.println("System plików zresetowany pomyślnie");
-                #endif
+                DEBUG_INFO("System plików zresetowany pomyślnie");
             } else {
-                #ifdef DEBUG
-                Serial.println("Nie udało się zamontować systemu plików po formatowaniu");
-                #endif
+                DEBUG_INFO("Nie udało się zamontować systemu plików po formatowaniu");
             }
         } else {
-            #ifdef DEBUG
-            Serial.println("Formatowanie systemu plików nie powiodło się");
-            #endif
+            DEBUG_INFO("Formatowanie systemu plików nie powiodło się");
         }
         
         StaticJsonDocument<128> doc;
@@ -2542,9 +2418,7 @@ void activateConfigMode() {
 
     // 5. Uruchomienie serwera
     server.begin();
-    #ifdef DEBUG
-    Serial.println("Serwer WWW uruchomiony");
-    #endif
+    DEBUG_INFO("Serwer WWW uruchomiony");
 }
 
 // dezaktywacja trybu konfiguracji
@@ -2624,9 +2498,7 @@ void resetTripData() {
     speed_sum = 0;
     speed_count = 0;
     
-    #ifdef DEBUG
-    Serial.println("Zresetowano dane przejazdu");
-    #endif
+    DEBUG_INFO("Zresetowano dane przejazdu");
 }
 
 //
@@ -2636,22 +2508,16 @@ void setCadencePulsesPerRevolution(uint8_t pulses) {
         preferences.begin("cadence", false);
         preferences.putUChar("pulses", pulses);
         preferences.end();
-        #ifdef DEBUG
-        Serial.printf("Ustawiono %d impulsów na obrót korby\n", pulses);
-        #endif
+        DEBUG_INFO("Ustawiono %d impulsów na obrót korby\n", pulses);
     } else {
-        #ifdef DEBUG
-        Serial.println("Błędna wartość dla impulsów na obrót (dozwolony zakres: 1-24)");
-        #endif
+        DEBUG_INFO("Bledna wartosc dla impulsow na obrot (dozwolony zakres: 1-24)");
     }
 }
 
 // tryb uśpienia
 void goToSleep() {
-    #ifdef DEBUG
-    Serial.println("Wchodzę w tryb głębokiego uśpienia (deep sleep)...");
-    Serial.printf("Aktualny tryb świateł: %d\n", (int)lightManager.getMode());
-    #endif
+    DEBUG_INFO("Wchodze w tryb glebokiego uspienia (DEEP SLEEP)...");
+    //DEBUG_INFO("Aktualny tryb świateł: %d\n", (int)lightManager.getMode());
 
     // Wyłącz wszystkie LEDy
     digitalWrite(FrontDayPin, LOW);
@@ -2669,11 +2535,9 @@ void goToSleep() {
     // Zapisz stan trybu świateł przed uśpieniem
     // Już nie jest potrzebne - LightManager zapisuje stan automatycznie
 
-    #ifdef DEBUG
-    Serial.println("Konfiguracja wybudzania przez przycisk SET (GPIO12)");
-    Serial.println("Przechodzę do deep sleep teraz. Do zobaczenia po wybudzeniu!");
+    //DEBUG_INFO("Konfiguracja wybudzania przez przycisk SET (GPIO12)");
+    DEBUG_INFO("Przechodze do DEEP SLEEP. Do zobaczenia po wybudzeniu!");
     Serial.flush(); // Upewnij się, że wszystkie dane zostały wysłane
-    #endif
 
     // Konfiguracja wybudzania przez przycisk SET
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_12, 0);  // GPIO12 (BTN_SET) stan niski
@@ -2872,13 +2736,10 @@ void applyBacklightSettings() {
     // Zastosuj jasność do wyświetlacza
     display.setContrast(displayBrightness);
     
-    #ifdef DEBUG
-    Serial.print("Target brightness: ");
-    Serial.print(targetBrightness);
-    Serial.print("%, Normalized: ");
-    Serial.print(normalized);
-    Serial.print("%, Display brightness: ");
-    Serial.println(displayBrightness);
+    #if DEBUG_INFO_ENABLED
+    DEBUG_INFO("Target brightness: ", targetBrightness);
+    DEBUG_INFO("Normalized: ", normalized);
+    DEBUG_INFO("Display brightness: ", displayBrightness);
     #endif
 }
 
@@ -3038,9 +2899,7 @@ void handleTemperature() {
 void loadSettings() {
     File configFile = LittleFS.open("/config.json", "r");
     if (!configFile) {
-        #ifdef DEBUG
-        Serial.println("Failed to open config file");
-        #endif
+        DEBUG_INFO("Failed to open config file");
         return;
     }
 
@@ -3048,9 +2907,7 @@ void loadSettings() {
     DeserializationError error = deserializeJson(doc, configFile);
 
     if (error) {
-        #ifdef DEBUG
-        Serial.println("Failed to parse config file");
-        #endif
+        DEBUG_INFO("Failed to parse config file");
         return;
     }
 
@@ -3151,16 +3008,12 @@ void saveSettings() {
 
     File configFile = LittleFS.open("/config.json", "w");
     if (!configFile) {
-        #ifdef DEBUG
-        Serial.println("Failed to open config file for writing");
-        #endif
+        DEBUG_INFO("Failed to open config file for writing");
         return;
     }
 
     if (serializeJson(doc, configFile) == 0) {
-        #ifdef DEBUG
-        Serial.println("Failed to write config file");
-        #endif
+        DEBUG_INFO("Failed to write config file");
     }
 
     configFile.close();
@@ -3331,7 +3184,7 @@ void setupWebServer() {
 
     // Dodaj endpoint do otrzymania informacji diagnostycznych
     server.on("/api/debug-odometer", HTTP_GET, [](AsyncWebServerRequest *request) {
-        #ifdef DEBUG
+        #ifdef DEBUG_INFO_ENABLED
         //odometer.debugPreferences();
         #endif
         
@@ -3480,12 +3333,10 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         return; // Czekamy na wszystkie dane
     }
     
-    #ifdef DEBUG
-    Serial.println("[LightsConfig] Processing request");
-    Serial.printf("[LightsConfig] Content-Type: %s\n", request->contentType().c_str());
-    Serial.printf("[LightsConfig] Data length: %d bytes\n", len);
-    #endif
-
+    DEBUG_LIGHT("Processing request");
+    DEBUG_LIGHT("Content-Type: %s\n", request->contentType().c_str());
+    DEBUG_LIGHT("Data length: %d bytes\n", len);
+    
     // Zmienna na dane JSON
     String jsonString;
     
@@ -3494,13 +3345,9 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         // Obsługa form-encoded
         if (request->hasParam("data", true)) {
             jsonString = request->getParam("data", true)->value();
-            #ifdef DEBUG
-            Serial.printf("[LightsConfig] Form data param: %s\n", jsonString.c_str());
-            #endif
+            DEBUG_LIGHT("Form data param: %s\n", jsonString.c_str());
         } else {
-            #ifdef DEBUG
-            Serial.println("[LightsConfig] Missing data parameter in form data");
-            #endif
+            DEBUG_LIGHT("Missing data parameter in form data");
             request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing data parameter\"}");
             return;
         }
@@ -3510,22 +3357,16 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         if (len > 0) {
             data[len] = '\0'; // Dodaj null terminator
             jsonString = String((char*)data);
-            #ifdef DEBUG
-            Serial.printf("[LightsConfig] Direct JSON data: %s\n", jsonString.c_str());
-            #endif
+            DEBUG_LIGHT("Direct JSON data: %s\n", jsonString.c_str());
         } else {
-            #ifdef DEBUG
-            Serial.println("[LightsConfig] Empty JSON data");
-            #endif
+            DEBUG_LIGHT("Empty JSON data");
             request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Empty JSON data\"}");
             return;
         }
     }
     else {
         // Nieznany format danych
-        #ifdef DEBUG
-        Serial.printf("[LightsConfig] Unsupported Content-Type: %s\n", request->contentType().c_str());
-        #endif
+        DEBUG_LIGHT("Unsupported Content-Type: %s\n", request->contentType().c_str());
         request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Unsupported content type\"}");
         return;
     }
@@ -3535,9 +3376,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
     DeserializationError error = deserializeJson(doc, jsonString);
     
     if (error) {
-        #ifdef DEBUG
-        Serial.printf("[LightsConfig] JSON parsing error: %s\n", error.c_str());
-        #endif
+        DEBUG_LIGHT("JSON parsing error: %s\n", error.c_str());
         request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON format\"}");
         return;
     }
@@ -3971,38 +3810,38 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
 // --- Funkcje systemu plików ---
 
 bool testFileSystem() {
-    Serial.println("\n--- Diagnostyka systemu plików ---");
+    blinkFrequency:("\n--- Diagnostyka systemu plikow ---");
     
     if (!LittleFS.begin(false)) {
-        Serial.println("Błąd montowania LittleFS - próba formatowania");
+        DEBUG_INFO("Blad montowania LittleFS - proba formatowania");
         
         if (LittleFS.format()) {
-            Serial.println("LittleFS sformatowany pomyślnie");
+            DEBUG_INFO("LittleFS sformatowany pomyslnie");
             
             if (!LittleFS.begin(false)) {
-                Serial.println("Nadal nie można zamontować LittleFS");
+                DEBUG_INFO("Nadal nie można zamontowac LittleFS");
                 return false;
             }
         } else {
-            Serial.println("Błąd formatowania LittleFS");
+            DEBUG_INFO("BLAd formatowania LittleFS");
             return false;
         }
     }
     
-    Serial.printf("Całkowita przestrzeń: %d bajtów\n", LittleFS.totalBytes());
-    Serial.printf("Użyta przestrzeń: %d bajtów\n", LittleFS.usedBytes());
-    Serial.printf("Wolna przestrzeń: %d bajtów\n", LittleFS.totalBytes() - LittleFS.usedBytes());
+    DEBUG_INFO("Calkowita przestrzen: %d bajtow\n", LittleFS.totalBytes());
+    DEBUG_INFO("Uzyta przestrzen: %d bajtow\n", LittleFS.usedBytes());
+    DEBUG_INFO("Wolna przestrzen: %d bajtow\n", LittleFS.totalBytes() - LittleFS.usedBytes());
     
     // Test zapisu
-    Serial.println("Test zapisu pliku...");
+    DEBUG_INFO("Test zapisu pliku...");
     File testFile = LittleFS.open("/test_fs.txt", "w");
     if (!testFile) {
-        Serial.println("Nie można utworzyć pliku testowego");
+        DEBUG_INFO("Nie moZna utworzyC pliku testowego");
         return false;
     }
     
     if (testFile.print("Test zapisu") == 0) {
-        Serial.println("Błąd zapisu do pliku testowego");
+        DEBUG_INFO("BLAd zapisu do pliku testowego");
         testFile.close();
         return false;
     }
@@ -4010,10 +3849,10 @@ bool testFileSystem() {
     testFile.close();
     
     // Test odczytu
-    Serial.println("Test odczytu pliku...");
+    DEBUG_INFO("Test odczytu pliku...");
     testFile = LittleFS.open("/test_fs.txt", "r");
     if (!testFile) {
-        Serial.println("Nie można otworzyć pliku testowego do odczytu");
+        DEBUG_INFO("Nie moZna otworzyC pliku testowego do odczytu");
         return false;
     }
     
@@ -4021,35 +3860,35 @@ bool testFileSystem() {
     testFile.close();
     
     if (content != "Test zapisu") {
-        Serial.println("Błąd odczytu - zawartość nie zgadza się z zapisaną");
+        DEBUG_INFO("BLAd odczytu - zawartoSC nie zgadza się z zapisanA");
         return false;
     }
     
     // Usuń plik testowy
     if (!LittleFS.remove("/test_fs.txt")) {
-        Serial.println("Nie udało się usunąć pliku testowego");
+        DEBUG_INFO("Nie udalo sie usunac pliku testowego");
     }
     
     // Lista plików
     File root = LittleFS.open("/", "r");
     if (!root) {
-        Serial.println("Błąd otwarcia katalogu głównego");
+        DEBUG_INFO("Blad otwarcia katalogu glownego");
         return false;
     }
     
     if (!root.isDirectory()) {
-        Serial.println("Katalog główny nie jest katalogiem!");
+        DEBUG_INFO("Katalog glowny nie jest katalogiem!");
         return false;
     }
     
-    Serial.println("\nLista plików:");
+    Serial.println("\nLista plikow:");
     File entry = root.openNextFile();
     while (entry) {
-        Serial.printf("  %s (%d bajtów)\n", entry.name(), entry.size());
+        DEBUG_INFO("  %s (%d bajtow)\n", entry.name(), entry.size());
         entry = root.openNextFile();
     }
     
-    Serial.println("\nTest systemu plików zakończony pomyślnie");
+    Serial.println("\nTest systemu plikow zakonczony pomyslnie");
     return true;
 }
 
@@ -4323,26 +4162,16 @@ void cleanupOldOdometer() {
 
 void initializeOdometer() {
     if (!odometer.isValid()) {
-        #ifdef DEBUG
-        Serial.println("Inicjalizacja licznika...");
-        #endif
+        DEBUG_INFO("Inicjalizacja licznika...");
         
         if (!odometer.isValid()) {
-            #ifdef DEBUG
-            Serial.println("Błąd inicjalizacji licznika!");
-            #endif
+            DEBUG_INFO("Blad inicjalizacji licznika!");
         } else {
-            #ifdef DEBUG
-            Serial.println("Licznik zainicjalizowany pomyślnie");
-            #endif
+            DEBUG_INFO("Licznik zainicjalizowany pomyslnie");
         }
     }
 
-    #ifdef DEBUG
-    Serial.printf("Stan licznika: %s, Wartość: %.2f\n", 
-                  odometer.isValid() ? "OK" : "BŁĄD", 
-                  odometer.getRawTotal());
-    #endif
+    DEBUG_INFO("Stan licznika: %s, Wartosc: %.2f\n", odometer.isValid() ? "OK" : "BLAD", odometer.getRawTotal());
 }
 
 void initializeBluetooth() {
@@ -4369,14 +4198,13 @@ void resetTpmsData() {
 }
 
 void printSystemInfo() {
-    Serial.println("\n=== Informacje o systemie ===");
-    Serial.printf("Pamięć: %d KB całość, %d KB wolne\n", 
+    DEBUG_INFO("\n=== Informacje o systemie ===");
+    DEBUG_INFO("Pamiec: %d KB calosc, %d KB wolne\n", 
                    ESP.getHeapSize()/1024, ESP.getFreeHeap()/1024);
-    Serial.printf("PSRAM: %d KB całość, %d KB wolne\n", 
+    DEBUG_INFO("PSRAM: %d KB całosc, %d KB wolne\n", 
                    ESP.getPsramSize()/1024, ESP.getFreePsram()/1024);
-    Serial.printf("Flash: %d MB, Szkic: %d KB\n", 
+    DEBUG_INFO("Flash: %d MB, Szkic: %d KB\n", 
                    ESP.getFlashChipSize()/(1024*1024), ESP.getSketchSize()/1024);
-    Serial.println("=============================\n");
 }
 
 void handleInitialSetButton() {
@@ -4410,13 +4238,13 @@ void setup() {
     Serial.begin(115200);
     Serial2.begin(CONTROLLER_UART_BAUD, SERIAL_8N1, CONTROLLER_RX_PIN, CONTROLLER_TX_PIN);
     
-    #ifdef DEBUG
-    Serial.println("\n=== Inicjalizacja systemu ===");
-    Serial.print("Przyczyna wybudzenia: ");
+    #ifdef DEBUG_INFO_ENABLED
+    DEBUG_INFO("\n=== Inicjalizacja systemu ===");
+    DEBUG_INFO("Przyczyna wybudzenia: ");
     switch(wakeup_reason) {
-        case ESP_SLEEP_WAKEUP_EXT0: Serial.println("Przycisk SET"); break;
-        case ESP_SLEEP_WAKEUP_UNDEFINED: Serial.println("Normalne uruchomienie"); break;
-        default: Serial.printf("Inna (%d)\n", wakeup_reason);
+        case ESP_SLEEP_WAKEUP_EXT0: DEBUG_INFO("Przycisk SET"); break;
+        case ESP_SLEEP_WAKEUP_UNDEFINED: DEBUG_INFO("Normalne uruchomienie"); break;
+        default: DEBUG_INFO("Inna (%d)\n", wakeup_reason);
     }
     #endif
     
@@ -4432,8 +4260,8 @@ void setup() {
 
     // Jeśli nie zostaliśmy wybudzeni przez przycisk, natychmiast przechodzimy do trybu uśpienia
     if (wakeup_reason != ESP_SLEEP_WAKEUP_EXT0) {
-        #ifdef DEBUG
-        Serial.println("Normalne uruchomienie - przechodzę do trybu uśpienia");
+        #ifdef DEBUG_INFO_ENABLED
+        DEBUG_INFO("Normalne uruchomienie - przechodze do trybu uspienia");
         Serial.flush();
         #endif
         goToSleep();
@@ -4445,30 +4273,23 @@ void setup() {
     // Inicjalizacja NVS (połączone operacje czyszczenia i inicjalizacji)
     esp_err_t err = nvs_flash_erase();
     if (err != ESP_OK) {
-        #ifdef DEBUG
-        Serial.printf("Błąd podczas czyszczenia NVS: %d\n", err);
-        #endif
+        DEBUG_INFO("Blad podczas czyszczenia NVS: %d\n", err);
     }
     
     if ((err = nvs_flash_init()) != ESP_OK) {
-        #ifdef DEBUG
-        Serial.printf("Błąd podczas inicjalizacji NVS: %d\n", err);
-        #endif
+        DEBUG_INFO("Blad podczas inicjalizacji NVS: %d\n", err);
         return;
     }
     
-    #ifdef DEBUG
-    Serial.println("NVS zainicjalizowane pomyślnie");
+    DEBUG_INFO("NVS zainicjalizowane pomyslnie");
     
     // Diagnostyka NVS (tylko w trybie DEBUG)
     nvs_stats_t nvs_stats;
     if (nvs_get_stats(NULL, &nvs_stats) == ESP_OK) {
-        Serial.println("\n=== Statystyki NVS ===");
-        Serial.printf("Użyte/Wolne/Całkowite wpisy: %d/%d/%d\n", 
+        DEBUG_INFO("\n=== Statystyki NVS ===");
+        DEBUG_INFO("Uzyte/Wolne/Calkowite wpisy: %d/%d/%d\n", 
                       nvs_stats.used_entries, nvs_stats.free_entries, nvs_stats.total_entries);
-        Serial.println("===================\n");
     }
-    #endif
 
     // Inicjalizacja czujników temperatury
     initializeTemperatureSensors();
@@ -4491,7 +4312,7 @@ void setup() {
     setLights();  
     applyBacklightSettings();
 
-    #ifdef DEBUG
+    #if DEBUG_INFO_ENABLED 
     printSystemInfo();
     #endif
 
