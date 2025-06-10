@@ -1156,6 +1156,7 @@ void saveBacklightSettingsToFile() {
     }
 
     StaticJsonDocument<200> doc;
+    doc["brightness"] = backlightSettings.Brightness;     // Dodana linia zapisująca jasność podstawową
     doc["dayBrightness"] = backlightSettings.dayBrightness;
     doc["nightBrightness"] = backlightSettings.nightBrightness;
     doc["autoMode"] = backlightSettings.autoMode;
@@ -1174,43 +1175,7 @@ void saveBacklightSettingsToFile() {
 }
 
 // wczytywanie ustawień podświetlenia
-void loadBacklightSettingsFromFile() {
-    File file = LittleFS.open(CONFIG_FILE, "r");
-    if (!file) {
-        DEBUG_LIGHT("Brak pliku konfiguracyjnego, używam ustawień domyślnych");
-        // Ustaw wartości domyślne
-        backlightSettings.Brightness = 70;
-        backlightSettings.dayBrightness = 100;
-        backlightSettings.nightBrightness = 50;
-        backlightSettings.autoMode = false;
-        // Zapisz domyślne ustawienia do pliku
-        saveBacklightSettingsToFile();
-        return;
-    }
 
-    StaticJsonDocument<200> doc;
-    DeserializationError error = deserializeJson(doc, file);
-    file.close();
-
-    if (error) {
-        DEBUG_LIGHT("Błąd podczas parsowania JSON, używam ustawień domyślnych");
-        // Ustaw wartości domyślne
-        backlightSettings.dayBrightness = 100;
-        backlightSettings.nightBrightness = 50;
-        backlightSettings.autoMode = false;
-        return;
-    }
-
-    // Wczytaj ustawienia
-    backlightSettings.dayBrightness = doc["dayBrightness"] | 100;
-    backlightSettings.nightBrightness = doc["nightBrightness"] | 50;
-    backlightSettings.autoMode = doc["autoMode"] | false;
-
-    DEBUG_LIGHT("Wczytano ustawienia z pliku:");
-    DEBUG_LIGHT("Day Brightness: %d", backlightSettings.dayBrightness);
-    DEBUG_LIGHT("Night Brightness: %d", backlightSettings.nightBrightness);
-    DEBUG_LIGHT("Auto Mode: %d", backlightSettings.autoMode ? 1 : 0);
-}
 
 // zapis ustawień ogólnych
 void saveGeneralSettingsToFile() {
@@ -3116,8 +3081,8 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         String response;
         serializeJson(doc, response);
         
-        DEBUG_INFO("Wysylam aktualny czas: %s", response.c_str());
-        
+        //DEBUG_INFO("Wysylam aktualny czas: %s", response.c_str());
+
         request->send(200, "application/json", response);
     });
 
@@ -3173,6 +3138,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
             
             if (!error) {
                 // Aktualizacja ustawień
+                backlightSettings.Brightness = doc["brightness"] | backlightSettings.Brightness; // Dodana obsługa parametru brightness
                 backlightSettings.dayBrightness = doc["dayBrightness"] | backlightSettings.dayBrightness;
                 backlightSettings.nightBrightness = doc["nightBrightness"] | backlightSettings.nightBrightness;
                 backlightSettings.autoMode = doc["autoMode"] | backlightSettings.autoMode;
@@ -3530,6 +3496,7 @@ void initializeDefaultSettings() {
     // lightManager zainicjalizowany jest w konstruktorze
 
     // Podświetlenie
+    backlightSettings.Brightness = 70;      // Dodana linia inicjalizująca podstawową jasność
     backlightSettings.dayBrightness = 100;
     backlightSettings.nightBrightness = 50;
     backlightSettings.autoMode = false;
@@ -3807,7 +3774,7 @@ void setup() {
     #if DEBUG_INFO_ENABLED
     printSystemInfo();
     #endif
-    
+
     // Obsługa przycisku SET po wybudzeniu
     handleInitialSetButton();
 }
