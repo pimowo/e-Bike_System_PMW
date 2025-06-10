@@ -3718,7 +3718,7 @@ bool testFileSystem() {
                 return false;
             }
         } else {
-            DEBUG_INFO("BLAd formatowania LittleFS");
+            DEBUG_ERROR("Blad formatowania LittleFS");
             return false;
         }
     }
@@ -3755,7 +3755,7 @@ bool testFileSystem() {
     testFile.close();
     
     if (content != "Test zapisu") {
-        DEBUG_INFO("BLAd odczytu - zawartoSC nie zgadza się z zapisanA");
+        DEBUG_ERROR("Blad odczytu - zawartosc nie zgadza sie z zapisana");
         return false;
     }
     
