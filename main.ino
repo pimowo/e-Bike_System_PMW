@@ -914,19 +914,22 @@ void updateBmsData() {
 // połączenie z BMS
 void connectToBms() {
     if (!bleClient->isConnected()) {
+    
         DEBUG_BLE("Próba połączenia z BMS...");
 
         if (bleClient->connect(bmsMacAddress)) {
             DEBUG_BLE("Połączono z BMS");
 
             bleService = bleClient->getService("0000ff00-0000-1000-8000-00805f9b34fb");
+        
             if (bleService == nullptr) {
-                DEBUG_BLE("Nie znaleziono usługi BMS");
+                DEBUG_BLE("Nie znaleziono uslugi BMS");
                 bleClient->disconnect();
                 return;
             }
 
             bleCharacteristicTx = bleService->getCharacteristic("0000ff02-0000-1000-8000-00805f9b34fb");
+        
             if (bleCharacteristicTx == nullptr) {
                 DEBUG_BLE("Nie znaleziono charakterystyki Tx");
                 bleClient->disconnect();
@@ -934,6 +937,7 @@ void connectToBms() {
             }
 
             bleCharacteristicRx = bleService->getCharacteristic("0000ff01-0000-1000-8000-00805f9b34fb");
+        
             if (bleCharacteristicRx == nullptr) {
                 DEBUG_BLE("Nie znaleziono charakterystyki Rx");
                 bleClient->disconnect();
@@ -949,38 +953,41 @@ void connectToBms() {
                 bleClient->disconnect();
                 return;
             }
+
         } else {
-          DEBUG_BLE("Nie udało się połączyć z BMS");
+
+            DEBUG_BLE("Nie udalo sie polaczyc z BMS");
         }
     }
 }
 
 void saveTpmsAddresses() {
+
     if (!LittleFS.begin(false)) {
         DEBUG_BLE("Błąd montowania LittleFS przy zapisie adresów TPMS");
         return;
     }
-    
+
     StaticJsonDocument<256> doc;
-    
+
     // Zapisz adresy czujników
     if (frontTpms.isActive && frontTpms.address[0] != '\0') {
         doc["front_tpms"] = frontTpms.address;
     }
-    
+
     if (rearTpms.isActive && rearTpms.address[0] != '\0') {
         doc["rear_tpms"] = rearTpms.address;
     }
-    
+
     File file = LittleFS.open("/tpms_config.json", "w");
+
     if (!file) {
         DEBUG_BLE("Nie można otworzyć pliku konfiguracji TPMS do zapisu");
         return;
     }
-    
+
     serializeJson(doc, file);
     file.close();
-    
     DEBUG_BLE("Zapisano konfigurację TPMS");
 }
 
@@ -1109,24 +1116,28 @@ void loadLightMode() {}
 
 void printLightConfig() {
     if (!LittleFS.begin(false)) {
-        Serial.println("Błąd montowania systemu plików");
+        DEBUG_ERROR("Blad montowania systemu plikow");
         return;
     }
     
     if (LittleFS.exists("/light_config.json")) {
         File file = LittleFS.open("/light_config.json", "r");
         if (file) {
-            Serial.println("Zawartość pliku konfiguracyjnego świateł:");
+            DEBUG_LIGHT("Zawartosc pliku konfiguracyjnego swiatel:");
+            
+            // Wczytanie całego pliku do bufora
+            String fileContent = "";
             while (file.available()) {
-                Serial.write(file.read());
+                fileContent += (char)file.read();
             }
-            Serial.println();
+            DEBUG_LIGHT("%s", fileContent.c_str());
+            
             file.close();
         } else {
-            Serial.println("Nie można otworzyć pliku konfiguracyjnego");
+            DEBUG_ERROR("Nie mozna otworzyc pliku konfiguracyjnego");
         }
     } else {
-        Serial.println("Plik konfiguracyjny nie istnieje");
+        DEBUG_INFO("Plik konfiguracyjny nie istnieje");
     }
 }
 
@@ -2268,7 +2279,7 @@ void activateConfigMode() {
         
         StaticJsonDocument<128> doc;
         doc["success"] = success;
-        doc["message"] = success ? "System plików zresetowany pomyślnie" : "Błąd resetowania systemu plików";
+        doc["message"] = success ? "System plikow zresetowany pomyslnie" : "Blad resetowania systemu plikow";
         
         String response;
         serializeJson(doc, response);
@@ -2454,7 +2465,7 @@ void applyBacklightSettings() {
 
 void printLightConfigFile() {
     if (!LittleFS.begin(false)) {
-        Serial.println("Błąd montowania systemu plików");
+        DEBUG_ERROR("Blad montowania systemu plikow");
         return;
     }
     
@@ -2984,14 +2995,12 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
     bool oldNightBlink = lightManager.getNightBlink();
     uint16_t oldBlinkFrequency = lightManager.getBlinkFrequency();
     
-    #ifdef DEBUG
-    Serial.println("[LightsConfig] Current configuration:");
-    Serial.printf("  dayConfig: 0x%02X (%s)\n", oldDayConfig, lightManager.getConfigString(oldDayConfig).c_str());
-    Serial.printf("  nightConfig: 0x%02X (%s)\n", oldNightConfig, lightManager.getConfigString(oldNightConfig).c_str());
-    Serial.printf("  dayBlink: %d\n", oldDayBlink);
-    Serial.printf("  nightBlink: %d\n", oldNightBlink);
-    Serial.printf("  blinkFrequency: %d\n", oldBlinkFrequency);
-    #endif
+    DEBUG_DETAIL("Aktualna konfiguracja:"); 
+    DEBUG_DETAIL("Konfiguracja dzienna: 0x%02X (%s)", oldDayConfig, lightManager.getConfigString(oldDayConfig).c_str());
+    DEBUG_DETAIL("Konfiguracja nocna: 0x%02X (%s)", oldNightConfig, lightManager.getConfigString(oldNightConfig).c_str());
+    DEBUG_DETAIL("Miganie dzienne: %d", oldDayBlink);
+    DEBUG_DETAIL("Miganie nocne: %d", oldNightBlink);
+    DEBUG_DETAIL("Czestotliwosc migania: %d", oldBlinkFrequency);
     
     // Zmień tylko te wartości, które są w żądaniu
     if (doc.containsKey("dayLights")) {
@@ -3000,10 +3009,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         bool dayBlink = doc.containsKey("dayBlink") ? doc["dayBlink"].as<bool>() : oldDayBlink;
         
         lightManager.setDayConfig(dayConfig, dayBlink);
-        #ifdef DEBUG
-        Serial.printf("[LightsConfig] Set day config: '%s' => 0x%02X, blink: %d\n", 
-                    dayLightsStr, dayConfig, dayBlink);
-        #endif
+        DEBUG_LIGHT("Ustawiono konfiguracje dzienna: '%s' => 0x%02X, miganie: %d", dayLightsStr, dayConfig, dayBlink);
     }
     
     if (doc.containsKey("nightLights")) {
@@ -3012,25 +3018,17 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         bool nightBlink = doc.containsKey("nightBlink") ? doc["nightBlink"].as<bool>() : oldNightBlink;
         
         lightManager.setNightConfig(nightConfig, nightBlink);
-        #ifdef DEBUG
-        Serial.printf("[LightsConfig] Set night config: '%s' => 0x%02X, blink: %d\n", 
-                    nightLightsStr, nightConfig, nightBlink);
-        #endif
+        DEBUG_LIGHT("Ustawiono konfiguracje nocna: '%s' => 0x%02X, miganie: %d", nightLightsStr, nightConfig, nightBlink);
     }
     
     if (doc.containsKey("blinkFrequency")) {
         lightManager.setBlinkFrequency(doc["blinkFrequency"] | oldBlinkFrequency);
-        #ifdef DEBUG
-        Serial.printf("[LightsConfig] Set blink frequency: %d\n", 
-                    (int)doc["blinkFrequency"]);
-        #endif
+        DEBUG_LIGHT("Ustawiono czestotliwosc migania: %d", (int)doc["blinkFrequency"]);
     }
     
     // Zapisz konfigurację
     configSuccess = lightManager.saveConfig();
-    #ifdef DEBUG
-    Serial.printf("[LightsConfig] Config save %s\n", configSuccess ? "succeeded" : "failed");
-    #endif
+    DEBUG_LIGHT("Zapis konfiguracji %s", configSuccess ? "powiodl sie" : "nie powiodl sie");
     
     // Przygotuj odpowiedź
     StaticJsonDocument<512> responseDoc;
@@ -3063,9 +3061,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
 
     String responseStr;
     serializeJson(responseDoc, responseStr);
-    #ifdef DEBUG
-    Serial.printf("[LightsConfig] Sending response: %s\n", responseStr.c_str());
-    #endif
+    DEBUG_LIGHT("Wysylam odpowiedz: %s", responseStr.c_str());
     
     request->send(200, "application/json", responseStr);
 });
@@ -3099,9 +3095,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         String response;
         serializeJson(doc, response);
         
-        #ifdef DEBUG
-        Serial.printf("[DEBUG] Konfiguracja świateł: %s\n", response.c_str());
-        #endif
+        DEBUG_LIGHT("Konfiguracja swiatel: %s", response.c_str());
         
         request->send(200, "application/json", response);
     });
@@ -3122,9 +3116,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         String response;
         serializeJson(doc, response);
         
-        #ifdef DEBUG
-        Serial.println("Wysyłam aktualny czas: " + response);
-        #endif
+        DEBUG_INFO("Wysylam aktualny czas: " + response);
         
         request->send(200, "application/json", response);
     });
@@ -3153,27 +3145,15 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
                     
                     rtc.adjust(DateTime(year, month, day, hour, minute, second));
                     
-                    #ifdef DEBUG
-                    Serial.println("Czas został zaktualizowany:");
-                    Serial.print(year); Serial.print("-");
-                    Serial.print(month); Serial.print("-");
-                    Serial.print(day); Serial.print(" ");
-                    Serial.print(hour); Serial.print(":");
-                    Serial.print(minute); Serial.print(":");
-                    Serial.println(second);
-                    #endif
+                    DEBUG_INFO("Czas zostal zaktualizowany: %d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second);
                     
                     request->send(200, "application/json", "{\"status\":\"ok\"}");
                 } else {
-                    #ifdef DEBUG
-                    Serial.println("Błędne wartości daty/czasu");
-                    #endif
+                    DEBUG_ERROR("Bledne wartosci daty/czasu");
                     request->send(400, "application/json", "{\"error\":\"Invalid date/time values\"}");
                 }
             } else {
-                #ifdef DEBUG
-                Serial.println("Błędny format JSON");
-                #endif
+                DEBUG_ERROR("Bledny format JSON");
                 request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
             }
     });
@@ -3238,11 +3218,8 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
                     
                     // Zapisz ustawienia od razu po zmianie
                     saveGeneralSettingsToFile();
-                    #ifdef DEBUG
-                    Serial.println("General settings saved");
-                    Serial.print("Wheel size: ");
-                    Serial.println(generalSettings.wheelSize);
-                    #endif
+                    DEBUG_INFO("Zapisano ustawienia ogolne");
+                    DEBUG_INFO("Rozmiar kola: %d", generalSettings.wheelSize);
                 }
 
                 request->send(200, "application/json", "{\"success\":true}");
@@ -3433,18 +3410,18 @@ bool testFileSystem() {
     
     // Usuń plik testowy
     if (!LittleFS.remove("/test_fs.txt")) {
-        DEBUG_INFO("Nie udalo sie usunac pliku testowego");
+        DEBUG_ERROR("Nie udalo sie usunac pliku testowego");
     }
     
     // Lista plików
     File root = LittleFS.open("/", "r");
     if (!root) {
-        DEBUG_INFO("Blad otwarcia katalogu glownego");
+        DEBUG_ERROR("Blad otwarcia katalogu glownego");
         return false;
     }
     
     if (!root.isDirectory()) {
-        DEBUG_INFO("Katalog glowny nie jest katalogiem!");
+        DEBUG_ERROR("Katalog glowny nie jest katalogiem!");
         return false;
     }
     
@@ -3496,17 +3473,9 @@ void listFiles() {
     File file = root.openNextFile();
     while (file) {
         if (file.isDirectory()) {
-            #ifdef DEBUG
-            Serial.print("  DIR : ");
-            Serial.println(file.name());
-            #endif
+            DEBUG_INFO("KATALOG: %s", file.name());
         } else {
-            #ifdef DEBUG
-            Serial.print("  FILE: ");
-            Serial.print(file.name());
-            Serial.print("\tSIZE: ");
-            Serial.println(file.size());
-            #endif
+            DEBUG_INFO("PLIK: %s\tROZMIAR: %d", file.name(), file.size());
         }
         file = root.openNextFile();
     }
@@ -3729,7 +3698,7 @@ void resetTpmsData() {
 void printSystemInfo() {
     DEBUG_INFO("=== Informacje o systemie ===");
     DEBUG_INFO("Pamiec: %d KB calosc, %d KB wolne", ESP.getHeapSize()/1024, ESP.getFreeHeap()/1024);
-    DEBUG_INFO("PSRAM: %d KB caLosc, %d KB wolne", ESP.getPsramSize()/1024, ESP.getFreePsram()/1024);
+    DEBUG_INFO("PSRAM: %d KB calosc, %d KB wolne", ESP.getPsramSize()/1024, ESP.getFreePsram()/1024);
     DEBUG_INFO("Flash: %d MB, Szkic: %d KB", ESP.getFlashChipSize()/(1024*1024), ESP.getSketchSize()/1024);
 }
 
@@ -3835,9 +3804,7 @@ void setup() {
     setLights();  
     applyBacklightSettings();
 
-    #if DEBUG_INFO_ENABLED 
-    printSystemInfo();
-    #endif
+    DEBUG_INFO_FUNC(printSystemInfo());
 
     // Obsługa przycisku SET po wybudzeniu
     handleInitialSetButton();
