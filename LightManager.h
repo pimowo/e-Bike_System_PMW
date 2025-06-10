@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include "DebugUtils.h"
 
 // Odkomentuj, aby włączyć debugowanie
 #define DEBUG
