@@ -3374,13 +3374,13 @@ void setupWebServer() {
             displayBrightness = newBrightness;
         }
         
-        DEBUG_INFO("Zapisuję ustawienia wyświetlacza: autoMode=%d, jasność=%d, dzień=%d, noc=%d", 
+        DEBUG_INFO("Zapisuje ustawienia wyswietlacza: autoMode = %d, jasnosc = %d, dzien = %d, noc = %d", 
             backlightSettings.autoMode, displayBrightness, backlightSettings.dayBrightness, backlightSettings.nightBrightness);
         
         // Aktualizacja ustawień auto-off
         if (doc.containsKey("autoOffTime")) {
             autoOffTime = doc["autoOffTime"] | 0;
-            DEBUG_INFO("Aktualizuję autoOffTime: %d minut", autoOffTime);
+            DEBUG_INFO("Aktualizuje autoOffTime: %d minut", autoOffTime);
             saveAutoOffSettings();
         }
         
