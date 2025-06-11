@@ -804,6 +804,7 @@ const infoContent = {
 // Główna inicjalizacja po załadowaniu DOM
 document.addEventListener('DOMContentLoaded', async function() {
     debug('Inicjalizacja aplikacji...');
+    console.log('DOM w pełni załadowany'); // Dodaj to dla lepszej diagnostyki
 
     try {
         // Najpierw zainicjalizuj rozwijane sekcje
@@ -826,10 +827,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             await loadLightConfig();
         }
 
+        // Załaduj wszystkie potrzebne konfiguracje
         await Promise.all([
             fetchDisplayConfig(),
             fetchControllerConfig(),
-            fetchSystemVersion()
+            fetchSystemVersion(),
+            fetchAutoOffSettings() // Dodane wczytywanie konfiguracji auto-wyłączania
         ]);
 
         // Inicjalizacja WebSocket
@@ -852,15 +855,18 @@ function initializeCollapsibleSections() {
     const collapseButtons = document.querySelectorAll('.collapse-btn');
     console.log('Znaleziono przycisków zwijania:', collapseButtons.length);
     
-    collapseButtons.forEach(button => {
+    collapseButtons.forEach((button, index) => {
+        console.log(`Konfigurowanie przycisku #${index + 1}`);
         button.addEventListener('click', function(event) {
-            console.log('Kliknięto przycisk zwijania');
+            console.log(`Kliknięto przycisk #${index + 1}`);
+            event.preventDefault(); // Dodaje to
             event.stopPropagation(); // Zatrzymaj propagację zdarzenia
             
             // Znajdź rodzica (.card)
             const card = this.closest('.card');
             
             if (card) {
+                console.log(`Znaleziono kartę: ${card.querySelector('h2')?.textContent || 'bez nazwy'}`);
                 // Znajdź zawartość karty (.card-content)
                 const content = card.querySelector('.card-content');
                 
@@ -886,7 +892,8 @@ function initializeCollapsibleSections() {
     const cardContents = document.querySelectorAll('.card-content');
     console.log('Znaleziono sekcji do zwinięcia:', cardContents.length);
     
-    cardContents.forEach(content => {
+    cardContents.forEach((content, index) => {
+        console.log(`Zwijanie sekcji #${index + 1}`);
         content.style.display = 'none';
     });
     
@@ -1801,46 +1808,3 @@ async function saveAutoOffSettings() {
         handleError(error, 'Błąd podczas zapisywania ustawień automatycznego wyłączania');
     }
 }
-
-document.addEventListener('DOMContentLoaded', async function() {
-    debug('Inicjalizacja aplikacji...');
-
-    try {
-        // Najpierw zainicjalizuj rozwijane sekcje
-        initializeCollapsibleSections();
-        
-        // Inicjalizacja modalu informacyjnego
-        setupModal();
-        
-        // Inicjalizacja zegara
-        let clockInterval = initializeClock();
-
-        // Poczekaj na pewność załadowania DOM
-        await new Promise(resolve => setTimeout(resolve, 200));
-
-        // Dodaj wczytywanie licznika
-        await loadOdometerValue();
-
-        // Inicjalizacja pozostałych modułów
-        if (document.querySelector('.light-config')) {
-            await loadLightConfig();
-        }
-
-        await Promise.all([
-            fetchDisplayConfig(),
-            fetchControllerConfig(),
-            fetchSystemVersion(),
-            fetchAutoOffSettings() // Dodaj to wywołanie
-        ]);
-
-        // Inicjalizacja WebSocket
-        setupWebSocket();
-        
-        // Inicjalizacja formularzy
-        setupFormListeners();
-
-        debug('Inicjalizacja zakończona pomyślnie');
-    } catch (error) {
-        console.error('Błąd podczas inicjalizacji:', error);
-    }
-});
