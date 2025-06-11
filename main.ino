@@ -1134,16 +1134,25 @@ void loadLightMode() {}
 
 // Funkcja aktualizująca czas ostatniej aktywności
 void updateActivityTime() {
-
-    lastActivityTime = millis();
-    DEBUG_INFO("Aktywnosc wykryta: czas = %u ms", lastActivityTime);
+    static unsigned long lastUpdateTime = 0;
+    unsigned long currentTime = millis();
+    
+    // Ograniczenie do max 1 aktualizacji na sekundę (1000ms)
+    if (currentTime - lastUpdateTime >= 1000) {
+        lastActivityTime = currentTime;
+        lastUpdateTime = currentTime;
+        DEBUG_INFO("Aktywnosc wykryta: czas = %u ms", lastActivityTime);
+    }
 }
 
 // Funkcja sprawdzająca czy należy automatycznie wyłączyć system
 void checkAutoOff() {
-    // Sprawdź czy funkcja auto-off jest aktywna
-    if (autoOffTime <= 0) {
-        return; // Funkcja wyłączona, zakończ
+    // Nie wykonuj automatycznego wyłączenia, gdy:
+    // 1. Auto-off jest wyłączone (autoOffTime <= 0)
+    // 2. Jesteśmy w trybie konfiguracji (configModeActive)
+    // 3. Aktywna jest konfiguracja przez WWW (webConfigActive)
+    if (autoOffTime <= 0 || configModeActive || webConfigActive) {
+        return;
     }
     
     // Oblicz czas nieaktywności z obsługą przepełnienia millis()
@@ -1170,16 +1179,17 @@ void checkAutoOff() {
     
     // Sprawdź czy przekroczono próg
     if (inactiveTime >= threshold) {
-        DEBUG_INFO("Auto-off: wyłączanie po %d min nieaktywności (%u s)", autoOffTime, inactiveTime/1000);
+        DEBUG_INFO("Auto-off: wyłaczanie po %d min nieaktywnosci (%u s)", autoOffTime, inactiveTime/1000);
         
         // Powiadom użytkownika przed wyłączeniem (opcjonalnie)
         display.clearBuffer();
-        display.setFont(czcionka_srednia);
-        display.drawStr(5, 32, "Automatyczne wylaczenie...");
+        //display.setFont(czcionka_srednia);
+        drawCenteredText("Automatyczne", 25, czcionka_srednia);
+        drawCenteredText("wylaczenie", 45, czcionka_srednia);
         display.sendBuffer();
         
         // Krótkie opóźnienie aby komunikat został wysłany i wyświetlony
-        delay(1000);
+        delay(2500);
         
         // Wyłącz system
         goToSleep();
@@ -2054,6 +2064,11 @@ void handleButtons() {
     bool upState = digitalRead(BTN_UP);
     bool downState = digitalRead(BTN_DOWN);
 
+    // Wywołuj updateActivityTime() TYLKO gdy naprawdę jest wciśnięty jakiś przycisk
+    if (!setState || !upState || !downState) {
+        updateActivityTime(); // Aktualizuj czas aktywności TYLKO gdy przycisk jest wciśnięty
+    }
+
     static unsigned long lastButtonCheck = 0;
     const unsigned long buttonDebounce = 50;
     static unsigned long legalModeStart = 0;
@@ -2096,9 +2111,6 @@ void handleButtons() {
 
     // Obsługa przycisków gdy wyświetlacz jest aktywny
     if (!showingWelcome) {
-
-        // Zawsze resetuj licznik aktywności przy naciśnięciu przycisku
-        //updateActivityTime();
 
         // Sprawdzanie trybu legal (UP + SET) - przełączanie trybu legalnego
         if (displayActive && !showingWelcome && !upState && !setState) {
@@ -2516,7 +2528,7 @@ void setCadencePulsesPerRevolution(uint8_t pulses) {
 // tryb uśpienia
 void goToSleep() {
     DEBUG_INFO("Wchodze w tryb glebokiego uspienia (DEEP SLEEP)...");
-    DEBUG_INFO("Aktualny tryb swiatel: %d", (int)lightManager.getMode());
+    //DEBUG_INFO("Aktualny tryb swiatel: %d", (int)lightManager.getMode());
 
     // Wyłącz wszystkie LEDy
     digitalWrite(FrontDayPin, LOW);
@@ -2544,77 +2556,6 @@ void goToSleep() {
     // Wejście w deep sleep
     esp_deep_sleep_start();
 }
-
-// void applyBacklightSettings() {
-//     // Wartości domyślne na wypadek niezainicjalizowanej struktury
-//     int targetBrightness = 70; // domyślna jasność
-    
-//     DEBUG_LIGHT("Aktualizacja podswietlenia:");
-//     DEBUG_LIGHT("  Tryb automatyczny: %s", backlightSettings.autoMode ? "TAK" : "NIE");
-//     DEBUG_LIGHT("  Tryb swiatel: %s", lightManager.getModeString());
-//     DEBUG_LIGHT("  Tryb sterowania: %s", lightManager.getControlMode() == LightManager::SMART_CONTROL ? "SMART" : "STEROWNIK");
-    
-//     if (!backlightSettings.autoMode) {
-//         // Tryb manualny - użyj podstawowej jasności
-//         targetBrightness = backlightSettings.Brightness > 0 ? backlightSettings.Brightness : 70;
-//         DEBUG_LIGHT("  Tryb manualny, jasnosc: %d", targetBrightness);
-//     } else {
-//         // Tryb auto - sprawdź tryb sterowania i stan świateł
-//         if (lightManager.getControlMode() == LightManager::SMART_CONTROL) {
-//             // W trybie SMART
-//             if (lightManager.getMode() == LightManager::NIGHT) {
-//                 // Tryb NOC
-//                 targetBrightness = backlightSettings.nightBrightness > 0 ? backlightSettings.nightBrightness : 50;
-//                 DEBUG_LIGHT("  Tryb automatyczny/SMART/NOC, jasnosc: %d", targetBrightness);
-//             } else {
-//                 // Tryb DZIEŃ lub wyłączone
-//                 targetBrightness = backlightSettings.dayBrightness > 0 ? backlightSettings.dayBrightness : 100;
-//                 DEBUG_LIGHT("  Tryb automatyczny/SMART/DZIEN, jasnosc: %d", targetBrightness);
-//             }
-//         } else {
-//             // W trybie STEROWNIK
-//             if (lightManager.getMode() != LightManager::OFF) {
-//                 // Światła włączone (LAMPY)
-//                 targetBrightness = backlightSettings.nightBrightness > 0 ? backlightSettings.nightBrightness : 50;
-//                 DEBUG_LIGHT("  Tryb automatyczny/STEROWNIK/LAMPY, jasnosc: %d", targetBrightness);
-//             } else {
-//                 // Światła wyłączone
-//                 targetBrightness = backlightSettings.dayBrightness > 0 ? backlightSettings.dayBrightness : 100;
-//                 DEBUG_LIGHT("  Tryb automatyczny/STEROWNIK/Wylaczone, jasnosc: %d", targetBrightness);
-//             }
-//         }
-//     }
-    
-//     // Zabezpieczenie przed nieprawidłowymi wartościami
-//     if (targetBrightness < 1) targetBrightness = 1;
-//     if (targetBrightness > 100) targetBrightness = 100;
-    
-//     // ZMIANA: lepsza funkcja mapowania jasności
-//     // Bardziej liniowe mapowanie, ale z większymi różnicami dla niskich wartości
-//     // Mapujemy na zakres 16-255
-//     int displayBrightnessValue;
-    
-//     if (targetBrightness <= 10) {
-//         // Dla bardzo niskich wartości (1-10) mapuj na zakres 16-50
-//         displayBrightnessValue = map(targetBrightness, 1, 10, 16, 50);
-//     } else if (targetBrightness <= 30) {
-//         // Dla niskich wartości (11-30) mapuj na zakres 51-100
-//         displayBrightnessValue = map(targetBrightness, 11, 30, 51, 100);
-//     } else if (targetBrightness <= 70) {
-//         // Dla średnich wartości (31-70) mapuj na zakres 101-180
-//         displayBrightnessValue = map(targetBrightness, 31, 70, 101, 180);
-//     } else {
-//         // Dla wysokich wartości (71-100) mapuj na zakres 181-255
-//         displayBrightnessValue = map(targetBrightness, 71, 100, 181, 255);
-//     }
-    
-//     displayBrightness = displayBrightnessValue;
-    
-//     // Zastosuj jasność do wyświetlacza
-//     display.setContrast(displayBrightness);
-    
-//     DEBUG_LIGHT("  Zastosowano jasność: %d (kontrast: %d)", targetBrightness, displayBrightness);
-// }
 
 void applyBacklightSettings() {
     // Wartości domyślne na wypadek niezainicjalizowanej struktury
@@ -3626,9 +3567,17 @@ void setupWebServer() {
         switch (type) {
             case WS_EVT_CONNECT:
                 DEBUG_INFO("Klient WebSocket #%u polaczony z %s\n", client->id(), client->remoteIP().toString().c_str());
+                webConfigActive = true; // Ustaw flagę aktywnej konfiguracji WWW
+                updateActivityTime(); // Zresetuj timer aktywności
                 break;
             case WS_EVT_DISCONNECT:
                 DEBUG_INFO("Klient WebSocket #%u rozlaczony\n", client->id());
+                if (ws.count() == 0) {
+                    webConfigActive = false; // Jeśli nie ma już żadnych klientów, wyłącz flagę
+                }
+                break;
+            case WS_EVT_DATA:
+                updateActivityTime(); // Każda komunikacja to aktywność
                 break;
         }
     });
@@ -4174,8 +4123,12 @@ void setup() {
     setLights();  
     applyBacklightSettings();
 
-    // Ustaw początkowy czas aktywności
+    // Ustaw początkowy czas aktywności - dodaj po inicjalizacji innych zmiennych
     lastActivityTime = millis();
+    webConfigActive = false;
+    
+    // Załaduj ustawienia auto-off - upewnij się, że to się dzieje
+    loadAutoOffSettings();
 
     #if DEBUG_INFO_ENABLED
     printSystemInfo();
@@ -4187,40 +4140,91 @@ void setup() {
 
 // Implementacja funkcji loop
 void loop() {
+    // Zmienne statyczne do śledzenia czasu
     static unsigned long lastButtonCheck = 0;
     static unsigned long lastUpdate = 0;
-    const unsigned long buttonInterval = 5;
-    const unsigned long updateInterval = 2000;
+    static unsigned long lastAutoOffCheck = 0;
+    static unsigned long lastDebugTime = 0;
+    static unsigned long prevActivityTime = 0;
+    static unsigned long lastAutoSaveTime = 0;
+    static unsigned long lastWebSocketUpdate = 0;
+    static unsigned long lastBlinkToggle = 0;
+    static unsigned long last_rpm_calc = 0;
 
-    // zmienne do śledzenia stanu świateł
+    // Stałe czasowe
+    const unsigned long buttonInterval = 5;          // Interwał sprawdzania przycisków
+    const unsigned long updateInterval = 2000;       // Interwał ogólnej aktualizacji danych
+    const unsigned long AUTO_OFF_CHECK_INTERVAL = 5000;  // Sprawdzanie auto-off co 5s
+    const unsigned long DEBUG_INTERVAL = 10000;      // Debugowanie co 10s
+    const unsigned long AUTO_SAVE_INTERVAL = 60000;  // Automatyczny zapis co minutę
+    const unsigned long WEBSOCKET_UPDATE = 1000;     // Aktualizacja WebSocket co sekundę
+    const unsigned long rpm_calc_interval = 100;     // Obliczanie kadencji co 100ms
+
+    // Zmienne do śledzenia stanu świateł
     static LightManager::LightMode lastLightMode = lightManager.getMode();
     static LightManager::ControlMode lastControlMode = lightManager.getControlMode();
 
     unsigned long currentTime = millis();
 
-    // Dodaj sprawdzanie auto-off w głównej pętli
-    if (displayActive && !configModeActive && !showingWelcome) {
-        checkAutoOff();
+    // Sprawdzanie aktywności WebSocket i aktualizacja flagi
+    if (currentTime - lastWebSocketUpdate >= WEBSOCKET_UPDATE) {
+        if (ws.count() > 0) {
+            webConfigActive = true;  // Konfiguracja WWW jest aktywna
+            updateActivityTime();    // Aktualizuj czas aktywności
+
+            // Wyślij dane statusu do klientów WebSocket
+            DynamicJsonDocument statusDoc(512);
+            statusDoc["speed"] = speed_kmh;
+            statusDoc["temperature"] = currentTemp;
+            statusDoc["battery"] = battery_capacity_percent;
+            statusDoc["power"] = power_w;
+            
+            // Informacje o światłach
+            JsonObject lightStatus = statusDoc.createNestedObject("lights");
+            lightStatus["mode"] = lightManager.getModeString();
+            lightStatus["dayConfig"] = lightManager.getConfigString(lightManager.getDayConfig());
+            lightStatus["nightConfig"] = lightManager.getConfigString(lightManager.getNightConfig());
+            
+            String jsonStr;
+            serializeJson(statusDoc, jsonStr);
+            ws.textAll(jsonStr);
+        } else {
+            webConfigActive = false; // Brak aktywnych połączeń WebSocket
+        }
+        lastWebSocketUpdate = currentTime;
     }
 
-    // Add a static variable to limit how often we check
-    static uint32_t lastAutoOffCheck = 0;
-    uint32_t currentMillis = millis();
-    
-    // Check auto-off every 5 seconds
-    if (currentMillis - lastAutoOffCheck >= 5000) {
-        lastAutoOffCheck = currentMillis;
-        checkAutoOff();
+    // Sprawdzanie automatycznego wyłączania (tylko gdy nie ma aktywnej konfiguracji)
+    if (currentTime - lastAutoOffCheck >= AUTO_OFF_CHECK_INTERVAL) {
+        lastAutoOffCheck = currentTime;
+        if (displayActive && !configModeActive && !showingWelcome && !webConfigActive) {
+            checkAutoOff();
+        }
     }
 
-    static unsigned long lastDebugTime = 0;
-    if (millis() - lastDebugTime > 5000) { // co 5 sekund
-        lastDebugTime = millis();
-        DEBUG_INFO("Status auto-off: czas=%d min, ostatnia aktywnosc=%u ms, nieaktywnosc=%u s", 
-            autoOffTime, lastActivityTime, (millis() - lastActivityTime) / 1000);
+    // Debugowanie stanu auto-off
+    if (currentTime - lastDebugTime > DEBUG_INTERVAL) {
+        lastDebugTime = currentTime;
+        
+        // Sprawdź czy lastActivityTime się zmienia (wskazuje na aktywność)
+        bool activityDetected = (lastActivityTime != prevActivityTime);
+        prevActivityTime = lastActivityTime;
+        
+        DEBUG_INFO("Auto-off status: czas=%d min, lastActivity=%u s, konfiguracja=%s, WWW=%s, aktywnosc=%s", 
+            autoOffTime, 
+            (currentTime - lastActivityTime) / 1000, 
+            configModeActive ? "TAK" : "NIE",
+            webConfigActive ? "TAK" : "NIE",
+            activityDetected ? "WYKRYTA" : "BRAK");
     }
 
-    // sekcja do sprawdzania zmian trybu świateł
+    // Automatyczny zapis danych
+    if (currentTime - lastAutoSaveTime >= AUTO_SAVE_INTERVAL) {
+        // Zapisz dane odometru i inne ważne dane
+        lastAutoSaveTime = currentTime;
+    }
+
+    // Sprawdzanie zmian trybu świateł
     if (lightManager.getMode() != lastLightMode || lightManager.getControlMode() != lastControlMode) {
         DEBUG_LIGHT("Wykryto zmiane trybu swiatel lub kontroli");
         lastLightMode = lightManager.getMode();
@@ -4228,8 +4232,10 @@ void loop() {
         
         // Zaktualizuj podświetlenie
         applyBacklightSettings();
+        updateActivityTime(); // Zmiana świateł to też aktywność
     }
 
+    // Tryb konfiguracji - wyświetlanie ekranu AP
     if (configModeActive) {      
         display.clearBuffer();
 
@@ -4247,71 +4253,36 @@ void loop() {
         if (!digitalRead(BTN_SET)) { 
             if (setPressStartTime == 0) {
                 setPressStartTime = millis();
-            } else if (millis() - setPressStartTime > 50) {
+                updateActivityTime(); // Naciśnięcie przycisku to aktywność
+            } else if (millis() - setPressStartTime > 50) { // Zwiększono z 50ms na 1000ms dla pewności
                 deactivateConfigMode();
                 setPressStartTime = 0;
             }
         } else {
             setPressStartTime = 0;
         }
-        return;
+        return; // Wyjdź z pętli loop gdy w trybie konfiguracji
     }
 
     // Sprawdzaj czy nie trzeba włączyć trybu konfiguracji
     checkConfigMode();
 
+    // Obsługa przycisków
     if (currentTime - lastButtonCheck >= buttonInterval) {
-        handleButtons();
+        handleButtons(); // Ta funkcja powinna wewnątrz wywoływać updateActivityTime()
         lastButtonCheck = currentTime;
     }
 
-    static unsigned long lastWebSocketUpdate = 0;
-    if (currentTime - lastWebSocketUpdate >= 1000) { // Aktualizuj co sekundę
-        if (ws.count() > 0) {
-            DynamicJsonDocument statusDoc(512);
-            statusDoc["speed"] = speed_kmh;
-            statusDoc["temperature"] = currentTemp;
-            statusDoc["battery"] = battery_capacity_percent;
-            statusDoc["power"] = power_w;
-            
-            // Dodaj informacje o światłach
-            JsonObject lightStatus = statusDoc.createNestedObject("lights");
-            lightStatus["mode"] = lightManager.getModeString();
-            lightStatus["dayConfig"] = lightManager.getConfigString(lightManager.getDayConfig());
-            lightStatus["nightConfig"] = lightManager.getConfigString(lightManager.getNightConfig());
-            
-            String jsonStr;
-            serializeJson(statusDoc, jsonStr);
-            ws.textAll(jsonStr);
-        }
-        lastWebSocketUpdate = currentTime;
-    }
-
     // Obsługa migania świateł
-    static unsigned long lastBlinkToggle = 0;
-    bool useBlink = false;
-    unsigned long blinkFrequency = lightManager.getBlinkFrequency();
-
-    // Sprawdź, czy miganie jest włączone
-    lightManager.update();
-
-    unsigned long lastAutoSaveTime = 0;
-    const unsigned long AUTO_SAVE_INTERVAL = 60000; // Co minutę
-
-    if (currentTime - lastAutoSaveTime >= AUTO_SAVE_INTERVAL) {
-        // Zapisz dane odometru i inne ważne dane
-        lastAutoSaveTime = currentTime;
-    }
+    lightManager.update(); // Aktualizacja stanu świateł
 
     // Aktualizuj wyświetlacz tylko jeśli jest aktywny i nie wyświetla komunikatów
     if (displayActive && messageStartTime == 0) {
         display.clearBuffer();
         
-        // sprawdzanie trybu prowadzenia roweru
+        // Sprawdzanie trybu prowadzenia roweru
         if (walkAssistActive) {
-            display.clearBuffer();
             showWalkAssistMode(false);
-            display.sendBuffer();
         } else {
             drawTopBar();
             drawHorizontalLine();
@@ -4323,10 +4294,8 @@ void loop() {
             updateBmsData();
         }
 
+        // Obliczanie kadencji
         unsigned long now = millis();
-        static unsigned long last_rpm_calc = 0;
-        const unsigned long rpm_calc_interval = 100; // co 100ms
-
         if (now - last_rpm_calc >= rpm_calc_interval) {
             unsigned long dt_sum = 0;
             int valid_intervals = 0;
@@ -4337,10 +4306,10 @@ void loop() {
                     valid_intervals++;
                 }
             }
+            
             int rpm = 0;
             if (valid_intervals > 0 && (now - cadence_pulse_times[0]) < 2000) {
                 float avg_period = (float)dt_sum / valid_intervals;
-                // Uwzględnij liczbę impulsów na jeden obrót
                 rpm = (60000.0 / avg_period) / cadence_pulses_per_revolution;
             }
             cadence_rpm = rpm;
@@ -4348,18 +4317,16 @@ void loop() {
             // Histereza dla strzałki kadencji
             switch (cadence_arrow_state) {
                 case ARROW_NONE:
-                    // ZMIANA: Przy niskiej kadencji strzałka w dół (niższy bieg)
                     if (cadence_rpm > 0 && cadence_rpm < CADENCE_OPTIMAL_MIN)
                         cadence_arrow_state = ARROW_DOWN;
-                    // ZMIANA: Przy wysokiej kadencji strzałka w górę (wyższy bieg)
                     else if (cadence_rpm > CADENCE_OPTIMAL_MAX)
                         cadence_arrow_state = ARROW_UP;
                     break;
-                case ARROW_DOWN: // Był ARROW_UP
+                case ARROW_DOWN:
                     if (cadence_rpm >= CADENCE_OPTIMAL_MIN + CADENCE_HYSTERESIS)
                         cadence_arrow_state = ARROW_NONE;
                     break;
-                case ARROW_UP: // Był ARROW_DOWN
+                case ARROW_UP:
                     if (cadence_rpm <= CADENCE_OPTIMAL_MAX - CADENCE_HYSTERESIS)
                         cadence_arrow_state = ARROW_NONE;
                     break;
@@ -4373,13 +4340,12 @@ void loop() {
             last_rpm_calc = now;
         }
 
-        // Co 5s aktualizuj wyświetlaną średnią i max, oraz zeruj sumatory
+        // Co 5s aktualizuj wyświetlaną średnią i max
         if (now - last_avg_max_update >= AVG_MAX_UPDATE_INTERVAL) {
             if (cadence_samples > 0)
                 cadence_avg_rpm = cadence_sum / cadence_samples;
             else
                 cadence_avg_rpm = 0;
-            // NIE zerujemy sumatorów ani max!
             last_avg_max_update = now;
         }
 
@@ -4387,23 +4353,22 @@ void loop() {
         drawCadenceArrowsAndCircle();
         display.sendBuffer();
 
-        unsigned long currentTime = millis();
+        // Obsługa TPMS
         if (bluetoothConfig.tpmsEnabled) {
             if (tpmsScanning && (currentTime - lastTpmsScanTime > 5000)) {
-                // Zakończ poprzednie skanowanie
                 stopTpmsScan();
             }
             
             if (!tpmsScanning && (currentTime - lastTpmsScanTime > TPMS_SCAN_INTERVAL)) {
-                // Rozpocznij nowe skanowanie
                 startTpmsScan();
             }
             
-            // Sprawdź, czy czujniki działają
             checkTpmsTimeout();
         }
 
+        // Aktualizacja danych co określony interwał
         if (currentTime - lastUpdate >= updateInterval) {
+            // Aktualizacja wszystkich danych (prędkość, temperatura, itp.)
             speed_kmh = (speed_kmh >= 35.0) ? 0.0 : speed_kmh + 0.1;
             temp_motor = 30.0 + random(20);
             range_km = 50.0 - (random(20) / 10.0);
@@ -4417,16 +4382,18 @@ void loop() {
             battery_capacity_wh = 14.5 - (random(20) / 10.0);
             battery_capacity_percent = (battery_capacity_percent <= 0) ? 100 : battery_capacity_percent - 1;
             battery_voltage = (battery_voltage <= 42.0) ? 50.0 : battery_voltage - 0.1;
-            lastUpdate = currentTime;
+            
+            // Aktualizacja średniej i maksymalnej prędkości
             static float speed_sum = 0;
             static int speed_count = 0;
             speed_sum += speed_kmh;
             speed_count++;
             speed_avg_kmh = speed_sum / speed_count;
-            // Aktualizacja maksymalnej prędkości
             if (speed_kmh > speed_max_kmh) {
                 speed_max_kmh = speed_kmh;
             }
+            
+            lastUpdate = currentTime;
         }
     }
 }
