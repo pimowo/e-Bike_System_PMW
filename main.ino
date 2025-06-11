@@ -76,7 +76,7 @@
  ********************************************************************/
 
 // Wersja oprogramowania
-const char* VERSION = "11.6.25";
+const char* VERSION = "11.6.25-B";
 
 // Nazwy plików konfiguracyjnych
 const char* CONFIG_FILE = "/display_config.json";
@@ -414,6 +414,7 @@ uint8_t displayBrightness = 16;  // Wartość od 0 do 255 (jasność wyświetlac
 int autoOffTime = 0;            // Czas do automatycznego wyłączenia w minutach (0 = funkcja wyłączona)
 unsigned long lastActivityTime = 0;  // Czas ostatniej aktywności
 bool autoOffEnabled = false;    // Czy funkcja auto-off jest włączona
+bool webConfigActive = false;
 
 // Zmienne pomiarowe
 float speed_kmh;
@@ -1140,30 +1141,48 @@ void updateActivityTime() {
 
 // Funkcja sprawdzająca czy należy automatycznie wyłączyć system
 void checkAutoOff() {
-
-    // Tylko jeśli auto-off jest aktywny
-    if (autoOffTime > 0) {
-        unsigned long currentTime = millis();
-        unsigned long inactiveTime = currentTime - lastActivityTime;
-        unsigned long threshold = (unsigned long)autoOffTime * 60000; // konwersja minut na ms
+    // Sprawdź czy funkcja auto-off jest aktywna
+    if (autoOffTime <= 0) {
+        return; // Funkcja wyłączona, zakończ
+    }
+    
+    // Oblicz czas nieaktywności z obsługą przepełnienia millis()
+    unsigned long currentTime = millis();
+    unsigned long inactiveTime;
+    
+    // Obsługa przepełnienia millis()
+    if (currentTime < lastActivityTime) {
+        // Przepełnienie - oblicz prawidłowy czas
+        inactiveTime = (0xFFFFFFFFUL - lastActivityTime) + currentTime;
+    } else {
+        inactiveTime = currentTime - lastActivityTime;
+    }
+    
+    // Oblicz próg wyłączenia (autoOffTime w minutach * 60000 ms)
+    uint32_t threshold = (uint32_t)autoOffTime * 60000UL;
+    
+    // Debugowanie co 10 sekund
+    static unsigned long lastCheckTime = 0;
+    if (currentTime - lastCheckTime > 10000) {
+        lastCheckTime = currentTime;
+        DEBUG_INFO("Auto-off: nieaktywnosc = %u s, prog = %u s, auto-off = %d min", inactiveTime/1000, threshold/1000, autoOffTime);
+    }
+    
+    // Sprawdź czy przekroczono próg
+    if (inactiveTime >= threshold) {
+        DEBUG_INFO("Auto-off: wyłączanie po %d min nieaktywności (%u s)", autoOffTime, inactiveTime/1000);
         
-        // Debugowanie
-        static unsigned long lastCheckTime = 0;
-
-        if (currentTime - lastCheckTime > 10000) { // co 10 sekund
-            lastCheckTime = currentTime;
-            DEBUG_INFO("Auto-off check: czas nieaktywności = %u s, próg = %u s", inactiveTime/1000, threshold/1000);
-        }
+        // Powiadom użytkownika przed wyłączeniem (opcjonalnie)
+        display.clearBuffer();
+        display.setFont(czcionka_srednia);
+        display.drawStr(5, 32, "Automatyczne wylaczenie...");
+        display.sendBuffer();
         
-        // Sprawdź czy przekroczono próg
-        if (inactiveTime >= threshold) {
-            DEBUG_INFO("Automatyczne wylaczenie po %d minutach nieaktywności (%u s)", autoOffTime, inactiveTime/1000);
-            
-            // Krótkie opóźnienie aby komunikat został wysłany
-            delay(100);
-            
-            goToSleep();
-        }
+        // Krótkie opóźnienie aby komunikat został wysłany i wyświetlony
+        delay(1000);
+        
+        // Wyłącz system
+        goToSleep();
     }
 }
 
