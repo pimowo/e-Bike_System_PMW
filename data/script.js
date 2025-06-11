@@ -180,21 +180,21 @@ const infoContent = {
         description: `Poziom jasności wyświetlacza używany w nocy (0-100%). Zalecana niższa wartość dla komfortowego użytkowania w ciemności.`
     },
 
-    'auto-off-time-info': {
-        title: '⏰ Czas automatycznego wyłączenia',
-        description: `Określa czas bezczynności, po którym system automatycznie się wyłączy.
+	'auto-off-time-info': {
+		title: '⏰ Czas automatycznego wyłączenia',
+		description: `Określa czas bezczynności, po którym system automatycznie się wyłączy.
 
-        Zakres: 0-60 minut
-        0: Funkcja wyłączona (system nie wyłączy się automatycznie)
-        1-60: Czas w minutach do automatycznego wyłączenia
+		Dostępne opcje:
+		• Wyłączone: funkcja automatycznego wyłączania jest nieaktywna
+		• 1-60 min: czas w minutach do automatycznego wyłączenia
 
-        💡 WSKAZÓWKA:
-          - Krótszy czas oszczędza baterię
-          - Dłuższy czas jest wygodniejszy przy dłuższych postojach
-        
-        ⚠️ UWAGA:
-        System zawsze zapisze wszystkie ustawienia przed wyłączeniem`
-    },
+		💡 WSKAZÓWKA:
+		  - Krótszy czas oszczędza baterię
+		  - Dłuższy czas jest wygodniejszy przy dłuższych postojach
+		
+		⚠️ UWAGA:
+		System zawsze zapisze wszystkie ustawienia przed wyłączeniem`
+	},
 
     // Sekcja sterownika //
 
@@ -1399,7 +1399,6 @@ function saveBluetoothConfig() {
 // Funkcja pobierająca i aktualizująca konfigurację wyświetlacza
 async function fetchDisplayConfig() {
     try {
-        // Zmiana endpointu z '/api/status' na '/api/display/config'
         const response = await fetch('/api/display/config');
         const data = await response.json();
         
@@ -1412,6 +1411,13 @@ async function fetchDisplayConfig() {
             updateElementValue('night-brightness', data.nightBrightness || 50);
             updateElementValue('display-auto', data.autoMode ? 'true' : 'false');
             
+            // Aktualizuj wartość auto-off
+            if (data.autoOffSettings) {
+                const autoOffTime = data.autoOffSettings.enabled ? 
+                    (data.autoOffSettings.autoOffTime || 0) : 0;
+                updateAutoOffDropdown(autoOffTime);
+            }
+            
             console.log('Ustawiono autoMode na:', data.autoMode ? 'true' : 'false');
             
             // Wywołaj funkcję przełączania, aby odpowiednio pokazać/ukryć sekcje
@@ -1422,15 +1428,22 @@ async function fetchDisplayConfig() {
     }
 }
 
-// Funkcja zapisująca konfigurację wyświetlacza
+// Funkcja zapisująca ustawienia auto-off
 async function saveDisplayConfig() {
     try {
+        const autoOffTime = parseInt(document.getElementById('auto-off-time').value);
         const autoMode = document.getElementById('display-auto').value === 'true';
+        
         const data = {
             brightness: parseInt(document.getElementById('brightness').value),
             dayBrightness: parseInt(document.getElementById('day-brightness').value),
             nightBrightness: parseInt(document.getElementById('night-brightness').value),
-            autoMode: autoMode
+            autoMode: autoMode,
+            // Nowe dane auto-off
+            autoOffSettings: {
+                enabled: autoOffTime > 0,
+                autoOffTime: autoOffTime
+            }
         };
 
         console.log('Wysyłam dane konfiguracji wyświetlacza:', data);
@@ -1447,7 +1460,6 @@ async function saveDisplayConfig() {
         console.log('Odpowiedź serwera:', result);
 
         if (result.status === 'ok') {
-            // Zmiana z showToast na showNotification
             showNotification('Zapisano ustawienia wyświetlacza', 'success');
             await fetchDisplayConfig(); // odśwież wyświetlane ustawienia po zapisie
         } else {
@@ -1766,12 +1778,29 @@ async function fetchAutoOffSettings() {
         console.log('Otrzymane dane auto-off:', data);
         
         if (data) {
-            updateElementValue('auto-off-time', data.autoOffTime || 0);
-            updateElementValue('auto-off-enabled', data.enabled ? 'true' : 'false');
+            // Aktualizacja dropdownu z czasem automatycznego wyłączenia
+            const autoOffTime = data.enabled ? (data.autoOffTime || 0) : 0;
+            updateAutoOffDropdown(autoOffTime);
         }
     } catch (error) {
         console.error('Błąd podczas pobierania ustawień auto-off:', error);
     }
+}
+
+// Funkcja aktualizująca dropdown auto-off
+function updateAutoOffDropdown(value) {
+    const dropdown = document.getElementById('auto-off-time');
+    if (!dropdown) return;
+    
+    // Jeśli nie ma dokładnie takiej wartości w dropdownie, znajdź najbliższą
+    const options = Array.from(dropdown.options).map(opt => parseInt(opt.value));
+    if (!options.includes(value)) {
+        // Znajdź najbliższą większą wartość
+        const closestValue = options.find(opt => opt > value) || options[options.length - 1];
+        value = closestValue;
+    }
+    
+    dropdown.value = value.toString();
 }
 
 // Funkcja zapisująca ustawienia auto-off
