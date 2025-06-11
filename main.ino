@@ -1134,26 +1134,35 @@ void loadLightMode() {}
 // Funkcja aktualizująca czas ostatniej aktywności
 void updateActivityTime() {
     lastActivityTime = millis();
-    DEBUG_INFO("Aktywność wykryta: czas=%u ms", lastActivityTime);
+    DEBUG_INFO("Aktywnosc wykryta: czas = %u ms", lastActivityTime);
 }
 
 // Funkcja sprawdzająca czy należy automatycznie wyłączyć system
 void checkAutoOff() {
-    // Sprawdź czy automatyczne wyłączanie jest aktywne i czy minął określony czas
-    if (autoOffTime > 0 && (millis() - lastActivityTime) > (autoOffTime * 60000)) {
-        DEBUG_INFO("Automatyczne wyłączenie po %d minutach nieaktywności", autoOffTime);
+    // Tylko jeśli auto-off jest aktywny
+    if (autoOffTime > 0) {
+        unsigned long currentTime = millis();
+        unsigned long inactiveTime = currentTime - lastActivityTime;
+        unsigned long threshold = (unsigned long)autoOffTime * 60000; // konwersja minut na ms
         
-        // Dodaj debugowanie
-        Serial.print("Auto-off aktywowane! Czas nieaktywności: ");
-        Serial.print((millis() - lastActivityTime) / 1000);
-        Serial.print("s, Próg: ");
-        Serial.print(autoOffTime * 60);
-        Serial.println("s");
+        // Debugowanie
+        static unsigned long lastCheckTime = 0;
+        if (currentTime - lastCheckTime > 10000) { // co 10 sekund
+            lastCheckTime = currentTime;
+            DEBUG_INFO("Auto-off check: czas nieaktywności = %u s, próg = %u s", 
+                inactiveTime/1000, threshold/1000);
+        }
         
-        // Krótkie opóźnienie aby komunikat został wysłany
-        delay(100);
-        
-        goToSleep();
+        // Sprawdź czy przekroczono próg
+        if (inactiveTime >= threshold) {
+            DEBUG_INFO("Automatyczne wyłączenie po %d minutach nieaktywności (%u s)", 
+                autoOffTime, inactiveTime/1000);
+            
+            // Krótkie opóźnienie aby komunikat został wysłany
+            delay(100);
+            
+            goToSleep();
+        }
     }
 }
 
@@ -1340,9 +1349,18 @@ void saveAutoOffSettings() {
         DEBUG_INFO("Zapisano ustawienia auto-off: %d minut", autoOffTime);
     }
     file.close();
+    
+    // Sprawdź, czy plik został poprawnie zapisany
+    File testFile = LittleFS.open("/auto_off.json", "r");
+    if (testFile) {
+        String content = testFile.readString();
+        DEBUG_INFO("Zawartość pliku auto_off.json: %s", content.c_str());
+        testFile.close();
+    } else {
+        DEBUG_ERROR("Nie można odczytać zapisanego pliku auto_off.json!");
+    }
 }
 
-// Funkcja wczytująca ustawienia automatycznego wyłączania
 void loadAutoOffSettings() {
     if (!LittleFS.begin()) {
         DEBUG_ERROR("Nie można zamontować systemu plików!");
@@ -1356,6 +1374,10 @@ void loadAutoOffSettings() {
         return;
     }
 
+    String content = file.readString();
+    DEBUG_INFO("Wczytany plik auto_off.json: %s", content.c_str());
+    
+    file.seek(0);
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, file);
     file.close();
@@ -1367,11 +1389,6 @@ void loadAutoOffSettings() {
 
     autoOffTime = doc["autoOffTime"] | 0;
     DEBUG_INFO("Wczytano ustawienia auto-off: %d minut", autoOffTime);
-    
-    // Dodaj debugowanie
-    Serial.print("Wczytano ustawienia auto-off: czas=");
-    Serial.print(autoOffTime);
-    Serial.println(" minut");
 }
 
 // --- Funkcje wyświetlacza ---
@@ -3346,8 +3363,9 @@ server.on("/api/display/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         int newAutoOffTime = doc["autoOffSettings"]["autoOffTime"] | 0;
         
         // Zapisz do debugowania
-        Serial.print("Nowe ustawienia auto-off: czas=");
+        Serial.print("Nowe ustawienia Auto-OFF: czas = ");
         Serial.println(newAutoOffTime);
+        Serial.println(" minut");
         
         // Aktualizuj zmienną globalną
         autoOffTime = newAutoOffTime;
@@ -3411,10 +3429,7 @@ server.on("/api/display/config", HTTP_POST, [](AsyncWebServerRequest *request) {
                 if (doc.containsKey("enabled")) {
                     autoOffEnabled = doc["enabled"].as<bool>();
                 }
-                
-                // Resetuj timer
-                updateActivityTime();
-                
+                                
                 // Zapisz ustawienia do pliku
                 saveAutoOffSettings();
                 
@@ -4156,6 +4171,13 @@ void loop() {
     if (currentMillis - lastAutoOffCheck >= 5000) {
         lastAutoOffCheck = currentMillis;
         checkAutoOff();
+    }
+
+    static unsigned long lastDebugTime = 0;
+    if (millis() - lastDebugTime > 5000) { // co 5 sekund
+        lastDebugTime = millis();
+        DEBUG_INFO("Status auto-off: czas=%d min, ostatnia aktywność=%u ms, nieaktywność=%u s", 
+            autoOffTime, lastActivityTime, (millis() - lastActivityTime) / 1000);
     }
 
     // sekcja do sprawdzania zmian trybu świateł
