@@ -6,6 +6,8 @@
 #include <LittleFS.h>
 #include "DebugUtils.h"
 
+extern void applyBacklightSettings();
+
 // Odkomentuj, aby włączyć debugowanie
 #define DEBUG
 
