@@ -66,8 +66,8 @@ LightManager::LightManager(uint8_t frontPin, uint8_t drlPin, uint8_t rearPin) :
     }
     
     DEBUG_LIGHT("Zainicjalizowano z pinami");
-    DEBUG_LIGHT("Konfiguracja dzienna: %s, miganie: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
-    DEBUG_LIGHT("Konfiguracja nocna: %s, miganie: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
+    DEBUG_LIGHT("Konfiguracja dzienna: %s, miganie: %d", getConfigString(dayConfig).c_str(), dayBlink);
+    DEBUG_LIGHT("Konfiguracja nocna: %s, miganie: %d", getConfigString(nightConfig).c_str(), nightBlink);
 }
 
 // Inicjalizacja - przypisanie pinow GPIO
@@ -99,14 +99,14 @@ void LightManager::begin(uint8_t frontPin, uint8_t drlPin, uint8_t rearPin) {
     
     #ifdef DEBUG
     DEBUG_LIGHT("Zainicjalizowano");
-    DEBUG_LIGHT("Konfiguracja dzienna: %s, miganie: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
-    DEBUG_LIGHT("Konfiguracja nocna: %s, miganie: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
+    DEBUG_LIGHT("Konfiguracja dzienna: %s, miganie: %d", getConfigString(dayConfig).c_str(), dayBlink);
+    DEBUG_LIGHT("Konfiguracja nocna: %s, miganie: %d", getConfigString(nightConfig).c_str(), nightBlink);
     #endif
 }
 
 // Ustawianie trybu
 void LightManager::setMode(LightMode mode) {
-    DEBUG_LIGHT("Ustawianie trybu %d\n", mode);
+    DEBUG_LIGHT("Ustawianie trybu %d", mode);
     
     if (mode >= OFF && mode <= NIGHT) {
         currentMode = mode;
@@ -116,13 +116,13 @@ void LightManager::setMode(LightMode mode) {
 
 // Settery
 void LightManager::setDayConfig(uint8_t config, bool blink) {
-    DEBUG_LIGHT("Ustawianie konfiguracji dziennej: przed=0x%02X, po=0x%02X, miganie: %d\n", dayConfig, config, blink);
-    DEBUG_LIGHT("REAR wlaczone? %s\n", (config & REAR) ? "TAK" : "NIE");
+    DEBUG_LIGHT("Ustawianie konfiguracji dziennej: przed=0x%02X, po=0x%02X, miganie: %d", dayConfig, config, blink);
+    DEBUG_LIGHT("REAR wlaczone? %s", (config & REAR) ? "TAK" : "NIE");
     
     dayConfig = config;
     dayBlink = blink;
     
-    DEBUG_LIGHT("Ustawiono konfiguracje dzienna: %s, miganie: %d\n", getConfigString(dayConfig).c_str(), dayBlink);
+    DEBUG_LIGHT("Ustawiono konfiguracje dzienna: %s, miganie: %d", getConfigString(dayConfig).c_str(), dayBlink);
     
     if (currentMode == DAY) {
         updateLights();
@@ -130,13 +130,13 @@ void LightManager::setDayConfig(uint8_t config, bool blink) {
 }
 
 void LightManager::setNightConfig(uint8_t config, bool blink) {
-    DEBUG_LIGHT("Ustawianie konfiguracji nocnej: przed=0x%02X, po=0x%02X, miganie: %d\n", nightConfig, config, blink);
-    DEBUG_LIGHT("REAR wlaczone? %s\n", (config & REAR) ? "TAK" : "NIE");
+    DEBUG_LIGHT("Ustawianie konfiguracji nocnej: przed=0x%02X, po=0x%02X, miganie: %d", nightConfig, config, blink);
+    DEBUG_LIGHT("REAR wlaczone? %s", (config & REAR) ? "TAK" : "NIE");
         
     nightConfig = config;
     nightBlink = blink;
     
-    DEBUG_LIGHT("Ustawiono konfiguracje nocna: %s, miganie: %d\n", getConfigString(nightConfig).c_str(), nightBlink);
+    DEBUG_LIGHT("Ustawiono konfiguracje nocna: %s, miganie: %d", getConfigString(nightConfig).c_str(), nightBlink);
     
     if (currentMode == NIGHT) {
         updateLights();
@@ -147,7 +147,7 @@ void LightManager::setBlinkFrequency(uint16_t frequency) {
     if (frequency >= 100 && frequency <= 2000) {
         blinkFrequency = frequency;
         
-        DEBUG_LIGHT("Ustawiono czestotliwosc migania: %d ms\n", blinkFrequency);
+        DEBUG_LIGHT("Ustawiono czestotliwosc migania: %d ms", blinkFrequency);
     }
 }
 
@@ -232,7 +232,7 @@ void LightManager::updateLights() {
     }
     
     if (currentMode != OFF) {
-        DEBUG_LIGHT("Swiatla zaktualizowane: przednie=%d, swiatlo dzienne=%d, tylne=%d, miganie=%d\n", frontState, drlState, rearState, shouldBlink);
+        DEBUG_LIGHT("Swiatla zaktualizowane: przednie=%d, swiatlo dzienne=%d, tylne=%d, miganie=%d", frontState, drlState, rearState, shouldBlink);
     } else {
         DEBUG_LIGHT("Wszystkie swiatla wylaczone");
     }
@@ -261,7 +261,7 @@ void LightManager::update() {
             blinkState = !blinkState;
             digitalWrite(rearPin, blinkState ? HIGH : LOW);
             
-            DEBUG_LIGHT("Miganie tylnego swiatla: %d\n", blinkState);
+            //DEBUG_LIGHT("Miganie tylnego swiatla: %d", blinkState);
         }
     } else if (rearState) {
         // Jesli nie migamy, ale swiatlo ma byc wlaczone
@@ -275,14 +275,14 @@ void LightManager::update() {
 // Zapisz konfiguracje
 bool LightManager::saveConfig() {
     DEBUG_LIGHT("Zapisywanie konfiguracji...");
-    DEBUG_LIGHT("Konfiguracja dzienna: 0x%02X (%s)\n", dayConfig, getConfigString(dayConfig).c_str());
-    DEBUG_LIGHT("Konfiguracja nocna: 0x%02X (%s)\n", nightConfig, getConfigString(nightConfig).c_str());
-    DEBUG_LIGHT("Miganie dzienne: %d, Miganie nocne: %d\n", dayBlink, nightBlink);
-    DEBUG_LIGHT("Czestotliwosc migania: %d\n", blinkFrequency);
+    DEBUG_LIGHT("Konfiguracja dzienna: 0x%02X (%s)", dayConfig, getConfigString(dayConfig).c_str());
+    DEBUG_LIGHT("Konfiguracja nocna: 0x%02X (%s)", nightConfig, getConfigString(nightConfig).c_str());
+    DEBUG_LIGHT("Miganie dzienne: %d, Miganie nocne: %d", dayBlink, nightBlink);
+    DEBUG_LIGHT("Czestotliwosc migania: %d", blinkFrequency);
     
     // Sprawdz poszczegolne bity
-    DEBUG_LIGHT("Konfiguracja dzienna - FRONT: %d, DRL: %d, REAR: %d\n", (dayConfig & FRONT) != 0, (dayConfig & DRL) != 0, (dayConfig & REAR) != 0);
-    DEBUG_LIGHT("Konfiguracja nocna - FRONT: %d, DRL: %d, REAR: %d\n", (nightConfig & FRONT) != 0, (nightConfig & DRL) != 0, (nightConfig & REAR) != 0);
+    DEBUG_LIGHT("Konfiguracja dzienna - FRONT: %d, DRL: %d, REAR: %d", (dayConfig & FRONT) != 0, (dayConfig & DRL) != 0, (dayConfig & REAR) != 0);
+    DEBUG_LIGHT("Konfiguracja nocna - FRONT: %d, DRL: %d, REAR: %d", (nightConfig & FRONT) != 0, (nightConfig & DRL) != 0, (nightConfig & REAR) != 0);
         
     if (!LittleFS.begin(false)) {
         DEBUG_LIGHT("Blad montowania LittleFS");
@@ -322,14 +322,14 @@ bool LightManager::saveConfig() {
     }
     
     #ifdef DEBUG_LIGHT_ENABLED
-    DEBUG_LIGHT("Konfiguracja zapisana pomyslnie (%d bajtow)\n", bytes);
+    DEBUG_LIGHT("Konfiguracja zapisana pomyslnie (%d bajtow)", bytes);
     
     // Dla pewnosci odczytaj zapisany plik i sprawdz jego zawartosc
     File readFile = LittleFS.open("/light_config.json", "r");
     if (readFile) {
         String content = readFile.readString();
         readFile.close();
-        DEBUG_LIGHT("Zapisana zawartosc pliku: %s\n", content.c_str());
+        DEBUG_LIGHT("Zapisana zawartosc pliku: %s", content.c_str());
     }
     #endif
     
@@ -361,7 +361,7 @@ bool LightManager::loadConfig() {
     configFile.close();
     
     if (error) {
-        DEBUG_LIGHT("Blad parsowania pliku konfiguracyjnego: %s\n", error.c_str());
+        DEBUG_LIGHT("Blad parsowania pliku konfiguracyjnego: %s", error.c_str());
         return false;
     }
     
@@ -399,10 +399,10 @@ bool LightManager::loadConfig() {
     
     #ifdef DEBUG_LIGHT_ENABLED
     DEBUG_LIGHT("Wczytana konfiguracja:");
-    DEBUG_LIGHT("Konfiguracja dzienna: 0x%02X (%s)\n", dayConfig, getConfigString(dayConfig).c_str());
-    DEBUG_LIGHT("Konfiguracja nocna: 0x%02X (%s)\n", nightConfig, getConfigString(nightConfig).c_str());
-    DEBUG_LIGHT("Miganie dzienne: %d, Miganie nocne: %d\n", dayBlink, nightBlink);
-    DEBUG_LIGHT("Czestotliwosc migania: %d\n", blinkFrequency);
+    DEBUG_LIGHT("Konfiguracja dzienna: 0x%02X (%s)", dayConfig, getConfigString(dayConfig).c_str());
+    DEBUG_LIGHT("Konfiguracja nocna: 0x%02X (%s)", nightConfig, getConfigString(nightConfig).c_str());
+    DEBUG_LIGHT("Miganie dzienne: %d, Miganie nocne: %d", dayBlink, nightBlink);
+    DEBUG_LIGHT("Czestotliwosc migania: %d", blinkFrequency);
     #endif
     
     return true;
@@ -410,7 +410,7 @@ bool LightManager::loadConfig() {
 
 // Konwersja config (uint8_t) na string
 String LightManager::getConfigString(uint8_t config) const {
-    DEBUG_LIGHT("getConfigString - wartsc wejsciowa: 0x%02X\n", config);
+    DEBUG_LIGHT("getConfigString - wartsc wejsciowa: 0x%02X", config);
     
     if (config == NONE) return "NONE";
     
@@ -427,7 +427,7 @@ String LightManager::getConfigString(uint8_t config) const {
         result += "REAR";
     }
     
-    DEBUG_LIGHT("getConfigString - rezultat: %s\n", result.c_str());
+    DEBUG_LIGHT("getConfigString - rezultat: %s", result.c_str());
         
     return result;
 }
@@ -448,7 +448,7 @@ String LightManager::getModeString() const {
 
 // Konwersja string na config (uint8_t)
 uint8_t LightManager::parseConfigString(const char* configStr) {
-    DEBUG_LIGHT("parseConfigString - wejsciowy string: '%s'\n", configStr);
+    DEBUG_LIGHT("parseConfigString - wejsciowy string: '%s'", configStr);
         
     String configString(configStr); // Konwertujemy const char* na String dla wygody
     uint8_t result = NONE;
@@ -471,7 +471,7 @@ uint8_t LightManager::parseConfigString(const char* configStr) {
             while (end > token && *end == ' ') end--;
             *(end + 1) = '\0';
             
-            DEBUG_LIGHT("Analizuje token: '%s'\n", token);
+            DEBUG_LIGHT("Analizuje token: '%s'", token);
                         
             if (strcmp(token, "FRONT") == 0) {
                 DEBUG_LIGHT("Dodaje flage FRONT (0x01)");
@@ -492,7 +492,7 @@ uint8_t LightManager::parseConfigString(const char* configStr) {
         free(copy); // Zwolnij pamiec
     } else {
         // Pojedyncza wartosc
-        DEBUG_LIGHT("Analizuje pojedyncza wartosc: '%s'\n", configStr);
+        DEBUG_LIGHT("Analizuje pojedyncza wartosc: '%s'", configStr);
                 
         if (strcmp(configStr, "FRONT") == 0) {
             DEBUG_LIGHT("Ustawiam flage FRONT (0x01)");
@@ -508,7 +508,7 @@ uint8_t LightManager::parseConfigString(const char* configStr) {
         }
     }
     
-    DEBUG_LIGHT("parseConfigString - rezultat: 0x%02X\n", result);
+    DEBUG_LIGHT("parseConfigString - rezultat: 0x%02X", result);
     
     return result;
 }
