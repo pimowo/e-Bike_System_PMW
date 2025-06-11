@@ -1396,52 +1396,51 @@ function saveBluetoothConfig() {
     });
 }
 
-// Popraw funkcję fetchDisplayConfig, aby prawidłowo mapowała wartości jasności
+// Poprawiona funkcja pobierania konfiguracji wyświetlacza
 async function fetchDisplayConfig() {
     try {
         const response = await fetch('/api/display/config');
         const data = await response.json();
         
-        console.log('Otrzymane dane podświetlenia:', data);
+        console.log('Otrzymane dane konfiguracji:', JSON.stringify(data));
         
         if (data) {
-            // Konwertuj wartość jasności z 0-255 na 0-100 jeśli potrzeba
-            let brightness = data.brightness || 70;
-            if (brightness > 100) {
-                // Wygląda jak wartość wewnętrzna (0-255), konwertuj na 0-100
-                brightness = Math.round((brightness / 255) * 100);
-                console.log('Przekonwertowano jasność z', data.brightness, 'na', brightness);
-            }
-            
             // Aktualizuj pola formularza
-            updateElementValue('brightness', brightness);
+            updateElementValue('brightness', data.brightness || 70);
             updateElementValue('day-brightness', data.dayBrightness || 100);
             updateElementValue('night-brightness', data.nightBrightness || 50);
             updateElementValue('display-auto', data.autoMode ? 'true' : 'false');
             
-            // Aktualizuj wartość auto-off
-            // Sprawdź różne możliwości struktury danych
-            let autoOffTime = 0;
+            // Wyraźnie zaloguj wartość auto-off przed i po konwersji
+            console.log('Otrzymana wartość autoOffTime:', data.autoOffTime);
             
-            if (data.autoOffTime !== undefined) {
-                // Bezpośrednio w obiekcie głównym
-                autoOffTime = data.autoOffTime;
-                console.log('Znaleziono autoOffTime bezpośrednio w danych:', autoOffTime);
-            } else if (data.autoOffSettings && data.autoOffSettings.autoOffTime !== undefined) {
-                // W obiekcie autoOffSettings
-                autoOffTime = data.autoOffSettings.autoOffTime;
-                console.log('Znaleziono autoOffTime w autoOffSettings:', autoOffTime);
+            // Upewnij się, że auto-off-time to rzeczywiście dropdown
+            const autoOffDropdown = document.getElementById('auto-off-time');
+            if (autoOffDropdown && autoOffDropdown.tagName === 'SELECT') {
+                const autoOffValue = data.autoOffTime !== undefined ? data.autoOffTime.toString() : '0';
+                console.log('Ustawianie dropdown auto-off na wartość:', autoOffValue);
+                
+                // Sprawdź czy taka opcja istnieje
+                let optionExists = false;
+                for (let i = 0; i < autoOffDropdown.options.length; i++) {
+                    if (autoOffDropdown.options[i].value === autoOffValue) {
+                        optionExists = true;
+                        break;
+                    }
+                }
+                
+                if (optionExists) {
+                    autoOffDropdown.value = autoOffValue;
+                    console.log('Ustawiono dropdown na wartość:', autoOffValue);
+                } else {
+                    console.warn('Opcja o wartości', autoOffValue, 'nie istnieje w dropdownie. Dostępne opcje:');
+                    Array.from(autoOffDropdown.options).forEach(opt => console.log(opt.value));
+                }
             } else {
-                console.log('Nie znaleziono wartości autoOffTime w danych');
+                console.error('Element auto-off-time nie jest selectem lub nie istnieje!');
             }
             
-            // Ustaw wartość w dropdownie
-            updateAutoOffDropdown(autoOffTime);
-            
-            console.log('Ustawiono autoMode na:', data.autoMode ? 'true' : 'false');
-            console.log('Ustawiono autoOffTime na:', autoOffTime);
-            
-            // Wywołaj funkcję przełączania, aby odpowiednio pokazać/ukryć sekcje
+            // Wywołaj funkcję przełączania dla trybu AUTO
             toggleAutoBrightness();
         }
     } catch (error) {
