@@ -3347,58 +3347,72 @@ void setupWebServer() {
             }
     });
     
-    // In your server setup code
-server.on("/api/display/config", HTTP_POST, [](AsyncWebServerRequest *request) {
-    // Obsługa POST
-}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-    StaticJsonDocument<512> doc;
-    DeserializationError error = deserializeJson(doc, data, len);
-    
-    if (error) {
-        request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON\"}");
-        return;
-    }
-    
-    // Aktualizacja ustawień podświetlenia
-    backlightSettings.autoMode = doc["autoMode"] | false;
-    backlightSettings.dayBrightness = doc["dayBrightness"] | 100;
-    backlightSettings.nightBrightness = doc["nightBrightness"] | 50;
-    displayBrightness = doc["brightness"] | 70;
-    
-    // Aktualizacja ustawień auto-off
-    if (doc.containsKey("autoOffSettings")) {
-        int newAutoOffTime = doc["autoOffSettings"]["autoOffTime"] | 0;
+    // Obsługa POST dla konfiguracji wyświetlacza
+    server.on("/api/display/config", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Obsługa POST
+    }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        StaticJsonDocument<512> doc;
+        DeserializationError error = deserializeJson(doc, data, len);
         
-        // Zapisz do debugowania
-        Serial.print("Nowe ustawienia Auto-OFF: czas = ");
-        Serial.println(newAutoOffTime);
-        Serial.println(" minut");
+        if (error) {
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON\"}");
+            return;
+        }
         
-        // Aktualizuj zmienną globalną
-        autoOffTime = newAutoOffTime;
+        // Aktualizacja ustawień podświetlenia
+        backlightSettings.autoMode = doc["autoMode"] | false;
+        backlightSettings.dayBrightness = doc["dayBrightness"] | 100;
+        backlightSettings.nightBrightness = doc["nightBrightness"] | 50;
         
-        // Zapisz ustawienia
-        saveAutoOffSettings();
-    }
-    
-    // Zastosuj ustawienia
-    applyBacklightSettings();
-    saveBacklightSettingsToFile();
-    
-    request->send(200, "application/json", "{\"status\":\"ok\"}");
-});
+        // Pobierz jasność i dostosuj jeśli potrzeba
+        int newBrightness = doc["brightness"] | 70;
+        if (newBrightness <= 100) {
+            // Wartość procentowa (0-100), zachowaj jak jest
+            displayBrightness = newBrightness;
+        } else {
+            // Wartość surowa (>100), użyj bezpośrednio
+            displayBrightness = newBrightness;
+        }
+        
+        DEBUG_INFO("Zapisuję ustawienia wyświetlacza: autoMode=%d, jasność=%d, dzień=%d, noc=%d", 
+            backlightSettings.autoMode, displayBrightness, backlightSettings.dayBrightness, backlightSettings.nightBrightness);
+        
+        // Aktualizacja ustawień auto-off
+        if (doc.containsKey("autoOffTime")) {
+            autoOffTime = doc["autoOffTime"] | 0;
+            DEBUG_INFO("Aktualizuję autoOffTime: %d minut", autoOffTime);
+            saveAutoOffSettings();
+        }
+        
+        // Zastosuj ustawienia
+        applyBacklightSettings();
+        saveBacklightSettingsToFile();
+        
+        request->send(200, "application/json", "{\"status\":\"ok\"}");
+    });
 
     // Endpoint do obsługi konfiguracji wyświetlacza
     server.on("/api/display/config", HTTP_GET, [](AsyncWebServerRequest *request) {
         StaticJsonDocument<512> doc;
-        doc["brightness"] = displayBrightness;
+        
+        // Przekształć wartość jasności na procenty, jeśli jest poza zakresem 0-100
+        int brightnessToSend = displayBrightness;
+        if (brightnessToSend > 100) {
+            brightnessToSend = map(displayBrightness, 0, 255, 0, 100);
+        }
+        
+        doc["brightness"] = brightnessToSend;
         doc["dayBrightness"] = backlightSettings.dayBrightness;
         doc["nightBrightness"] = backlightSettings.nightBrightness;
         doc["autoMode"] = backlightSettings.autoMode;
+        // Dodaj bezpośrednio wartość autoOffTime
         doc["autoOffTime"] = autoOffTime;
 
         String response;
         serializeJson(doc, response);
+        
+        DEBUG_INFO("Wysyłam konfigurację wyświetlacza: %s", response.c_str());
+        
         request->send(200, "application/json", response);
     });
 
