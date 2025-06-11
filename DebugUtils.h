@@ -15,7 +15,7 @@
 #define DEBUG_ERROR_ENABLED   1  // Błędy krytyczne
 #define DEBUG_WARN_ENABLED    1  // Ostrzeżenia
 #define DEBUG_INFO_ENABLED    1  // Informacje ogólne
-#define DEBUG_LIGHT_ENABLED   1  // Logi dotyczące oświetlenia
+#define DEBUG_LIGHT_ENABLED   0  // Logi dotyczące oświetlenia
 #define DEBUG_TEMP_ENABLED    1  // Logi czujników temperatury
 #define DEBUG_BLE_ENABLED     1  // Logi komunikacji Bluetooth
 #define DEBUG_DETAIL_ENABLED  1  // Szczegółowe logi
