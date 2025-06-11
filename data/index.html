@@ -226,8 +226,22 @@
 									Czas automatycznego wyłączenia
 									<button class="info-icon" data-info="auto-off-time-info">ℹ</button>
 								</label>
+								<div class="toggle-switch">
+									<select id="auto-off-enabled">
+										<option value="false">Nie</option>
+										<option value="true">Tak</option>
+									</select>
+								</div>
+							</div>
+
+							<!-- Czas do automatycznego wyłączenia -->
+							<div class="display-row">
+								<label>
+									Czas nieaktywności
+									<button class="info-icon" data-info="auto-off-time-info">ℹ</button>
+								</label>
 								<div class="input-with-unit">
-									<input type="number" id="auto-off-time" min="0" max="60" value="5">
+									<input type="number" id="auto-off-time" min="0" max="60" value="0">
 									<span class="unit">min</span>
 								</div>
 							</div>
