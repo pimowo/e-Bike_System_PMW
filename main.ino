@@ -2404,19 +2404,90 @@ void goToSleep() {
     esp_deep_sleep_start();
 }
 
+// void applyBacklightSettings() {
+//     // Wartości domyślne na wypadek niezainicjalizowanej struktury
+//     int targetBrightness = 70; // domyślna jasność
+    
+//     DEBUG_LIGHT("Aktualizacja podswietlenia:");
+//     DEBUG_LIGHT("  Tryb automatyczny: %s", backlightSettings.autoMode ? "TAK" : "NIE");
+//     DEBUG_LIGHT("  Tryb swiatel: %s", lightManager.getModeString());
+//     DEBUG_LIGHT("  Tryb sterowania: %s", lightManager.getControlMode() == LightManager::SMART_CONTROL ? "SMART" : "STEROWNIK");
+    
+//     if (!backlightSettings.autoMode) {
+//         // Tryb manualny - użyj podstawowej jasności
+//         targetBrightness = backlightSettings.Brightness > 0 ? backlightSettings.Brightness : 70;
+//         DEBUG_LIGHT("  Tryb manualny, jasnosc: %d", targetBrightness);
+//     } else {
+//         // Tryb auto - sprawdź tryb sterowania i stan świateł
+//         if (lightManager.getControlMode() == LightManager::SMART_CONTROL) {
+//             // W trybie SMART
+//             if (lightManager.getMode() == LightManager::NIGHT) {
+//                 // Tryb NOC
+//                 targetBrightness = backlightSettings.nightBrightness > 0 ? backlightSettings.nightBrightness : 50;
+//                 DEBUG_LIGHT("  Tryb automatyczny/SMART/NOC, jasnosc: %d", targetBrightness);
+//             } else {
+//                 // Tryb DZIEŃ lub wyłączone
+//                 targetBrightness = backlightSettings.dayBrightness > 0 ? backlightSettings.dayBrightness : 100;
+//                 DEBUG_LIGHT("  Tryb automatyczny/SMART/DZIEN, jasnosc: %d", targetBrightness);
+//             }
+//         } else {
+//             // W trybie STEROWNIK
+//             if (lightManager.getMode() != LightManager::OFF) {
+//                 // Światła włączone (LAMPY)
+//                 targetBrightness = backlightSettings.nightBrightness > 0 ? backlightSettings.nightBrightness : 50;
+//                 DEBUG_LIGHT("  Tryb automatyczny/STEROWNIK/LAMPY, jasnosc: %d", targetBrightness);
+//             } else {
+//                 // Światła wyłączone
+//                 targetBrightness = backlightSettings.dayBrightness > 0 ? backlightSettings.dayBrightness : 100;
+//                 DEBUG_LIGHT("  Tryb automatyczny/STEROWNIK/Wylaczone, jasnosc: %d", targetBrightness);
+//             }
+//         }
+//     }
+    
+//     // Zabezpieczenie przed nieprawidłowymi wartościami
+//     if (targetBrightness < 1) targetBrightness = 1;
+//     if (targetBrightness > 100) targetBrightness = 100;
+    
+//     // ZMIANA: lepsza funkcja mapowania jasności
+//     // Bardziej liniowe mapowanie, ale z większymi różnicami dla niskich wartości
+//     // Mapujemy na zakres 16-255
+//     int displayBrightnessValue;
+    
+//     if (targetBrightness <= 10) {
+//         // Dla bardzo niskich wartości (1-10) mapuj na zakres 16-50
+//         displayBrightnessValue = map(targetBrightness, 1, 10, 16, 50);
+//     } else if (targetBrightness <= 30) {
+//         // Dla niskich wartości (11-30) mapuj na zakres 51-100
+//         displayBrightnessValue = map(targetBrightness, 11, 30, 51, 100);
+//     } else if (targetBrightness <= 70) {
+//         // Dla średnich wartości (31-70) mapuj na zakres 101-180
+//         displayBrightnessValue = map(targetBrightness, 31, 70, 101, 180);
+//     } else {
+//         // Dla wysokich wartości (71-100) mapuj na zakres 181-255
+//         displayBrightnessValue = map(targetBrightness, 71, 100, 181, 255);
+//     }
+    
+//     displayBrightness = displayBrightnessValue;
+    
+//     // Zastosuj jasność do wyświetlacza
+//     display.setContrast(displayBrightness);
+    
+//     DEBUG_LIGHT("  Zastosowano jasność: %d (kontrast: %d)", targetBrightness, displayBrightness);
+// }
+
 void applyBacklightSettings() {
     // Wartości domyślne na wypadek niezainicjalizowanej struktury
     int targetBrightness = 70; // domyślna jasność
     
-    DEBUG_LIGHT("Aktualizacja podświetlenia:");
+    DEBUG_LIGHT("Aktualizacja podswietlenia:");
     DEBUG_LIGHT("  Tryb automatyczny: %s", backlightSettings.autoMode ? "TAK" : "NIE");
-    DEBUG_LIGHT("  Tryb świateł: %s", lightManager.getModeString());
+    DEBUG_LIGHT("  Tryb swiatel: %s", lightManager.getModeString());
     DEBUG_LIGHT("  Tryb sterowania: %s", lightManager.getControlMode() == LightManager::SMART_CONTROL ? "SMART" : "STEROWNIK");
     
     if (!backlightSettings.autoMode) {
         // Tryb manualny - użyj podstawowej jasności
         targetBrightness = backlightSettings.Brightness > 0 ? backlightSettings.Brightness : 70;
-        DEBUG_LIGHT("  Tryb manualny, jasność: %d", targetBrightness);
+        DEBUG_LIGHT("  Tryb manualny, jasnosc: %d", targetBrightness);
     } else {
         // Tryb auto - sprawdź tryb sterowania i stan świateł
         if (lightManager.getControlMode() == LightManager::SMART_CONTROL) {
@@ -2424,50 +2495,33 @@ void applyBacklightSettings() {
             if (lightManager.getMode() == LightManager::NIGHT) {
                 // Tryb NOC
                 targetBrightness = backlightSettings.nightBrightness > 0 ? backlightSettings.nightBrightness : 50;
-                DEBUG_LIGHT("  Tryb automatyczny/SMART/NOC, jasność: %d", targetBrightness);
+                DEBUG_LIGHT("  Tryb automatyczny/SMART/NOC, jasnosc: %d", targetBrightness);
             } else {
                 // Tryb DZIEŃ lub wyłączone
                 targetBrightness = backlightSettings.dayBrightness > 0 ? backlightSettings.dayBrightness : 100;
-                DEBUG_LIGHT("  Tryb automatyczny/SMART/DZIEŃ, jasność: %d", targetBrightness);
+                DEBUG_LIGHT("  Tryb automatyczny/SMART/DZIEN, jasnosc: %d", targetBrightness);
             }
         } else {
             // W trybie STEROWNIK
             if (lightManager.getMode() != LightManager::OFF) {
                 // Światła włączone (LAMPY)
                 targetBrightness = backlightSettings.nightBrightness > 0 ? backlightSettings.nightBrightness : 50;
-                DEBUG_LIGHT("  Tryb automatyczny/STEROWNIK/LAMPY, jasność: %d", targetBrightness);
+                DEBUG_LIGHT("  Tryb automatyczny/STEROWNIK/LAMPY, jasnosc: %d", targetBrightness);
             } else {
                 // Światła wyłączone
                 targetBrightness = backlightSettings.dayBrightness > 0 ? backlightSettings.dayBrightness : 100;
-                DEBUG_LIGHT("  Tryb automatyczny/STEROWNIK/Wyłączone, jasność: %d", targetBrightness);
+                DEBUG_LIGHT("  Tryb automatyczny/STEROWNIK/Wylaczone, jasnosc: %d", targetBrightness);
             }
         }
     }
     
     // Zabezpieczenie przed nieprawidłowymi wartościami
-    if (targetBrightness < 1) targetBrightness = 1;
+    if (targetBrightness < 0) targetBrightness = 0;  // Teraz pozwalamy na 0%
     if (targetBrightness > 100) targetBrightness = 100;
     
-    // ZMIANA: lepsza funkcja mapowania jasności
-    // Bardziej liniowe mapowanie, ale z większymi różnicami dla niskich wartości
-    // Mapujemy na zakres 16-255
-    int displayBrightnessValue;
-    
-    if (targetBrightness <= 10) {
-        // Dla bardzo niskich wartości (1-10) mapuj na zakres 16-50
-        displayBrightnessValue = map(targetBrightness, 1, 10, 16, 50);
-    } else if (targetBrightness <= 30) {
-        // Dla niskich wartości (11-30) mapuj na zakres 51-100
-        displayBrightnessValue = map(targetBrightness, 11, 30, 51, 100);
-    } else if (targetBrightness <= 70) {
-        // Dla średnich wartości (31-70) mapuj na zakres 101-180
-        displayBrightnessValue = map(targetBrightness, 31, 70, 101, 180);
-    } else {
-        // Dla wysokich wartości (71-100) mapuj na zakres 181-255
-        displayBrightnessValue = map(targetBrightness, 71, 100, 181, 255);
-    }
-    
-    displayBrightness = displayBrightnessValue;
+    // PROSTE MAPOWANIE LINIOWE: 0-100% -> 0-255
+    // Bezpośrednie przełożenie procentu jasności na wartość kontrastu
+    displayBrightness = map(targetBrightness, 0, 100, 0, 255);
     
     // Zastosuj jasność do wyświetlacza
     display.setContrast(displayBrightness);
