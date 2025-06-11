@@ -71,20 +71,26 @@ const infoContent = {
       - Utrzymuj światła w czystości
       - Wymień uszkodzone elementy`
     },
-	
+		
 	'light-control-info': {
-        title: 'Tryb sterowania światłami',
-        description: 
-		`Smart
-		Zaawansowane sterowanie świateł przez system e-Bike. 
-		Dostępne są opcje konfiguracji świateł dziennych, 
-		nocnych oraz opcji migania.
-        
-        Sterownik
-		Podstawowe sterowanie świateł przez kontroler. 
-		System e-Bike będzie tylko włączał/wyłączał światła, 
-		a kontroler będzie decydował o szczegółach ich działania`
-	},	
+        title: '🚦 Tryb sterowania światłami',
+        description: `Dostępne tryby sterowania:
+    
+		🧠 Smart
+		Zaawansowane sterowanie świateł przez system e-Bike
+		  - dostępne opcje konfiguracji świateł dziennych i nocnych
+		  - kontrola funkcji migania i częstotliwości
+		  - automatyczne przełączanie między trybem dziennym i nocnym
+		
+		⚙️ Sterownik
+		Podstawowe sterowanie świateł przez kontroler
+		  - system e-Bike będzie tylko włączał/wyłączał światła
+		  - kontroler będzie decydował o szczegółach ich działania
+		  - prostsze działanie, bez dodatkowych opcji konfiguracji
+			
+		⚠️ Uwaga! 
+			Zmiana tego ustawienia wpłynie na dostępność pozostałych opcji konfiguracji świateł`
+    },
 
     'day-lights-info': {
         title: '☀️ Światła dzienne',
@@ -1669,3 +1675,69 @@ function handleError(error, userMessage = 'Wystąpił błąd') {
     console.error(error);
     showNotification(userMessage + ': ' + error.message, 'error');
 }
+
+// Funkcja wczytująca ustawienia podświetlenia
+function loadDisplaySettings() {
+    fetch('/api/display/config')
+        .then(response => response.json())
+        .then(data => {
+            // Wypełnij pola formularza aktualnymi wartościami
+            document.getElementById('brightness').value = data.brightness;
+            document.getElementById('dayBrightness').value = data.dayBrightness;
+            document.getElementById('nightBrightness').value = data.nightBrightness;
+            document.getElementById('autoMode').checked = data.autoMode;
+            
+            // Aktualizuj wizualne wskaźniki
+            updateSliderValues();
+        })
+        .catch(error => {
+            console.error('Błąd wczytywania ustawień podświetlenia:', error);
+        });
+}
+
+// Funkcja odświeżająca wizualne wskaźniki
+function updateSliderValues() {
+    document.getElementById('brightnessValue').textContent = document.getElementById('brightness').value;
+    document.getElementById('dayBrightnessValue').textContent = document.getElementById('dayBrightness').value;
+    document.getElementById('nightBrightnessValue').textContent = document.getElementById('nightBrightness').value;
+}
+
+// Wywołaj funkcję wczytującą ustawienia po załadowaniu strony
+document.addEventListener('DOMContentLoaded', function() {
+    loadDisplaySettings();
+    
+    // Podłącz funkcję zapisującą do przycisku zapisu
+    document.getElementById('saveDisplaySettings').addEventListener('click', function() {
+        const data = {
+            brightness: parseInt(document.getElementById('brightness').value),
+            dayBrightness: parseInt(document.getElementById('dayBrightness').value),
+            nightBrightness: parseInt(document.getElementById('nightBrightness').value),
+            autoMode: document.getElementById('autoMode').checked
+        };
+        
+        fetch('/api/display/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                alert('Ustawienia zostały zapisane');
+            } else {
+                alert('Błąd podczas zapisywania ustawień');
+            }
+        })
+        .catch(error => {
+            console.error('Błąd:', error);
+            alert('Wystąpił błąd podczas zapisywania ustawień');
+        });
+    });
+    
+    // Podłącz aktualizację wartości do zmiany suwaków
+    document.getElementById('brightness').addEventListener('input', updateSliderValues);
+    document.getElementById('dayBrightness').addEventListener('input', updateSliderValues);
+    document.getElementById('nightBrightness').addEventListener('input', updateSliderValues);
+});
