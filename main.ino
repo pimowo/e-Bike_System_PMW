@@ -232,7 +232,11 @@ private:
     float currentTotal = 0;
 
     void saveToFile() {
-        //DEBUG_INFO("Zapisywanie licznika do pliku...");
+        // Upewnij się, że system plików jest zamontowany
+        if (!LittleFS.begin(false)) {
+            DEBUG_ERROR("Blad montowania LittleFS przed zapisem licznika");
+            return;
+        }
 
         File file = LittleFS.open(filename, "w");
         if (!file) {
@@ -246,7 +250,7 @@ private:
         if (serializeJson(doc, file) == 0) {
             DEBUG_ERROR("Blad zapisu do pliku licznika");
         } else {
-            //DEBUG_INFO("Zapisano licznik: %.2f", currentTotal);
+            DEBUG_INFO("Zapisano licznik: %.2f", currentTotal);
         }
         
         file.close();
@@ -2024,16 +2028,19 @@ void handleButtons() {
                 if (lightManager.getControlMode() == LightManager::SMART_CONTROL) {
                     // Cykliczne przełączanie: dzień -> noc -> wyłączone
                     lightManager.cycleMode();
+                    applyBacklightSettings();
                 } else {
                     // Tryb sterownika: włącz/wyłącz światła
                     if (lightManager.getMode() == LightManager::OFF) {
                         // Włącz światła (wysyłając komendę UART do sterownika)
                         lightManager.setMode(LightManager::DAY); // Tymczasowo ustawiam DAY jako "włączone" w trybie sterownika
                         // TODO: Dodać wysyłanie komendy UART do sterownika KT
+                        applyBacklightSettings();
                     } else {
                         // Wyłącz światła
                         lightManager.setMode(LightManager::OFF);
                         // TODO: Dodać wysyłanie komendy UART do sterownika KT
+                        applyBacklightSettings();
                     }
                 }
                 upLongPressExecuted = true;
@@ -2401,36 +2408,71 @@ void applyBacklightSettings() {
     // Wartości domyślne na wypadek niezainicjalizowanej struktury
     int targetBrightness = 70; // domyślna jasność
     
+    DEBUG_LIGHT("Aktualizacja podświetlenia:");
+    DEBUG_LIGHT("  Tryb automatyczny: %s", backlightSettings.autoMode ? "TAK" : "NIE");
+    DEBUG_LIGHT("  Tryb świateł: %s", lightManager.getModeString());
+    DEBUG_LIGHT("  Tryb sterowania: %s", lightManager.getControlMode() == LightManager::SMART_CONTROL ? "SMART" : "STEROWNIK");
+    
     if (!backlightSettings.autoMode) {
         // Tryb manualny - użyj podstawowej jasności
         targetBrightness = backlightSettings.Brightness > 0 ? backlightSettings.Brightness : 70;
+        DEBUG_LIGHT("  Tryb manualny, jasność: %d", targetBrightness);
     } else {
-        // Tryb auto - sprawdź stan świateł
-        if (lightManager.getMode() == LightManager::NIGHT) {  // Światła nocne
-            targetBrightness = backlightSettings.nightBrightness > 0 ? backlightSettings.nightBrightness : 50;
-        } else {  // Światła dzienne (DAY) lub wyłączone (OFF)
-            targetBrightness = backlightSettings.dayBrightness > 0 ? backlightSettings.dayBrightness : 100;
+        // Tryb auto - sprawdź tryb sterowania i stan świateł
+        if (lightManager.getControlMode() == LightManager::SMART_CONTROL) {
+            // W trybie SMART
+            if (lightManager.getMode() == LightManager::NIGHT) {
+                // Tryb NOC
+                targetBrightness = backlightSettings.nightBrightness > 0 ? backlightSettings.nightBrightness : 50;
+                DEBUG_LIGHT("  Tryb automatyczny/SMART/NOC, jasność: %d", targetBrightness);
+            } else {
+                // Tryb DZIEŃ lub wyłączone
+                targetBrightness = backlightSettings.dayBrightness > 0 ? backlightSettings.dayBrightness : 100;
+                DEBUG_LIGHT("  Tryb automatyczny/SMART/DZIEŃ, jasność: %d", targetBrightness);
+            }
+        } else {
+            // W trybie STEROWNIK
+            if (lightManager.getMode() != LightManager::OFF) {
+                // Światła włączone (LAMPY)
+                targetBrightness = backlightSettings.nightBrightness > 0 ? backlightSettings.nightBrightness : 50;
+                DEBUG_LIGHT("  Tryb automatyczny/STEROWNIK/LAMPY, jasność: %d", targetBrightness);
+            } else {
+                // Światła wyłączone
+                targetBrightness = backlightSettings.dayBrightness > 0 ? backlightSettings.dayBrightness : 100;
+                DEBUG_LIGHT("  Tryb automatyczny/STEROWNIK/Wyłączone, jasność: %d", targetBrightness);
+            }
         }
     }
     
     // Zabezpieczenie przed nieprawidłowymi wartościami
-    if (targetBrightness < 10) targetBrightness = 10;
+    if (targetBrightness < 1) targetBrightness = 1;
     if (targetBrightness > 100) targetBrightness = 100;
     
-    // Nieliniowe mapowanie jasności
-    float normalized = (targetBrightness * targetBrightness) / 100.0;
+    // ZMIANA: lepsza funkcja mapowania jasności
+    // Bardziej liniowe mapowanie, ale z większymi różnicami dla niskich wartości
+    // Mapujemy na zakres 16-255
+    int displayBrightnessValue;
     
-    // Mapujemy wartość na zakres 16-255
-    displayBrightness = map(normalized, 0, 100, 16, 255);
+    if (targetBrightness <= 10) {
+        // Dla bardzo niskich wartości (1-10) mapuj na zakres 16-50
+        displayBrightnessValue = map(targetBrightness, 1, 10, 16, 50);
+    } else if (targetBrightness <= 30) {
+        // Dla niskich wartości (11-30) mapuj na zakres 51-100
+        displayBrightnessValue = map(targetBrightness, 11, 30, 51, 100);
+    } else if (targetBrightness <= 70) {
+        // Dla średnich wartości (31-70) mapuj na zakres 101-180
+        displayBrightnessValue = map(targetBrightness, 31, 70, 101, 180);
+    } else {
+        // Dla wysokich wartości (71-100) mapuj na zakres 181-255
+        displayBrightnessValue = map(targetBrightness, 71, 100, 181, 255);
+    }
+    
+    displayBrightness = displayBrightnessValue;
     
     // Zastosuj jasność do wyświetlacza
     display.setContrast(displayBrightness);
     
-    #if DEBUG_INFO_ENABLED
-    DEBUG_INFO("Target brightness: %d", targetBrightness);
-    DEBUG_INFO("Normalized: %.2f", normalized);
-    DEBUG_INFO("Display brightness: %d", displayBrightness);
-    #endif
+    DEBUG_LIGHT("  Zastosowano jasność: %d (kontrast: %d)", targetBrightness, displayBrightness);
 }
 
 void printLightConfigFile() {
@@ -3027,6 +3069,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
     if (doc.containsKey("controlMode")) {
         int controlMode = doc["controlMode"].as<int>();
         lightManager.setControlMode((LightManager::ControlMode)controlMode);
+        applyBacklightSettings();
     }
 
     String responseStr;
@@ -3131,8 +3174,7 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
     server.on("/api/display/config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
             if (index + len != total) {
-                // Jeśli to nie jest ostatni fragment danych, czekamy na więcej
-                return;
+                return; // Czekamy na wszystkie dane
             }
 
             // Dodaj null terminator do danych
@@ -3142,11 +3184,16 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
             DeserializationError error = deserializeJson(doc, (const char*)data);
             
             if (!error) {
-                // Aktualizacja ustawień
-                backlightSettings.Brightness = doc["brightness"] | backlightSettings.Brightness; // Dodana obsługa parametru brightness
+                // Aktualizacja ustawień - zwróć uwagę na obsługę autoMode
+                backlightSettings.Brightness = doc["brightness"] | backlightSettings.Brightness;
                 backlightSettings.dayBrightness = doc["dayBrightness"] | backlightSettings.dayBrightness;
                 backlightSettings.nightBrightness = doc["nightBrightness"] | backlightSettings.nightBrightness;
-                backlightSettings.autoMode = doc["autoMode"] | backlightSettings.autoMode;
+                
+                // WAŻNE - sprawdzenie czy autoMode jest w danych
+                if (doc.containsKey("autoMode")) {
+                    backlightSettings.autoMode = doc["autoMode"].as<bool>();
+                    DEBUG_LIGHT("Ustawiono autoMode: %s", backlightSettings.autoMode ? "TAK" : "NIE");
+                }
                 
                 // Zapisz do pliku
                 saveBacklightSettingsToFile();
@@ -3155,7 +3202,16 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
                 applyBacklightSettings();
                 
                 // Odpowiedz używając send()
-                String response = "{\"status\":\"ok\"}";
+                StaticJsonDocument<200> responseDoc;
+                responseDoc["status"] = "ok";
+                // Dodaj aktualne ustawienia do odpowiedzi
+                responseDoc["brightness"] = backlightSettings.Brightness;
+                responseDoc["dayBrightness"] = backlightSettings.dayBrightness;
+                responseDoc["nightBrightness"] = backlightSettings.nightBrightness;
+                responseDoc["autoMode"] = backlightSettings.autoMode;
+                
+                String response;
+                serializeJson(responseDoc, response);
                 request->send(200, "application/json", response);
             } else {
                 String response = "{\"status\":\"error\",\"message\":\"Invalid JSON\"}";
@@ -3175,6 +3231,13 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         
         String response;
         serializeJson(doc, response);
+        
+        DEBUG_LIGHT("Wysylam ustawienia podswietlenia: brightness=%d, dayBrightness=%d, nightBrightness=%d, autoMode=%d", 
+                backlightSettings.Brightness, 
+                backlightSettings.dayBrightness, 
+                backlightSettings.nightBrightness, 
+                backlightSettings.autoMode ? 1 : 0);
+        
         request->send(200, "application/json", response);
     });
 
@@ -3886,7 +3949,21 @@ void loop() {
     const unsigned long buttonInterval = 5;
     const unsigned long updateInterval = 2000;
 
+    // zmienne do śledzenia stanu świateł
+    static LightManager::LightMode lastLightMode = lightManager.getMode();
+    static LightManager::ControlMode lastControlMode = lightManager.getControlMode();
+
     unsigned long currentTime = millis();
+
+    // sekcja do sprawdzania zmian trybu świateł
+    if (lightManager.getMode() != lastLightMode || lightManager.getControlMode() != lastControlMode) {
+        DEBUG_LIGHT("Wykryto zmianę trybu świateł lub kontroli");
+        lastLightMode = lightManager.getMode();
+        lastControlMode = lightManager.getControlMode();
+        
+        // Zaktualizuj podświetlenie
+        applyBacklightSettings();
+    }
 
     if (configModeActive) {      
         display.clearBuffer();
