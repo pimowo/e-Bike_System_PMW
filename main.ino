@@ -1135,14 +1135,36 @@ void loadLightMode() {}
 void updateActivityTime() {
     lastActivityTime = millis();
     //DEBUG_INFO("Aktywnosc wykryta, zaktualizowano czas");
+    Serial.print("Activity detected at: ");
+    Serial.println(millis());
 }
 
 // Funkcja sprawdzająca czy należy automatycznie wyłączyć system
 void checkAutoOff() {
-    // Sprawdź czy automatyczne wyłączanie jest aktywne i czy minął określony czas
-    if (autoOffTime > 0 && (millis() - lastActivityTime) > (autoOffTime * 60000)) {
-        DEBUG_INFO("Automatyczne wyłączenie po %d minutach nieaktywności", autoOffTime);
-        goToSleep();
+    // Only check if auto-off is enabled and time is set
+    if (autoOffEnabled && autoOffTimeMinutes > 0) {
+        // Get current time
+        uint32_t currentTime = millis();
+        uint32_t inactivityTime = currentTime - lastActivityTime;
+        
+        // Convert minutes to milliseconds
+        uint32_t autoOffTimeMs = autoOffTimeMinutes * 60 * 1000;
+        
+        // Debug output
+        Serial.print("Auto-off check: Inactivity time: ");
+        Serial.print(inactivityTime / 1000);
+        Serial.print("s / Threshold: ");
+        Serial.print(autoOffTimeMs / 1000);
+        Serial.println("s");
+        
+        // Check if inactive for longer than the set time
+        if (inactivityTime >= autoOffTimeMs) {
+            Serial.println("Auto-off triggered! Shutting down...");
+            // Add a short delay to allow the serial message to be sent
+            delay(100);
+            // Call function to shut down the system
+            goToSleep();
+        }
     }
 }
 
@@ -1333,29 +1355,31 @@ void saveAutoOffSettings() {
 
 // Funkcja wczytująca ustawienia automatycznego wyłączania
 void loadAutoOffSettings() {
-    if (!LittleFS.begin()) {
-        DEBUG_ERROR("Nie można zamontować systemu plików!");
-        return;
+    if (LittleFS.begin()) {
+        if (LittleFS.exists("/auto_off.json")) {
+            File file = LittleFS.open("/auto_off.json", "r");
+            if (file) {
+                StaticJsonDocument<128> doc;
+                DeserializationError error = deserializeJson(doc, file);
+                file.close();
+                
+                if (!error) {
+                    autoOffEnabled = doc["enabled"] | false;
+                    autoOffTimeMinutes = doc["autoOffTime"] | 0;
+                    
+                    Serial.print("Auto-off settings loaded: enabled=");
+                    Serial.print(autoOffEnabled ? "true" : "false");
+                    Serial.print(", time=");
+                    Serial.println(autoOffTimeMinutes);
+                    return;
+                }
+            }
+        }
+        // Default values if file doesn't exist or has errors
+        autoOffEnabled = false;
+        autoOffTimeMinutes = 0;
+        Serial.println("Using default auto-off settings: disabled");
     }
-
-    File file = LittleFS.open("/auto_off.json", "r");
-    if (!file) {
-        DEBUG_INFO("Brak pliku auto_off.json, używam domyślnych ustawień");
-        autoOffTime = 0; // Domyślnie wyłączone
-        return;
-    }
-
-    StaticJsonDocument<256> doc;
-    DeserializationError error = deserializeJson(doc, file);
-    file.close();
-
-    if (error) {
-        DEBUG_ERROR("Błąd parsowania auto_off.json: %s", error.c_str());
-        return;
-    }
-
-    autoOffTime = doc["autoOffTime"] | 0;
-    DEBUG_INFO("Wczytano ustawienia auto-off: %d minut", autoOffTime);
 }
 
 // --- Funkcje wyświetlacza ---
@@ -3307,32 +3331,43 @@ void setupWebServer() {
             }
     });
     
+    // In your server setup code
     server.on("/api/display/config", HTTP_POST, [](AsyncWebServerRequest *request) {
-        // Obsługa POST
-    }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        String json = request->getParam("plain", true)->value();
+        Serial.println("Received display config:");
+        Serial.println(json);
+        
         StaticJsonDocument<512> doc;
-        DeserializationError error = deserializeJson(doc, data, len);
+        DeserializationError error = deserializeJson(doc, json);
         
         if (error) {
             request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON\"}");
             return;
         }
         
-        // Aktualizacja ustawień podświetlenia
-        backlightSettings.autoMode = doc["autoMode"] | false;
-        backlightSettings.dayBrightness = doc["dayBrightness"] | 100;
-        backlightSettings.nightBrightness = doc["nightBrightness"] | 50;
-        displayBrightness = doc["brightness"] | 70;
+        // Extract auto-off settings
+        bool autoOffEnabled = false;
+        int autoOffTimeMinutes = 0;
         
-        // Aktualizacja ustawień auto-off
-        if (doc.containsKey("autoOffTime")) {
-            autoOffTime = doc["autoOffTime"] | 0;
+        if (doc.containsKey("autoOffSettings")) {
+            autoOffEnabled = doc["autoOffSettings"]["enabled"];
+            autoOffTimeMinutes = doc["autoOffSettings"]["autoOffTime"];
+            
+            // Log the values we extracted
+            Serial.print("Auto-off settings: enabled=");
+            Serial.print(autoOffEnabled ? "true" : "false");
+            Serial.print(", time=");
+            Serial.println(autoOffTimeMinutes);
+            
+            // Save these values to your global variables
+            ::autoOffEnabled = autoOffEnabled;
+            ::autoOffTimeMinutes = autoOffTimeMinutes;
+            
+            // Save to file
             saveAutoOffSettings();
         }
         
-        // Zastosuj ustawienia
-        applyBacklightSettings();
-        saveBacklightSettingsToFile();
+        // Process other display settings...
         
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
@@ -4119,6 +4154,16 @@ void loop() {
 
     // Dodaj sprawdzanie auto-off w głównej pętli
     if (displayActive && !configModeActive && !showingWelcome) {
+        checkAutoOff();
+    }
+
+    // Add a static variable to limit how often we check
+    static uint32_t lastAutoOffCheck = 0;
+    uint32_t currentMillis = millis();
+    
+    // Check auto-off every 5 seconds
+    if (currentMillis - lastAutoOffCheck >= 5000) {
+        lastAutoOffCheck = currentMillis;
         checkAutoOff();
     }
 
