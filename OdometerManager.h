@@ -12,21 +12,17 @@ public:
     }
 
     ~OdometerManager() {
-        // Upewnij się, że Preferences są zamknięte
+        // Upewnij sie, ze Preferences sa zamkniete
         if (preferences.isOpen()) {
             preferences.end();
         }
     }
 
     void loadFromPreferences() {
-        #ifdef DEBUG
-        Serial.println("[OdometerManager] Wczytywanie licznika z preferencji...");
-        #endif
+        DEBUG_INFO("Wczytywanie licznika z preferencji...");
 
         if (!preferences.begin(NAMESPACE, false)) {
-            #ifdef DEBUG
-            Serial.println("[OdometerManager] Nie można otworzyć przestrzeni nazw Preferences");
-            #endif
+            DEBUG_ERROR("Nie mozna otworzyc przestrzeni nazw Preferences");
             currentTotal = 0.0f;
             initialized = false;
             return;
@@ -36,36 +32,26 @@ public:
         initialized = true;
         preferences.end();
 
-        #ifdef DEBUG
-        Serial.printf("[OdometerManager] Wczytano licznik: %.2f\n", currentTotal);
-        #endif
+        DEBUG_INFO("Wczytano licznik: %.2f", currentTotal);
     }
 
     bool saveToPreferences() {
-        #ifdef DEBUG
-        Serial.println("[OdometerManager] Zapisywanie licznika do preferencji...");
-        #endif
+        DEBUG_INFO("Zapisywanie licznika do preferencji...");
 
         if (!preferences.begin(NAMESPACE, false)) {
-            #ifdef DEBUG
-            Serial.println("[OdometerManager] Nie można otworzyć przestrzeni nazw Preferences");
-            #endif
+            DEBUG_ERROR("Nie mozna otworzyc przestrzeni nazw Preferences");
             return false;
         }
 
         preferences.putFloat(TOTAL_KEY, currentTotal);
-        bool success = preferences.isKey(TOTAL_KEY); // Sprawdź czy zapis się powiódł
+        bool success = preferences.isKey(TOTAL_KEY); // Sprawdz czy zapis sie powiodl
         preferences.end();
 
         if (success) {
-            #ifdef DEBUG
-            Serial.printf("[OdometerManager] Zapisano licznik: %.2f\n", currentTotal);
-            #endif
+            DEBUG_INFO("Zapisano licznik: %.2f", currentTotal);
             initialized = true;
         } else {
-            #ifdef DEBUG
-            Serial.println("[OdometerManager] Błąd zapisu licznika");
-            #endif
+            DEBUG_ERROR("Blad zapisu licznika");
         }
 
         return success;
@@ -77,15 +63,11 @@ public:
 
     bool setInitialValue(float value) {
         if (value < 0.0f) {
-            #ifdef DEBUG
-            Serial.println("[OdometerManager] Błąd: ujemna wartość licznika");
-            #endif
+            DEBUG_ERROR("Blad: ujemna wartosc licznika");
             return false;
         }
 
-        #ifdef DEBUG
-        Serial.printf("[OdometerManager] Ustawianie początkowej wartości licznika: %.2f\n", value);
-        #endif
+        DEBUG_INFO("Ustawianie poczatkowej wartosci licznika: %.2f", value);
 
         currentTotal = value;
         return saveToPreferences();
@@ -93,9 +75,7 @@ public:
 
     void updateTotal(float newValue) {
         if (newValue > currentTotal) {
-            #ifdef DEBUG
-            Serial.printf("[OdometerManager] Aktualizacja licznika z %.2f na %.2f\n", currentTotal, newValue);
-            #endif
+            DEBUG_INFO("Aktualizacja licznika z %.2f na %.2f", currentTotal, newValue);
             
             currentTotal = newValue;
             saveToPreferences();
@@ -106,7 +86,7 @@ public:
         return initialized;
     }
 
-    // Metoda do ręcznej inicjalizacji (jeśli konstruktor nie zadziała)
+    // Metoda do recznej inicjalizacji (jesli konstruktor nie zadziala)
     bool initialize() {
         loadFromPreferences();
         return initialized;
@@ -120,19 +100,16 @@ public:
 
     // Metoda do debugowania stanu Preferences
     void debugPreferences() {
-        #ifdef DEBUG
-        Serial.println("\n--- Diagnostyka OdometerManager ---");
+        DEBUG_DETAIL("=== Diagnostyka OdometerManager ===");
         
         if (!preferences.begin(NAMESPACE, true)) { // Tryb tylko do odczytu
-            Serial.println("Nie można otworzyć przestrzeni nazw Preferences");
+            DEBUG_ERROR("Nie mozna otworzyc przestrzeni nazw Preferences");
             return;
         }
         
-        Serial.printf("Klucze w przestrzeni nazw %s:\n", NAMESPACE);
-        Serial.printf("- Licznik (total): %.2f\n", preferences.getFloat(TOTAL_KEY, -1.0f));
+        DEBUG_DETAIL("Klucze w przestrzeni nazw %s:", NAMESPACE);
+        DEBUG_DETAIL("- Licznik (total): %.2f", preferences.getFloat(TOTAL_KEY, -1.0f));
         
         preferences.end();
-        Serial.println("-----------------------------\n");
-        #endif
     }
 };
