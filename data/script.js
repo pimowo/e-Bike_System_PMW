@@ -1429,24 +1429,27 @@ async function fetchDisplayConfig() {
 }
 
 // Funkcja zapisująca ustawienia auto-off
+// Modify saveDisplayConfig() in script.js to explicitly include auto-off settings
 async function saveDisplayConfig() {
     try {
         const autoOffTime = parseInt(document.getElementById('auto-off-time').value);
         const autoMode = document.getElementById('display-auto').value === 'true';
+        
+        console.log('Auto-off time being saved:', autoOffTime);
         
         const data = {
             brightness: parseInt(document.getElementById('brightness').value),
             dayBrightness: parseInt(document.getElementById('day-brightness').value),
             nightBrightness: parseInt(document.getElementById('night-brightness').value),
             autoMode: autoMode,
-            // Nowe dane auto-off
+            // Make sure auto-off settings are explicitly set
             autoOffSettings: {
-                enabled: autoOffTime > 0,
+                enabled: autoOffTime > 0, // Enable if time is greater than 0
                 autoOffTime: autoOffTime
             }
         };
 
-        console.log('Wysyłam dane konfiguracji wyświetlacza:', data);
+        console.log('Sending display config data:', JSON.stringify(data));
 
         const response = await fetch('/api/display/config', {
             method: 'POST',
@@ -1457,16 +1460,16 @@ async function saveDisplayConfig() {
         });
 
         const result = await response.json();
-        console.log('Odpowiedź serwera:', result);
+        console.log('Server response:', result);
 
         if (result.status === 'ok') {
-            showNotification('Zapisano ustawienia wyświetlacza', 'success');
-            await fetchDisplayConfig(); // odśwież wyświetlane ustawienia po zapisie
+            showNotification('Display settings saved successfully', 'success');
+            await fetchDisplayConfig(); // Refresh displayed settings
         } else {
-            throw new Error(result.message || 'Błąd odpowiedzi serwera');
+            throw new Error(result.message || 'Server response error');
         }
     } catch (error) {
-        handleError(error, 'Błąd podczas zapisywania ustawień wyświetlacza');
+        handleError(error, 'Error saving display settings');
     }
 }
 
