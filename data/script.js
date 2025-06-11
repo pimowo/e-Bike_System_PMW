@@ -147,12 +147,12 @@ const infoContent = {
     Dostępne opcje:
     🔆 Jasność:
       - Tryb automatyczny: automatyczne dostosowanie jasności
-      - Jasność dzienna: poziom w trybie dziennym (0-100%)
-      - Jasność nocna: poziom w trybie nocnym (0-100%)
+      - Jasność dzienna: poziom w trybie dziennym (1-100%)
+      - Jasność nocna: poziom w trybie nocnym (1-100%)
     
     💡 WSKAZÓWKI:
-      - W nocy zalecana jasność 30-50%
-      - W dzień zalecana jasność 70-100%
+      - W nocy zalecana jasność 1-50%
+      - W dzień zalecana jasność 50-100%
     
     ⚠️ UWAGA: 
     Zbyt niska jasność może utrudnić odczyt w silnym świetle słonecznym`
@@ -1435,7 +1435,8 @@ async function saveDisplayConfig() {
         console.log('Odpowiedź serwera:', result);
 
         if (result.status === 'ok') {
-            showToast('Zapisano ustawienia wyświetlacza', 'success');
+            // Zmiana z showToast na showNotification
+            showNotification('Zapisano ustawienia wyświetlacza', 'success');
             await fetchDisplayConfig(); // odśwież wyświetlane ustawienia po zapisie
         } else {
             throw new Error(result.message || 'Błąd odpowiedzi serwera');
