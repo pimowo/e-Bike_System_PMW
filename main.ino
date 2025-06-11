@@ -410,6 +410,11 @@ int currentSubScreen = 0;
 bool inSubScreen = false;
 uint8_t displayBrightness = 16;  // Wartość od 0 do 255 (jasność wyświetlacza)
 
+// Zmienne dla automatycznego wyłączania
+int autoOffTime = 0;            // Czas do automatycznego wyłączenia w minutach (0 = funkcja wyłączona)
+unsigned long lastActivityTime = 0;  // Czas ostatniej aktywności
+bool autoOffEnabled = false;    // Czy funkcja auto-off jest włączona
+
 // Zmienne pomiarowe
 float speed_kmh;
 float temp_air;
@@ -619,18 +624,7 @@ class TemperatureSensor {
         }
 };
 
-void IRAM_ATTR cadence_ISR() {
-    unsigned long now = millis();
-    unsigned long minDelay = max(8, 200 / cadence_pulses_per_revolution); // Minimum 8ms
-    
-    if (now - cadence_last_pulse_time > minDelay) {
-        for (int i = CADENCE_SAMPLES_WINDOW - 1; i > 0; i--) {
-            cadence_pulse_times[i] = cadence_pulse_times[i - 1];
-        }
-        cadence_pulse_times[0] = now;
-        cadence_last_pulse_time = now;
-    }
-}
+
 
 /********************************************************************
  * DEKLARACJE I IMPLEMENTACJE FUNKCJI
@@ -677,6 +671,7 @@ bool isValidTemperature(float temp);
 void handleTemperature();
 void saveLightMode();
 void loadLightMode();
+void updateActivityTime();
 
 // --- Deklaracje funkcji konfiguracyjnych ---
 void loadSettings();
@@ -696,6 +691,8 @@ void saveGeneralSettingsToFile();
 void saveBluetoothConfigToFile();
 void loadBluetoothConfigFromFile();
 void loadGeneralSettingsFromFile();
+void saveAutoOffSettings(); // Dodaj te dwie linijki
+void loadAutoOffSettings(); //
 
 // --- Deklaracje funkcji TPMS ---
 void updateTpmsData(const char* address, uint8_t sensorNumber, float pressure, float temperature, uint8_t batteryPercent, bool alarm);
@@ -714,6 +711,22 @@ float getOdometerValue();
 bool saveOdometerValue(float value);
 
 // --- UART kontroler
+
+void IRAM_ATTR cadence_ISR() {
+    unsigned long now = millis();
+    unsigned long minDelay = max(8, 200 / cadence_pulses_per_revolution); // Minimum 8ms
+    
+    if (now - cadence_last_pulse_time > minDelay) {
+        for (int i = CADENCE_SAMPLES_WINDOW - 1; i > 0; i--) {
+            cadence_pulse_times[i] = cadence_pulse_times[i - 1];
+        }
+        cadence_pulse_times[0] = now;
+        cadence_last_pulse_time = now;
+
+        // Resetuj timer aktywności przy wykryciu pedałowania
+        updateActivityTime();
+    }
+}
 
 // Funkcja wysyłająca komendę włączenia/wyłączenia świateł do sterownika KT
 void sendLightCommandToKT(bool lightsOn) {
@@ -1118,6 +1131,50 @@ void loadLightSettings() {}
 void saveLightMode() {}
 void loadLightMode() {}
 
+// Funkcja aktualizująca czas ostatniej aktywności
+void updateActivityTime() {
+    lastActivityTime = millis();
+    //DEBUG_INFO("Aktywnosc wykryta, zaktualizowano czas");
+}
+
+// Funkcja sprawdzająca czy należy automatycznie wyłączyć system
+void checkAutoOff() {
+    // Jeśli funkcja auto-off jest wyłączona lub czas nie jest ustawiony, wyjdź
+    if (!autoOffEnabled || autoOffTime <= 0) {
+        return;
+    }
+    
+    unsigned long currentTime = millis();
+    unsigned long inactivityTime = currentTime - lastActivityTime;
+    
+    // Przelicz minuty na milisekundy
+    unsigned long autoOffTimeMs = (unsigned long)autoOffTime * 60000;
+    
+    // Jeśli czas nieaktywności przekroczył ustawiony limit
+    if (inactivityTime >= autoOffTimeMs) {
+        DEBUG_INFO("Czas nieaktywności przekroczony (%d minut), wyłączanie...", autoOffTime);
+        
+        // Wyświetl komunikat o automatycznym wyłączaniu
+        display.clearBuffer();
+        drawCenteredText("Auto-wylaczanie", 25, czcionka_srednia);
+        drawCenteredText("Nieaktywny przez", 40, czcionka_mala);
+        
+        char timeStr[20];
+        sprintf(timeStr, "%d minut", autoOffTime);
+        drawCenteredText(timeStr, 52, czcionka_mala);
+        
+        display.sendBuffer();
+        delay(2000);  // Pokaż komunikat przez 2 sekundy
+        
+        // Zapisz wszystkie ważne ustawienia przed wyłączeniem
+        saveBacklightSettingsToFile();
+        lightManager.saveConfig();
+        
+        // Przejdź do trybu uśpienia
+        goToSleep();
+    }
+}
+
 void printLightConfig() {
     if (!LittleFS.begin(false)) {
         DEBUG_ERROR("Blad montowania systemu plikow");
@@ -1277,6 +1334,66 @@ void loadGeneralSettingsFromFile() {
     generalSettings.wheelSize = doc["wheelSize"] | 26; // Domyślnie 26 cali jeśli nie znaleziono
 
     DEBUG_INFO("Loaded wheel size: %d", generalSettings.wheelSize);
+}
+
+// Funkcja zapisująca ustawienia automatycznego wyłączania
+void saveAutoOffSettings() {
+    File file = LittleFS.open("/auto_off.json", "w");
+    if (!file) {
+        DEBUG_INFO("Nie można otworzyć pliku auto_off.json do zapisu");
+        return;
+    }
+
+    StaticJsonDocument<64> doc;
+    doc["autoOffTime"] = autoOffTime;
+    doc["enabled"] = autoOffEnabled;
+
+    DEBUG_INFO("Zapisuje ustawienia auto-off do pliku:");
+    DEBUG_INFO("  autoOffTime: %d minut", autoOffTime);
+    DEBUG_INFO("  enabled: %s", autoOffEnabled ? "TAK" : "NIE");
+
+    // Zapisz JSON do pliku
+    if (serializeJson(doc, file)) {
+        DEBUG_INFO("Zapisano ustawienia auto-off do pliku");
+    } else {
+        DEBUG_INFO("Błąd podczas zapisu ustawień auto-off do pliku");
+    }
+    
+    file.close();
+}
+
+// Funkcja wczytująca ustawienia automatycznego wyłączania
+void loadAutoOffSettings() {
+    // Sprawdź czy plik istnieje
+    if (!LittleFS.exists("/auto_off.json")) {
+        DEBUG_INFO("Brak pliku ustawień auto-off, używam ustawień domyślnych");
+        autoOffTime = 0;  // Domyślnie wyłączone
+        autoOffEnabled = false;
+        saveAutoOffSettings();  // Zapisz domyślne ustawienia
+        return;
+    }
+
+    File file = LittleFS.open("/auto_off.json", "r");
+    if (!file) {
+        DEBUG_INFO("Nie można otworzyć pliku auto_off.json do odczytu");
+        return;
+    }
+
+    StaticJsonDocument<64> doc;
+    DeserializationError error = deserializeJson(doc, file);
+    file.close();
+
+    if (error) {
+        DEBUG_INFO("Błąd podczas parsowania JSON ustawień auto-off");
+        return;
+    }
+
+    // Wczytaj ustawienia z pliku
+    autoOffTime = doc["autoOffTime"] | 0;
+    autoOffEnabled = doc["enabled"] | false;
+
+    DEBUG_INFO("Wczytano ustawienia auto-off: czas=%d minut, włączone=%s", 
+              autoOffTime, autoOffEnabled ? "TAK" : "NIE");
 }
 
 // --- Funkcje wyświetlacza ---
@@ -1907,6 +2024,9 @@ void clearTripData() {
 
 // obsługa przycisków
 void handleButtons() {
+    // Zawsze resetuj licznik aktywności przy naciśnięciu przycisku
+    updateActivityTime();
+
     if (configModeActive) {
         return; // W trybie konfiguracji nie obsługuj normalnych funkcji przycisków
     }
@@ -2526,7 +2646,7 @@ void applyBacklightSettings() {
     // Zastosuj jasność do wyświetlacza
     display.setContrast(displayBrightness);
     
-    DEBUG_LIGHT("  Zastosowano jasność: %d (kontrast: %d)", targetBrightness, displayBrightness);
+    DEBUG_LIGHT("  Zastosowano jasnosc: %d (kontrast: %d)", targetBrightness, displayBrightness);
 }
 
 void printLightConfigFile() {
@@ -2545,7 +2665,7 @@ void printLightConfigFile() {
 
             file.close();
         } else {
-            DEBUG_INFO("Nie można otworzyć pliku konfiguracyjnego");
+            DEBUG_INFO("Nie można otworzyc pliku konfiguracyjnego");
         }
     } else {
         DEBUG_ERROR("Plik konfiguracyjny /light_config.json nie istnieje");
@@ -3295,6 +3415,54 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
         request->send(200, "application/json", response);
     });
 
+    // Endpoint GET dla ustawień auto-off
+    server.on("/api/display/auto-off", HTTP_GET, [](AsyncWebServerRequest *request) {
+        StaticJsonDocument<64> doc;
+        doc["autoOffTime"] = autoOffTime;
+        doc["enabled"] = autoOffEnabled;
+        
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+
+    // Endpoint POST dla ustawień auto-off
+    server.on("/api/display/auto-off", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
+        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (index + len != total) {
+                return; // Czekamy na wszystkie dane
+            }
+
+            data[len] = '\0'; // Dodaj null terminator
+            StaticJsonDocument<64> doc;
+            DeserializationError error = deserializeJson(doc, (const char*)data);
+            
+            if (!error) {
+                if (doc.containsKey("autoOffTime")) {
+                    autoOffTime = doc["autoOffTime"].as<int>();
+                    
+                    // Ogranicz wartość do sensownego zakresu
+                    if (autoOffTime < 0) autoOffTime = 0;
+                    if (autoOffTime > 60) autoOffTime = 60;  // Max 60 minut
+                }
+                
+                if (doc.containsKey("enabled")) {
+                    autoOffEnabled = doc["enabled"].as<bool>();
+                }
+                
+                // Resetuj timer
+                updateActivityTime();
+                
+                // Zapisz ustawienia do pliku
+                saveAutoOffSettings();
+                
+                request->send(200, "application/json", "{\"status\":\"ok\"}");
+            } else {
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON\"}");
+            }
+        }
+    );
+
     // Endpoint do zapisywania ustawień ogólnych
     server.on("/save-general-settings", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
         [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
@@ -3803,6 +3971,7 @@ void initializeFileSystemAndSettings() {
     loadBacklightSettingsFromFile();
     loadGeneralSettingsFromFile();
     loadBluetoothConfigFromFile();
+    loadAutoOffSettings(); // Dodaj tę linijkę
     
     // Sprawdź i utwórz konfigurację Bluetooth jeśli nie istnieje
     if (!LittleFS.exists("/bluetooth_config.json")) {
@@ -3988,6 +4157,9 @@ void setup() {
     setLights();  
     applyBacklightSettings();
 
+    // Ustaw początkowy czas aktywności
+    lastActivityTime = millis();
+
     #if DEBUG_INFO_ENABLED
     printSystemInfo();
     #endif
@@ -4008,6 +4180,11 @@ void loop() {
     static LightManager::ControlMode lastControlMode = lightManager.getControlMode();
 
     unsigned long currentTime = millis();
+
+    // Dodaj sprawdzanie auto-off w głównej pętli
+    if (displayActive && !configModeActive && !showingWelcome) {
+        checkAutoOff();
+    }
 
     // sekcja do sprawdzania zmian trybu świateł
     if (lightManager.getMode() != lastLightMode || lightManager.getControlMode() != lastControlMode) {
