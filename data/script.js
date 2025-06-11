@@ -1056,20 +1056,22 @@ function toggleTpmsFields() {
 }
 
 function toggleAutoBrightness() {
-    const autoMode = document.getElementById('display-auto').value === 'true';
+    const autoModeSelect = document.getElementById('display-auto');
+    const autoMode = autoModeSelect.value === 'true';
+    console.log('toggleAutoBrightness - autoModeSelect.value:', autoModeSelect.value);
+    console.log('toggleAutoBrightness - autoMode:', autoMode);
+    
     const autoBrightnessSection = document.getElementById('auto-brightness-section');
     const normalBrightness = document.getElementById('brightness').parentElement.parentElement;
     
     if (autoMode) {
-        autoBrightnessSection.style.display = 'block';
-        normalBrightness.style.display = 'none';
-        // Ustaw jasność dzienną jako domyślną jasność
-        document.getElementById('day-brightness').value = document.getElementById('brightness').value;
+        console.log('Przełączam na tryb AUTO');
+        if (autoBrightnessSection) autoBrightnessSection.style.display = 'block';
+        if (normalBrightness) normalBrightness.style.display = 'none';
     } else {
-        autoBrightnessSection.style.display = 'none';
-        normalBrightness.style.display = 'flex';
-        // Ustaw normalną jasność na wartość jasności dziennej
-        document.getElementById('brightness').value = document.getElementById('day-brightness').value;
+        console.log('Przełączam na tryb MANUAL');
+        if (autoBrightnessSection) autoBrightnessSection.style.display = 'none';
+        if (normalBrightness) normalBrightness.style.display = 'flex';
     }
 }
 
@@ -1385,21 +1387,22 @@ function saveBluetoothConfig() {
 // Funkcja pobierająca i aktualizująca konfigurację wyświetlacza
 async function fetchDisplayConfig() {
     try {
-        const response = await fetch('/api/status');
+        // Zmiana endpointu z '/api/status' na '/api/display/config'
+        const response = await fetch('/api/display/config');
         const data = await response.json();
-        if (data.backlight) {
-            //document.getElementById('day-brightness').value = data.backlight.dayBrightness;
-            //document.getElementById('night-brightness').value = data.backlight.nightBrightness;
-            //document.getElementById('display-auto').value = data.backlight.autoMode.toString();
-            // Ustawienie jasności normalnej na podstawie jasności dziennej w trybie manualnym
-            //document.getElementById('brightness').value = data.backlight.dayBrightness;
-            updateElementValue('day-brightness', data.backlight.dayBrightness);
-            updateElementValue('night-brightness', data.backlight.nightBrightness);
-            updateElementValue('display-auto', data.backlight.autoMode.toString());
-            // Ustawienie jasności normalnej na podstawie jasności dziennej w trybie manualnym
-            updateElementValue('brightness', data.backlight.dayBrightness);
-			
-			// Wywołaj funkcję przełączania, aby odpowiednio pokazać/ukryć sekcje
+        
+        console.log('Otrzymane dane podświetlenia:', data);
+        
+        if (data) {
+            // Aktualizuj pola formularza
+            updateElementValue('brightness', data.brightness || 70);
+            updateElementValue('day-brightness', data.dayBrightness || 100);
+            updateElementValue('night-brightness', data.nightBrightness || 50);
+            updateElementValue('display-auto', data.autoMode ? 'true' : 'false');
+            
+            console.log('Ustawiono autoMode na:', data.autoMode ? 'true' : 'false');
+            
+            // Wywołaj funkcję przełączania, aby odpowiednio pokazać/ukryć sekcje
             toggleAutoBrightness();
         }
     } catch (error) {
@@ -1412,14 +1415,13 @@ async function saveDisplayConfig() {
     try {
         const autoMode = document.getElementById('display-auto').value === 'true';
         const data = {
-            dayBrightness: parseInt(autoMode ? 
-                document.getElementById('day-brightness').value : 
-                document.getElementById('brightness').value),
+            brightness: parseInt(document.getElementById('brightness').value),
+            dayBrightness: parseInt(document.getElementById('day-brightness').value),
             nightBrightness: parseInt(document.getElementById('night-brightness').value),
             autoMode: autoMode
         };
 
-        console.log('Wysyłane dane:', data);
+        console.log('Wysyłam dane konfiguracji wyświetlacza:', data);
 
         const response = await fetch('/api/display/config', {
             method: 'POST',
@@ -1433,8 +1435,8 @@ async function saveDisplayConfig() {
         console.log('Odpowiedź serwera:', result);
 
         if (result.status === 'ok') {
-            showNotification('Zapisano ustawienia wyświetlacza', 'success');
-            await fetchDisplayConfig(); // odśwież wyświetlane ustawienia
+            showToast('Zapisano ustawienia wyświetlacza', 'success');
+            await fetchDisplayConfig(); // odśwież wyświetlane ustawienia po zapisie
         } else {
             throw new Error(result.message || 'Błąd odpowiedzi serwera');
         }
