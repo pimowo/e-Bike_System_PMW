@@ -747,8 +747,7 @@ void sendLightCommandToKT(bool lightsOn) {
 // --- Funkcje BLE ---
 
 // callback dla BLE
-void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic, 
-                        uint8_t* pData, size_t length, bool isNotify) {
+void notificationCallback(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
     if (length < 2) return;  // Sprawdzenie minimalnej długości pakietu
 
     switch (pData[1]) {  // Sprawdź typ pakietu
@@ -893,7 +892,7 @@ class TpmsAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 // wysyłanie zapytania do BMS
 void requestBmsData(const uint8_t* command, size_t length) {
     if (bleClient && bleClient->isConnected() && bleCharacteristicTx) {
-//        bleCharacteristicTx->writeValue(command, length);
+    //bleCharacteristicTx->writeValue(command, length);
     }
 }
 
@@ -1108,6 +1107,7 @@ void loadTpmsAddresses() {
 }
 
 void checkTpmsTimeout() {
+
     unsigned long currentTime = millis();
     const unsigned long TPMS_TIMEOUT = 30000; // 30 sekund
     
@@ -1133,12 +1133,14 @@ void loadLightMode() {}
 
 // Funkcja aktualizująca czas ostatniej aktywności
 void updateActivityTime() {
+
     lastActivityTime = millis();
     DEBUG_INFO("Aktywnosc wykryta: czas = %u ms", lastActivityTime);
 }
 
 // Funkcja sprawdzająca czy należy automatycznie wyłączyć system
 void checkAutoOff() {
+
     // Tylko jeśli auto-off jest aktywny
     if (autoOffTime > 0) {
         unsigned long currentTime = millis();
@@ -1147,16 +1149,15 @@ void checkAutoOff() {
         
         // Debugowanie
         static unsigned long lastCheckTime = 0;
+
         if (currentTime - lastCheckTime > 10000) { // co 10 sekund
             lastCheckTime = currentTime;
-            DEBUG_INFO("Auto-off check: czas nieaktywności = %u s, próg = %u s", 
-                inactiveTime/1000, threshold/1000);
+            DEBUG_INFO("Auto-off check: czas nieaktywności = %u s, próg = %u s", inactiveTime/1000, threshold/1000);
         }
         
         // Sprawdź czy przekroczono próg
         if (inactiveTime >= threshold) {
-            DEBUG_INFO("Automatyczne wyłączenie po %d minutach nieaktywności (%u s)", 
-                autoOffTime, inactiveTime/1000);
+            DEBUG_INFO("Automatyczne wylaczenie po %d minutach nieaktywności (%u s)", autoOffTime, inactiveTime/1000);
             
             // Krótkie opóźnienie aby komunikat został wysłany
             delay(100);
@@ -1167,13 +1168,16 @@ void checkAutoOff() {
 }
 
 void printLightConfig() {
+
     if (!LittleFS.begin(false)) {
         DEBUG_ERROR("Blad montowania systemu plikow");
         return;
     }
     
     if (LittleFS.exists("/light_config.json")) {
+
         File file = LittleFS.open("/light_config.json", "r");
+
         if (file) {
             DEBUG_LIGHT("Zawartosc pliku konfiguracyjnego swiatel:");
             
@@ -1188,7 +1192,9 @@ void printLightConfig() {
         } else {
             DEBUG_ERROR("Nie mozna otworzyc pliku konfiguracyjnego");
         }
+
     } else {
+
         DEBUG_INFO("Plik konfiguracyjny nie istnieje");
     }
 }
@@ -1354,10 +1360,10 @@ void saveAutoOffSettings() {
     File testFile = LittleFS.open("/auto_off.json", "r");
     if (testFile) {
         String content = testFile.readString();
-        DEBUG_INFO("Zawartość pliku auto_off.json: %s", content.c_str());
+        DEBUG_INFO("Zawartosc pliku auto_off.json: %s", content.c_str());
         testFile.close();
     } else {
-        DEBUG_ERROR("Nie można odczytać zapisanego pliku auto_off.json!");
+        DEBUG_ERROR("Nie mozna odczytac zapisanego pliku auto_off.json!");
     }
 }
 
@@ -2019,8 +2025,6 @@ void clearTripData() {
 
 // obsługa przycisków
 void handleButtons() {
-    // Zawsze resetuj licznik aktywności przy naciśnięciu przycisku
-    updateActivityTime();
 
     if (configModeActive) {
         return; // W trybie konfiguracji nie obsługuj normalnych funkcji przycisków
@@ -2073,6 +2077,9 @@ void handleButtons() {
 
     // Obsługa przycisków gdy wyświetlacz jest aktywny
     if (!showingWelcome) {
+
+        // Zawsze resetuj licznik aktywności przy naciśnięciu przycisku
+        //updateActivityTime();
 
         // Sprawdzanie trybu legal (UP + SET) - przełączanie trybu legalnego
         if (displayActive && !showingWelcome && !upState && !setState) {
@@ -4176,13 +4183,13 @@ void loop() {
     static unsigned long lastDebugTime = 0;
     if (millis() - lastDebugTime > 5000) { // co 5 sekund
         lastDebugTime = millis();
-        DEBUG_INFO("Status auto-off: czas=%d min, ostatnia aktywność=%u ms, nieaktywność=%u s", 
+        DEBUG_INFO("Status auto-off: czas=%d min, ostatnia aktywnosc=%u ms, nieaktywnosc=%u s", 
             autoOffTime, lastActivityTime, (millis() - lastActivityTime) / 1000);
     }
 
     // sekcja do sprawdzania zmian trybu świateł
     if (lightManager.getMode() != lastLightMode || lightManager.getControlMode() != lastControlMode) {
-        DEBUG_LIGHT("Wykryto zmianę trybu świateł lub kontroli");
+        DEBUG_LIGHT("Wykryto zmiane trybu swiatel lub kontroli");
         lastLightMode = lightManager.getMode();
         lastControlMode = lightManager.getControlMode();
         
