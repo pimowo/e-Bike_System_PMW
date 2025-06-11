@@ -1152,6 +1152,11 @@ function setupFormListeners() {
 	if (controllerSaveButton) {
 		controllerSaveButton.addEventListener('click', saveControllerConfig);
 	}
+	
+	const autoOffSaveButton = document.getElementById('save-auto-off');
+    if (autoOffSaveButton) {
+        autoOffSaveButton.addEventListener('click', saveAutoOffSettings);
+    }
 }
 
 // Funkcja pobierająca wersję systemu
@@ -1743,4 +1748,99 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('brightness').addEventListener('input', updateSliderValues);
     document.getElementById('dayBrightness').addEventListener('input', updateSliderValues);
     document.getElementById('nightBrightness').addEventListener('input', updateSliderValues);
+});
+
+// Funkcja pobierająca i aktualizująca ustawienia auto-off
+async function fetchAutoOffSettings() {
+    try {
+        const response = await fetch('/api/display/auto-off');
+        const data = await response.json();
+        
+        console.log('Otrzymane dane auto-off:', data);
+        
+        if (data) {
+            updateElementValue('auto-off-time', data.autoOffTime || 0);
+            updateElementValue('auto-off-enabled', data.enabled ? 'true' : 'false');
+        }
+    } catch (error) {
+        console.error('Błąd podczas pobierania ustawień auto-off:', error);
+    }
+}
+
+// Funkcja zapisująca ustawienia auto-off
+async function saveAutoOffSettings() {
+    try {
+        const enabled = document.getElementById('auto-off-enabled').value === 'true';
+        const time = parseInt(document.getElementById('auto-off-time').value) || 0;
+        
+        const data = {
+            autoOffTime: time,
+            enabled: enabled
+        };
+
+        console.log('Wysyłam dane ustawień auto-off:', data);
+
+        const response = await fetch('/api/display/auto-off', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+        console.log('Odpowiedź serwera:', result);
+
+        if (result.status === 'ok') {
+            showNotification('Zapisano ustawienia automatycznego wyłączania', 'success');
+            await fetchAutoOffSettings(); // odśwież wyświetlane ustawienia po zapisie
+        } else {
+            throw new Error(result.message || 'Błąd odpowiedzi serwera');
+        }
+    } catch (error) {
+        handleError(error, 'Błąd podczas zapisywania ustawień automatycznego wyłączania');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async function() {
+    debug('Inicjalizacja aplikacji...');
+
+    try {
+        // Najpierw zainicjalizuj rozwijane sekcje
+        initializeCollapsibleSections();
+        
+        // Inicjalizacja modalu informacyjnego
+        setupModal();
+        
+        // Inicjalizacja zegara
+        let clockInterval = initializeClock();
+
+        // Poczekaj na pewność załadowania DOM
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        // Dodaj wczytywanie licznika
+        await loadOdometerValue();
+
+        // Inicjalizacja pozostałych modułów
+        if (document.querySelector('.light-config')) {
+            await loadLightConfig();
+        }
+
+        await Promise.all([
+            fetchDisplayConfig(),
+            fetchControllerConfig(),
+            fetchSystemVersion(),
+            fetchAutoOffSettings() // Dodaj to wywołanie
+        ]);
+
+        // Inicjalizacja WebSocket
+        setupWebSocket();
+        
+        // Inicjalizacja formularzy
+        setupFormListeners();
+
+        debug('Inicjalizacja zakończona pomyślnie');
+    } catch (error) {
+        console.error('Błąd podczas inicjalizacji:', error);
+    }
 });
