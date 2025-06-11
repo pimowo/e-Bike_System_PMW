@@ -1396,7 +1396,7 @@ function saveBluetoothConfig() {
     });
 }
 
-// Funkcja pobierająca i aktualizująca konfigurację wyświetlacza
+// Popraw funkcję fetchDisplayConfig, aby prawidłowo mapowała wartości jasności
 async function fetchDisplayConfig() {
     try {
         const response = await fetch('/api/display/config');
@@ -1405,20 +1405,41 @@ async function fetchDisplayConfig() {
         console.log('Otrzymane dane podświetlenia:', data);
         
         if (data) {
+            // Konwertuj wartość jasności z 0-255 na 0-100 jeśli potrzeba
+            let brightness = data.brightness || 70;
+            if (brightness > 100) {
+                // Wygląda jak wartość wewnętrzna (0-255), konwertuj na 0-100
+                brightness = Math.round((brightness / 255) * 100);
+                console.log('Przekonwertowano jasność z', data.brightness, 'na', brightness);
+            }
+            
             // Aktualizuj pola formularza
-            updateElementValue('brightness', data.brightness || 70);
+            updateElementValue('brightness', brightness);
             updateElementValue('day-brightness', data.dayBrightness || 100);
             updateElementValue('night-brightness', data.nightBrightness || 50);
             updateElementValue('display-auto', data.autoMode ? 'true' : 'false');
             
             // Aktualizuj wartość auto-off
-            if (data.autoOffSettings) {
-                const autoOffTime = data.autoOffSettings.enabled ? 
-                    (data.autoOffSettings.autoOffTime || 0) : 0;
-                updateAutoOffDropdown(autoOffTime);
+            // Sprawdź różne możliwości struktury danych
+            let autoOffTime = 0;
+            
+            if (data.autoOffTime !== undefined) {
+                // Bezpośrednio w obiekcie głównym
+                autoOffTime = data.autoOffTime;
+                console.log('Znaleziono autoOffTime bezpośrednio w danych:', autoOffTime);
+            } else if (data.autoOffSettings && data.autoOffSettings.autoOffTime !== undefined) {
+                // W obiekcie autoOffSettings
+                autoOffTime = data.autoOffSettings.autoOffTime;
+                console.log('Znaleziono autoOffTime w autoOffSettings:', autoOffTime);
+            } else {
+                console.log('Nie znaleziono wartości autoOffTime w danych');
             }
             
+            // Ustaw wartość w dropdownie
+            updateAutoOffDropdown(autoOffTime);
+            
             console.log('Ustawiono autoMode na:', data.autoMode ? 'true' : 'false');
+            console.log('Ustawiono autoOffTime na:', autoOffTime);
             
             // Wywołaj funkcję przełączania, aby odpowiednio pokazać/ukryć sekcje
             toggleAutoBrightness();
@@ -1428,28 +1449,29 @@ async function fetchDisplayConfig() {
     }
 }
 
-// Funkcja zapisująca ustawienia auto-off
-// Modify saveDisplayConfig() in script.js to explicitly include auto-off settings
+// Popraw funkcję saveDisplayConfig, aby prawidłowo obsługiwała wartości jasności
 async function saveDisplayConfig() {
     try {
         const autoOffTime = parseInt(document.getElementById('auto-off-time').value);
         const autoMode = document.getElementById('display-auto').value === 'true';
         
-        console.log('Auto-off time being saved:', autoOffTime);
+        // Pobierz wartości jasności
+        let brightness = parseInt(document.getElementById('brightness').value);
+        let dayBrightness = parseInt(document.getElementById('day-brightness').value);
+        let nightBrightness = parseInt(document.getElementById('night-brightness').value);
+        
+        console.log('Zapisywanie ustawień podświetlenia. Jasność:', brightness);
         
         const data = {
-            brightness: parseInt(document.getElementById('brightness').value),
-            dayBrightness: parseInt(document.getElementById('day-brightness').value),
-            nightBrightness: parseInt(document.getElementById('night-brightness').value),
+            brightness: brightness,
+            dayBrightness: dayBrightness,
+            nightBrightness: nightBrightness,
             autoMode: autoMode,
-            // Make sure auto-off settings are explicitly set
-            autoOffSettings: {
-                enabled: autoOffTime > 0, // Enable if time is greater than 0
-                autoOffTime: autoOffTime
-            }
+            // Nowe dane auto-off
+            autoOffTime: autoOffTime // Używaj prostszej struktury
         };
 
-        console.log('Sending display config data:', JSON.stringify(data));
+        console.log('Wysyłam dane konfiguracji wyświetlacza:', data);
 
         const response = await fetch('/api/display/config', {
             method: 'POST',
@@ -1460,16 +1482,16 @@ async function saveDisplayConfig() {
         });
 
         const result = await response.json();
-        console.log('Server response:', result);
+        console.log('Odpowiedź serwera:', result);
 
         if (result.status === 'ok') {
-            showNotification('Display settings saved successfully', 'success');
-            await fetchDisplayConfig(); // Refresh displayed settings
+            showNotification('Zapisano ustawienia wyświetlacza', 'success');
+            await fetchDisplayConfig(); // odśwież wyświetlane ustawienia po zapisie
         } else {
-            throw new Error(result.message || 'Server response error');
+            throw new Error(result.message || 'Błąd odpowiedzi serwera');
         }
     } catch (error) {
-        handleError(error, 'Error saving display settings');
+        handleError(error, 'Błąd podczas zapisywania ustawień wyświetlacza');
     }
 }
 
@@ -1790,20 +1812,29 @@ async function fetchAutoOffSettings() {
     }
 }
 
-// Funkcja aktualizująca dropdown auto-off
+// Upewnij się, że mamy tę funkcję poprawnie zdefiniowaną
 function updateAutoOffDropdown(value) {
     const dropdown = document.getElementById('auto-off-time');
-    if (!dropdown) return;
+    if (!dropdown) {
+        console.error('Nie znaleziono elementu auto-off-time!');
+        return;
+    }
     
-    // Jeśli nie ma dokładnie takiej wartości w dropdownie, znajdź najbliższą
+    // Konwertuj na liczbę całkowitą
+    value = parseInt(value) || 0;
+    console.log('Ustawianie dropdownu auto-off na wartość:', value);
+    
+    // Znajdź najbliższą dostępną wartość w dropdownie
     const options = Array.from(dropdown.options).map(opt => parseInt(opt.value));
     if (!options.includes(value)) {
         // Znajdź najbliższą większą wartość
         const closestValue = options.find(opt => opt > value) || options[options.length - 1];
+        console.log('Nie znaleziono dokładnej wartości, używam najbliższej:', closestValue);
         value = closestValue;
     }
     
     dropdown.value = value.toString();
+    console.log('Ustawiono dropdown na:', dropdown.value);
 }
 
 // Funkcja zapisująca ustawienia auto-off
