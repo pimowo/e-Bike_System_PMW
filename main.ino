@@ -1139,38 +1139,9 @@ void updateActivityTime() {
 
 // Funkcja sprawdzająca czy należy automatycznie wyłączyć system
 void checkAutoOff() {
-    // Jeśli funkcja auto-off jest wyłączona lub czas nie jest ustawiony, wyjdź
-    if (!autoOffEnabled || autoOffTime <= 0) {
-        return;
-    }
-    
-    unsigned long currentTime = millis();
-    unsigned long inactivityTime = currentTime - lastActivityTime;
-    
-    // Przelicz minuty na milisekundy
-    unsigned long autoOffTimeMs = (unsigned long)autoOffTime * 60000;
-    
-    // Jeśli czas nieaktywności przekroczył ustawiony limit
-    if (inactivityTime >= autoOffTimeMs) {
-        DEBUG_INFO("Czas nieaktywności przekroczony (%d minut), wyłączanie...", autoOffTime);
-        
-        // Wyświetl komunikat o automatycznym wyłączaniu
-        display.clearBuffer();
-        drawCenteredText("Auto-wylaczanie", 25, czcionka_srednia);
-        drawCenteredText("Nieaktywny przez", 40, czcionka_mala);
-        
-        char timeStr[20];
-        sprintf(timeStr, "%d minut", autoOffTime);
-        drawCenteredText(timeStr, 52, czcionka_mala);
-        
-        display.sendBuffer();
-        delay(2000);  // Pokaż komunikat przez 2 sekundy
-        
-        // Zapisz wszystkie ważne ustawienia przed wyłączeniem
-        saveBacklightSettingsToFile();
-        lightManager.saveConfig();
-        
-        // Przejdź do trybu uśpienia
+    // Sprawdź czy automatyczne wyłączanie jest aktywne i czy minął określony czas
+    if (autoOffTime > 0 && (millis() - lastActivityTime) > (autoOffTime * 60000)) {
+        DEBUG_INFO("Automatyczne wyłączenie po %d minutach nieaktywności", autoOffTime);
         goToSleep();
     }
 }
@@ -1338,62 +1309,53 @@ void loadGeneralSettingsFromFile() {
 
 // Funkcja zapisująca ustawienia automatycznego wyłączania
 void saveAutoOffSettings() {
-    File file = LittleFS.open("/auto_off.json", "w");
-    if (!file) {
-        DEBUG_INFO("Nie można otworzyć pliku auto_off.json do zapisu");
+    if (!LittleFS.begin()) {
+        DEBUG_ERROR("Nie mozna zamontowac systemu plikow!");
         return;
     }
 
-    StaticJsonDocument<64> doc;
+    StaticJsonDocument<256> doc;
     doc["autoOffTime"] = autoOffTime;
-    doc["enabled"] = autoOffEnabled;
 
-    DEBUG_INFO("Zapisuje ustawienia auto-off do pliku:");
-    DEBUG_INFO("  autoOffTime: %d minut", autoOffTime);
-    DEBUG_INFO("  enabled: %s", autoOffEnabled ? "TAK" : "NIE");
-
-    // Zapisz JSON do pliku
-    if (serializeJson(doc, file)) {
-        DEBUG_INFO("Zapisano ustawienia auto-off do pliku");
-    } else {
-        DEBUG_INFO("Błąd podczas zapisu ustawień auto-off do pliku");
+    File file = LittleFS.open("/auto_off.json", "w");
+    if (!file) {
+        DEBUG_ERROR("Nie mozna otworzyc pliku auto_off.json do zapisu!");
+        return;
     }
-    
+
+    if (serializeJson(doc, file) == 0) {
+        DEBUG_ERROR("Blad podczas zapisu do pliku auto_off.json!");
+    } else {
+        DEBUG_INFO("Zapisano ustawienia auto-off: %d minut", autoOffTime);
+    }
     file.close();
 }
 
 // Funkcja wczytująca ustawienia automatycznego wyłączania
 void loadAutoOffSettings() {
-    // Sprawdź czy plik istnieje
-    if (!LittleFS.exists("/auto_off.json")) {
-        DEBUG_INFO("Brak pliku ustawień auto-off, używam ustawień domyślnych");
-        autoOffTime = 0;  // Domyślnie wyłączone
-        autoOffEnabled = false;
-        saveAutoOffSettings();  // Zapisz domyślne ustawienia
+    if (!LittleFS.begin()) {
+        DEBUG_ERROR("Nie można zamontować systemu plików!");
         return;
     }
 
     File file = LittleFS.open("/auto_off.json", "r");
     if (!file) {
-        DEBUG_INFO("Nie można otworzyć pliku auto_off.json do odczytu");
+        DEBUG_INFO("Brak pliku auto_off.json, używam domyślnych ustawień");
+        autoOffTime = 0; // Domyślnie wyłączone
         return;
     }
 
-    StaticJsonDocument<64> doc;
+    StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, file);
     file.close();
 
     if (error) {
-        DEBUG_INFO("Błąd podczas parsowania JSON ustawień auto-off");
+        DEBUG_ERROR("Błąd parsowania auto_off.json: %s", error.c_str());
         return;
     }
 
-    // Wczytaj ustawienia z pliku
     autoOffTime = doc["autoOffTime"] | 0;
-    autoOffEnabled = doc["enabled"] | false;
-
-    DEBUG_INFO("Wczytano ustawienia auto-off: czas=%d minut, włączone=%s", 
-              autoOffTime, autoOffEnabled ? "TAK" : "NIE");
+    DEBUG_INFO("Wczytano ustawienia auto-off: %d minut", autoOffTime);
 }
 
 // --- Funkcje wyświetlacza ---
@@ -3043,215 +3005,215 @@ void setupWebServer() {
         request->send(200, "application/json", response);
     });
 
-server.on("/api/lights/file", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (!LittleFS.begin(false)) {
-        request->send(500, "application/json", "{\"error\":\"Failed to mount filesystem\"}");
-        return;
-    }
-    
-    if (LittleFS.exists("/light_config.json")) {
-        File file = LittleFS.open("/light_config.json", "r");
-        if (!file) {
-            request->send(500, "application/json", "{\"error\":\"Failed to open config file\"}");
+    server.on("/api/lights/file", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (!LittleFS.begin(false)) {
+            request->send(500, "application/json", "{\"error\":\"Failed to mount filesystem\"}");
             return;
         }
         
-        // Odczytaj zawartość pliku
-        String content = file.readString();
-        file.close();
-        
-        // Analizuj JSON, aby wyświetlić go w bardziej czytelnej formie
-        StaticJsonDocument<256> doc;
-        DeserializationError error = deserializeJson(doc, content);
-        
-        if (error) {
-            request->send(200, "text/plain", content); // Pokaż surową zawartość w przypadku błędu parsowania
-        } else {
-            // Dodaj dodatkowe informacje
-            JsonObject debug = doc.createNestedObject("_debug");
-            if (doc.containsKey("dayConfig")) {
-                uint8_t dayConfigValue = doc["dayConfig"];
-                debug["dayConfig_hex"] = "0x" + String(dayConfigValue, HEX);
-                debug["dayConfig_bin"] = "0b" + String(dayConfigValue, BIN);
-                debug["dayConfig_FRONT"] = (dayConfigValue & LightManager::FRONT) != 0;
-                debug["dayConfig_DRL"] = (dayConfigValue & LightManager::DRL) != 0;
-                debug["dayConfig_REAR"] = (dayConfigValue & LightManager::REAR) != 0;
+        if (LittleFS.exists("/light_config.json")) {
+            File file = LittleFS.open("/light_config.json", "r");
+            if (!file) {
+                request->send(500, "application/json", "{\"error\":\"Failed to open config file\"}");
+                return;
             }
             
-            if (doc.containsKey("nightConfig")) {
-                uint8_t nightConfigValue = doc["nightConfig"];
-                debug["nightConfig_hex"] = "0x" + String(nightConfigValue, HEX);
-                debug["nightConfig_bin"] = "0b" + String(nightConfigValue, BIN);
-                debug["nightConfig_FRONT"] = (nightConfigValue & LightManager::FRONT) != 0;
-                debug["nightConfig_DRL"] = (nightConfigValue & LightManager::DRL) != 0;
-                debug["nightConfig_REAR"] = (nightConfigValue & LightManager::REAR) != 0;
-            }
+            // Odczytaj zawartość pliku
+            String content = file.readString();
+            file.close();
             
-            String enriched;
-            serializeJsonPretty(doc, enriched);
-            request->send(200, "application/json", enriched);
-        }
-    } else {
-        request->send(404, "application/json", "{\"error\":\"Config file not found\"}");
-    }
-});
-
-// Endpoint GET dla konfiguracji świateł
-server.on("/api/lights/config", HTTP_GET, [](AsyncWebServerRequest *request) {
-    StaticJsonDocument<512> doc;
-    
-    doc["status"] = "ok";
-    JsonObject lights = doc.createNestedObject("lights");
-    lights["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
-    lights["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
-    lights["dayBlink"] = lightManager.getDayBlink();
-    lights["nightBlink"] = lightManager.getNightBlink();
-    lights["blinkFrequency"] = lightManager.getBlinkFrequency();
-    lights["currentMode"] = (int)lightManager.getMode();
-    lights["controlMode"] = (int)lightManager.getControlMode(); // Dodaj informację o trybie sterowania
-    
-    String response;
-    serializeJson(doc, response);
-    request->send(200, "application/json", response);
-});
-
-// Endpoint POST dla konfiguracji świateł
-server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
-    // Ten handler zostanie wywołany po zakończeniu przetwarzania danych
-}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-    if (index + len != total) {
-        return; // Czekamy na wszystkie dane
-    }
-    
-    DEBUG_LIGHT("Processing request");
-    DEBUG_LIGHT("Content-Type: %s\n", request->contentType().c_str());
-    DEBUG_LIGHT("Data length: %d bytes\n", len);
-    
-    // Zmienna na dane JSON
-    String jsonString;
-    
-    // Określ źródło danych na podstawie Content-Type
-    if (request->contentType() == "application/x-www-form-urlencoded") {
-        // Obsługa form-encoded
-        if (request->hasParam("data", true)) {
-            jsonString = request->getParam("data", true)->value();
-            DEBUG_LIGHT("Form data param: %s\n", jsonString.c_str());
+            // Analizuj JSON, aby wyświetlić go w bardziej czytelnej formie
+            StaticJsonDocument<256> doc;
+            DeserializationError error = deserializeJson(doc, content);
+            
+            if (error) {
+                request->send(200, "text/plain", content); // Pokaż surową zawartość w przypadku błędu parsowania
+            } else {
+                // Dodaj dodatkowe informacje
+                JsonObject debug = doc.createNestedObject("_debug");
+                if (doc.containsKey("dayConfig")) {
+                    uint8_t dayConfigValue = doc["dayConfig"];
+                    debug["dayConfig_hex"] = "0x" + String(dayConfigValue, HEX);
+                    debug["dayConfig_bin"] = "0b" + String(dayConfigValue, BIN);
+                    debug["dayConfig_FRONT"] = (dayConfigValue & LightManager::FRONT) != 0;
+                    debug["dayConfig_DRL"] = (dayConfigValue & LightManager::DRL) != 0;
+                    debug["dayConfig_REAR"] = (dayConfigValue & LightManager::REAR) != 0;
+                }
+                
+                if (doc.containsKey("nightConfig")) {
+                    uint8_t nightConfigValue = doc["nightConfig"];
+                    debug["nightConfig_hex"] = "0x" + String(nightConfigValue, HEX);
+                    debug["nightConfig_bin"] = "0b" + String(nightConfigValue, BIN);
+                    debug["nightConfig_FRONT"] = (nightConfigValue & LightManager::FRONT) != 0;
+                    debug["nightConfig_DRL"] = (nightConfigValue & LightManager::DRL) != 0;
+                    debug["nightConfig_REAR"] = (nightConfigValue & LightManager::REAR) != 0;
+                }
+                
+                String enriched;
+                serializeJsonPretty(doc, enriched);
+                request->send(200, "application/json", enriched);
+            }
         } else {
-            DEBUG_LIGHT("Missing data parameter in form data");
-            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing data parameter\"}");
-            return;
+            request->send(404, "application/json", "{\"error\":\"Config file not found\"}");
         }
-    } 
-    else if (request->contentType() == "application/json") {
-        // Obsługa czystego JSON
-        if (len > 0) {
-            data[len] = '\0'; // Dodaj null terminator
-            jsonString = String((char*)data);
-            DEBUG_LIGHT("Direct JSON data: %s\n", jsonString.c_str());
-        } else {
-            DEBUG_LIGHT("Empty JSON data");
-            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Empty JSON data\"}");
-            return;
-        }
-    }
-    else {
-        // Nieznany format danych
-        DEBUG_LIGHT("Unsupported Content-Type: %s\n", request->contentType().c_str());
-        request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Unsupported content type\"}");
-        return;
-    }
-    
-    // Parsowanie JSON
-    StaticJsonDocument<512> doc;
-    DeserializationError error = deserializeJson(doc, jsonString);
-    
-    if (error) {
-        DEBUG_LIGHT("JSON parsing error: %s\n", error.c_str());
-        request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON format\"}");
-        return;
-    }
-    
-    // Przetwarzanie danych
-    bool configSuccess = false;
-    
-    // Zapisz poprzednie wartości dla porównania
-    uint8_t oldDayConfig = lightManager.getDayConfig();
-    uint8_t oldNightConfig = lightManager.getNightConfig();
-    bool oldDayBlink = lightManager.getDayBlink();
-    bool oldNightBlink = lightManager.getNightBlink();
-    uint16_t oldBlinkFrequency = lightManager.getBlinkFrequency();
-    
-    DEBUG_DETAIL("Aktualna konfiguracja:"); 
-    DEBUG_DETAIL("Konfiguracja dzienna: 0x%02X (%s)", oldDayConfig, lightManager.getConfigString(oldDayConfig).c_str());
-    DEBUG_DETAIL("Konfiguracja nocna: 0x%02X (%s)", oldNightConfig, lightManager.getConfigString(oldNightConfig).c_str());
-    DEBUG_DETAIL("Miganie dzienne: %d", oldDayBlink);
-    DEBUG_DETAIL("Miganie nocne: %d", oldNightBlink);
-    DEBUG_DETAIL("Czestotliwosc migania: %d", oldBlinkFrequency);
-    
-    // Zmień tylko te wartości, które są w żądaniu
-    if (doc.containsKey("dayLights")) {
-        const char* dayLightsStr = doc["dayLights"];
-        uint8_t dayConfig = lightManager.parseConfigString(dayLightsStr);
-        bool dayBlink = doc.containsKey("dayBlink") ? doc["dayBlink"].as<bool>() : oldDayBlink;
+    });
+
+    // Endpoint GET dla konfiguracji świateł
+    server.on("/api/lights/config", HTTP_GET, [](AsyncWebServerRequest *request) {
+        StaticJsonDocument<512> doc;
         
-        lightManager.setDayConfig(dayConfig, dayBlink);
-        DEBUG_LIGHT("Ustawiono konfiguracje dzienna: '%s' => 0x%02X, miganie: %d", dayLightsStr, dayConfig, dayBlink);
-    }
-    
-    if (doc.containsKey("nightLights")) {
-        const char* nightLightsStr = doc["nightLights"];
-        uint8_t nightConfig = lightManager.parseConfigString(nightLightsStr);
-        bool nightBlink = doc.containsKey("nightBlink") ? doc["nightBlink"].as<bool>() : oldNightBlink;
-        
-        lightManager.setNightConfig(nightConfig, nightBlink);
-        DEBUG_LIGHT("Ustawiono konfiguracje nocna: '%s' => 0x%02X, miganie: %d", nightLightsStr, nightConfig, nightBlink);
-    }
-    
-    if (doc.containsKey("blinkFrequency")) {
-        lightManager.setBlinkFrequency(doc["blinkFrequency"] | oldBlinkFrequency);
-        DEBUG_LIGHT("Ustawiono czestotliwosc migania: %d", (int)doc["blinkFrequency"]);
-    }
-    
-    // Zapisz konfigurację
-    configSuccess = lightManager.saveConfig();
-    DEBUG_LIGHT("Zapis konfiguracji %s", configSuccess ? "powiodl sie" : "nie powiodl sie");
-    
-    // Przygotuj odpowiedź
-    StaticJsonDocument<512> responseDoc;
-    
-    if (configSuccess) {
-        responseDoc["status"] = "ok";
-        responseDoc["message"] = "Konfiguracja zapisana pomyślnie";
-        
-        // Dodaj aktualne ustawienia świateł do odpowiedzi
-        JsonObject lights = responseDoc.createNestedObject("lights");
+        doc["status"] = "ok";
+        JsonObject lights = doc.createNestedObject("lights");
         lights["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
         lights["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
         lights["dayBlink"] = lightManager.getDayBlink();
         lights["nightBlink"] = lightManager.getNightBlink();
         lights["blinkFrequency"] = lightManager.getBlinkFrequency();
         lights["currentMode"] = (int)lightManager.getMode();
+        lights["controlMode"] = (int)lightManager.getControlMode(); // Dodaj informację o trybie sterowania
         
-        // Zastosuj nowe ustawienia natychmiast
-        LightManager::LightMode currentMode = lightManager.getMode();
-        lightManager.setMode(currentMode);  // To wymusi ponowną konfigurację świateł
-    } else {
-        responseDoc["status"] = "error";
-        responseDoc["message"] = "Błąd podczas zapisu konfiguracji świateł";
-    }
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
 
-    if (doc.containsKey("controlMode")) {
-        int controlMode = doc["controlMode"].as<int>();
-        lightManager.setControlMode((LightManager::ControlMode)controlMode);
-        applyBacklightSettings();
-    }
+    // Endpoint POST dla konfiguracji świateł
+    server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Ten handler zostanie wywołany po zakończeniu przetwarzania danych
+    }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        if (index + len != total) {
+            return; // Czekamy na wszystkie dane
+        }
+        
+        DEBUG_LIGHT("Processing request");
+        DEBUG_LIGHT("Content-Type: %s\n", request->contentType().c_str());
+        DEBUG_LIGHT("Data length: %d bytes\n", len);
+        
+        // Zmienna na dane JSON
+        String jsonString;
+        
+        // Określ źródło danych na podstawie Content-Type
+        if (request->contentType() == "application/x-www-form-urlencoded") {
+            // Obsługa form-encoded
+            if (request->hasParam("data", true)) {
+                jsonString = request->getParam("data", true)->value();
+                DEBUG_LIGHT("Form data param: %s\n", jsonString.c_str());
+            } else {
+                DEBUG_LIGHT("Missing data parameter in form data");
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing data parameter\"}");
+                return;
+            }
+        } 
+        else if (request->contentType() == "application/json") {
+            // Obsługa czystego JSON
+            if (len > 0) {
+                data[len] = '\0'; // Dodaj null terminator
+                jsonString = String((char*)data);
+                DEBUG_LIGHT("Direct JSON data: %s\n", jsonString.c_str());
+            } else {
+                DEBUG_LIGHT("Empty JSON data");
+                request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Empty JSON data\"}");
+                return;
+            }
+        }
+        else {
+            // Nieznany format danych
+            DEBUG_LIGHT("Unsupported Content-Type: %s\n", request->contentType().c_str());
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Unsupported content type\"}");
+            return;
+        }
+        
+        // Parsowanie JSON
+        StaticJsonDocument<512> doc;
+        DeserializationError error = deserializeJson(doc, jsonString);
+        
+        if (error) {
+            DEBUG_LIGHT("JSON parsing error: %s\n", error.c_str());
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON format\"}");
+            return;
+        }
+        
+        // Przetwarzanie danych
+        bool configSuccess = false;
+        
+        // Zapisz poprzednie wartości dla porównania
+        uint8_t oldDayConfig = lightManager.getDayConfig();
+        uint8_t oldNightConfig = lightManager.getNightConfig();
+        bool oldDayBlink = lightManager.getDayBlink();
+        bool oldNightBlink = lightManager.getNightBlink();
+        uint16_t oldBlinkFrequency = lightManager.getBlinkFrequency();
+        
+        DEBUG_DETAIL("Aktualna konfiguracja:"); 
+        DEBUG_DETAIL("Konfiguracja dzienna: 0x%02X (%s)", oldDayConfig, lightManager.getConfigString(oldDayConfig).c_str());
+        DEBUG_DETAIL("Konfiguracja nocna: 0x%02X (%s)", oldNightConfig, lightManager.getConfigString(oldNightConfig).c_str());
+        DEBUG_DETAIL("Miganie dzienne: %d", oldDayBlink);
+        DEBUG_DETAIL("Miganie nocne: %d", oldNightBlink);
+        DEBUG_DETAIL("Czestotliwosc migania: %d", oldBlinkFrequency);
+        
+        // Zmień tylko te wartości, które są w żądaniu
+        if (doc.containsKey("dayLights")) {
+            const char* dayLightsStr = doc["dayLights"];
+            uint8_t dayConfig = lightManager.parseConfigString(dayLightsStr);
+            bool dayBlink = doc.containsKey("dayBlink") ? doc["dayBlink"].as<bool>() : oldDayBlink;
+            
+            lightManager.setDayConfig(dayConfig, dayBlink);
+            DEBUG_LIGHT("Ustawiono konfiguracje dzienna: '%s' => 0x%02X, miganie: %d", dayLightsStr, dayConfig, dayBlink);
+        }
+        
+        if (doc.containsKey("nightLights")) {
+            const char* nightLightsStr = doc["nightLights"];
+            uint8_t nightConfig = lightManager.parseConfigString(nightLightsStr);
+            bool nightBlink = doc.containsKey("nightBlink") ? doc["nightBlink"].as<bool>() : oldNightBlink;
+            
+            lightManager.setNightConfig(nightConfig, nightBlink);
+            DEBUG_LIGHT("Ustawiono konfiguracje nocna: '%s' => 0x%02X, miganie: %d", nightLightsStr, nightConfig, nightBlink);
+        }
+        
+        if (doc.containsKey("blinkFrequency")) {
+            lightManager.setBlinkFrequency(doc["blinkFrequency"] | oldBlinkFrequency);
+            DEBUG_LIGHT("Ustawiono czestotliwosc migania: %d", (int)doc["blinkFrequency"]);
+        }
+        
+        // Zapisz konfigurację
+        configSuccess = lightManager.saveConfig();
+        DEBUG_LIGHT("Zapis konfiguracji %s", configSuccess ? "powiodl sie" : "nie powiodl sie");
+        
+        // Przygotuj odpowiedź
+        StaticJsonDocument<512> responseDoc;
+        
+        if (configSuccess) {
+            responseDoc["status"] = "ok";
+            responseDoc["message"] = "Konfiguracja zapisana pomyślnie";
+            
+            // Dodaj aktualne ustawienia świateł do odpowiedzi
+            JsonObject lights = responseDoc.createNestedObject("lights");
+            lights["dayLights"] = lightManager.getConfigString(lightManager.getDayConfig());
+            lights["nightLights"] = lightManager.getConfigString(lightManager.getNightConfig());
+            lights["dayBlink"] = lightManager.getDayBlink();
+            lights["nightBlink"] = lightManager.getNightBlink();
+            lights["blinkFrequency"] = lightManager.getBlinkFrequency();
+            lights["currentMode"] = (int)lightManager.getMode();
+            
+            // Zastosuj nowe ustawienia natychmiast
+            LightManager::LightMode currentMode = lightManager.getMode();
+            lightManager.setMode(currentMode);  // To wymusi ponowną konfigurację świateł
+        } else {
+            responseDoc["status"] = "error";
+            responseDoc["message"] = "Błąd podczas zapisu konfiguracji świateł";
+        }
 
-    String responseStr;
-    serializeJson(responseDoc, responseStr);
-    DEBUG_LIGHT("Wysylam odpowiedz: %s", responseStr.c_str());
-    
-    request->send(200, "application/json", responseStr);
-});
+        if (doc.containsKey("controlMode")) {
+            int controlMode = doc["controlMode"].as<int>();
+            lightManager.setControlMode((LightManager::ControlMode)controlMode);
+            applyBacklightSettings();
+        }
+
+        String responseStr;
+        serializeJson(responseDoc, responseStr);
+        DEBUG_LIGHT("Wysylam odpowiedz: %s", responseStr.c_str());
+        
+        request->send(200, "application/json", responseStr);
+    });
 
     // Dodaj endpoint do testowania konfiguracji
     server.on("/api/lights/debug", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -3345,73 +3307,47 @@ server.on("/api/lights/config", HTTP_POST, [](AsyncWebServerRequest *request) {
             }
     });
     
-    server.on("/api/display/config", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
-        [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-            if (index + len != total) {
-                return; // Czekamy na wszystkie dane
-            }
-
-            // Dodaj null terminator do danych
-            data[len] = '\0';
-            
-            StaticJsonDocument<200> doc;
-            DeserializationError error = deserializeJson(doc, (const char*)data);
-            
-            if (!error) {
-                // Aktualizacja ustawień - zwróć uwagę na obsługę autoMode
-                backlightSettings.Brightness = doc["brightness"] | backlightSettings.Brightness;
-                backlightSettings.dayBrightness = doc["dayBrightness"] | backlightSettings.dayBrightness;
-                backlightSettings.nightBrightness = doc["nightBrightness"] | backlightSettings.nightBrightness;
-                
-                // WAŻNE - sprawdzenie czy autoMode jest w danych
-                if (doc.containsKey("autoMode")) {
-                    backlightSettings.autoMode = doc["autoMode"].as<bool>();
-                    DEBUG_LIGHT("Ustawiono autoMode: %s", backlightSettings.autoMode ? "TAK" : "NIE");
-                }
-                
-                // Zapisz do pliku
-                saveBacklightSettingsToFile();
-                
-                // Zastosuj nowe ustawienia
-                applyBacklightSettings();
-                
-                // Odpowiedz używając send()
-                StaticJsonDocument<200> responseDoc;
-                responseDoc["status"] = "ok";
-                // Dodaj aktualne ustawienia do odpowiedzi
-                responseDoc["brightness"] = backlightSettings.Brightness;
-                responseDoc["dayBrightness"] = backlightSettings.dayBrightness;
-                responseDoc["nightBrightness"] = backlightSettings.nightBrightness;
-                responseDoc["autoMode"] = backlightSettings.autoMode;
-                
-                String response;
-                serializeJson(responseDoc, response);
-                request->send(200, "application/json", response);
-            } else {
-                String response = "{\"status\":\"error\",\"message\":\"Invalid JSON\"}";
-                request->send(400, "application/json", response);
-            }
-        }
-    );
-
-    // Endpoint GET dla konfiguracji podświetlenia
-    server.on("/api/display/config", HTTP_GET, [](AsyncWebServerRequest *request) {
-        StaticJsonDocument<200> doc;
+    server.on("/api/display/config", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // Obsługa POST
+    }, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        StaticJsonDocument<512> doc;
+        DeserializationError error = deserializeJson(doc, data, len);
         
-        doc["brightness"] = backlightSettings.Brightness;
+        if (error) {
+            request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid JSON\"}");
+            return;
+        }
+        
+        // Aktualizacja ustawień podświetlenia
+        backlightSettings.autoMode = doc["autoMode"] | false;
+        backlightSettings.dayBrightness = doc["dayBrightness"] | 100;
+        backlightSettings.nightBrightness = doc["nightBrightness"] | 50;
+        displayBrightness = doc["brightness"] | 70;
+        
+        // Aktualizacja ustawień auto-off
+        if (doc.containsKey("autoOffTime")) {
+            autoOffTime = doc["autoOffTime"] | 0;
+            saveAutoOffSettings();
+        }
+        
+        // Zastosuj ustawienia
+        applyBacklightSettings();
+        saveBacklightSettingsToFile();
+        
+        request->send(200, "application/json", "{\"status\":\"ok\"}");
+    });
+
+    // Endpoint do obsługi konfiguracji wyświetlacza
+    server.on("/api/display/config", HTTP_GET, [](AsyncWebServerRequest *request) {
+        StaticJsonDocument<512> doc;
+        doc["brightness"] = displayBrightness;
         doc["dayBrightness"] = backlightSettings.dayBrightness;
         doc["nightBrightness"] = backlightSettings.nightBrightness;
         doc["autoMode"] = backlightSettings.autoMode;
-        
+        doc["autoOffTime"] = autoOffTime;
+
         String response;
         serializeJson(doc, response);
-        
-        DEBUG_LIGHT("Wysylam ustawienia podswietlenia: brightness=%d, dayBrightness=%d, nightBrightness=%d, autoMode=%d", 
-                backlightSettings.Brightness, 
-                backlightSettings.dayBrightness, 
-                backlightSettings.nightBrightness, 
-                backlightSettings.autoMode ? 1 : 0);
-        
         request->send(200, "application/json", response);
     });
 
